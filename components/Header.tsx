@@ -5,88 +5,177 @@ import { useState } from "react";
 
 export default function Header() {
   const [currency, setCurrency] = useState("GHS");
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-gray-200 bg-white/95 backdrop-blur">
-      <div
-        className="mx-auto flex max-w-7xl items-center justify-between px-5"
-        style={{
-          minHeight: "70px",
-          gap: "15px",
-          flexWrap: "wrap",
-        }}
-      >
-        {/* LOGO */}
-        <Link
-          href="/"
-          style={{
-            fontSize: "22px",
-            fontWeight: 900,
-            color: "#087443",
-            whiteSpace: "nowrap",
-          }}
-        >
-          ALL PROMINENT GHANA
-        </Link>
+    <header className="sticky top-0 z-50 border-b border-gray-200 bg-white shadow-sm">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6">
 
-        {/* NAVIGATION */}
-        <nav
-          className="hidden md:flex"
-          style={{
-            alignItems: "center",
-            gap: "15px",
-            flexWrap: "wrap",
-          }}
-        >
+        <div className="flex min-h-[72px] items-center justify-between gap-4">
+
+          {/* LOGO */}
           <Link
-            href="/listings"
-            className="font-semibold text-gray-700 hover:text-[#087443]"
+            href="/"
+            className="shrink-0"
+            onClick={() => setMenuOpen(false)}
           >
-            Marketplace
+            <div className="text-xl font-black tracking-tight text-[#155EEF] sm:text-2xl">
+              ALL PROMINENT GHANA
+            </div>
+
+            <div className="text-xs font-semibold text-[#667085]">
+              Buy • Sell • Advertise • Connect
+            </div>
           </Link>
 
-          <Link
-            href="/ads"
-            className="font-semibold text-gray-700 hover:text-[#087443]"
-          >
-            Advertise
-          </Link>
+          {/* DESKTOP NAVIGATION */}
+          <nav className="hidden items-center gap-6 lg:flex">
 
-          <Link
-            href="/dashboard"
-            className="font-semibold text-gray-700 hover:text-[#087443]"
-          >
-            My Account
-          </Link>
-        </nav>
+            <Link
+              href="/"
+              className="font-semibold text-[#155EEF] transition hover:text-[#0F4BC9]"
+            >
+              Home
+            </Link>
 
-        {/* CURRENCY + POST */}
-        <div
-          className="flex items-center"
-          style={{
-            gap: "10px",
-          }}
-        >
-          <select
-            value={currency}
-            onChange={(e) => setCurrency(e.target.value)}
-            aria-label="Select currency"
-            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold"
-          >
-            <option value="GHS">GH₵ GHS</option>
-            <option value="USD">$ USD</option>
-            <option value="EUR">€ EUR</option>
-            <option value="GBP">£ GBP</option>
-            <option value="CNY">¥ CNY</option>
-          </select>
+            <Link
+              href="/listings"
+              className="font-semibold text-[#344054] transition hover:text-[#155EEF]"
+            >
+              Marketplace
+            </Link>
 
-          <Link
-            href="/ads/new"
-            className="rounded-lg bg-[#087443] px-4 py-2 font-bold text-white transition hover:bg-[#065c35]"
+            <Link
+              href="/ads"
+              className="font-semibold text-[#344054] transition hover:text-[#155EEF]"
+            >
+              Advertise
+            </Link>
+
+            <Link
+              href="/dashboard"
+              className="font-semibold text-[#344054] transition hover:text-[#155EEF]"
+            >
+              My Account
+            </Link>
+
+          </nav>
+
+          {/* RIGHT SIDE */}
+          <div className="hidden items-center gap-3 sm:flex">
+
+            {/* CURRENCY */}
+            <select
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
+              aria-label="Select currency"
+              className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-bold text-[#344054] outline-none transition focus:border-[#155EEF] focus:ring-2 focus:ring-[#DCEBFF]"
+            >
+              <option value="GHS">GH₵ GHS</option>
+              <option value="USD">$ USD</option>
+              <option value="EUR">€ EUR</option>
+              <option value="GBP">£ GBP</option>
+              <option value="CNY">¥ CNY</option>
+            </select>
+
+            {/* SELL BUTTON */}
+            <Link
+              href="/ads"
+              className="rounded-xl bg-[#155EEF] px-5 py-3 text-sm font-extrabold text-white shadow-md shadow-blue-100 transition hover:bg-[#0F4BC9]"
+            >
+              + Sell an Item
+            </Link>
+
+          </div>
+
+          {/* MOBILE MENU BUTTON */}
+          <button
+            type="button"
+            onClick={() => setMenuOpen(!menuOpen)}
+            aria-label="Open menu"
+            aria-expanded={menuOpen}
+            className="flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 bg-white text-[#155EEF] shadow-sm lg:hidden"
           >
-            + Post Ad
-          </Link>
+            <span className="text-2xl">
+              {menuOpen ? "✕" : "☰"}
+            </span>
+          </button>
+
         </div>
+
+        {/* MOBILE MENU */}
+        {menuOpen && (
+          <div className="border-t border-gray-100 py-4 lg:hidden">
+
+            <nav className="flex flex-col gap-2">
+
+              <Link
+                href="/"
+                onClick={() => setMenuOpen(false)}
+                className="rounded-xl bg-[#DCEBFF] px-4 py-3 font-bold text-[#155EEF]"
+              >
+                🏠 Home
+              </Link>
+
+              <Link
+                href="/listings"
+                onClick={() => setMenuOpen(false)}
+                className="rounded-xl px-4 py-3 font-semibold text-[#344054] hover:bg-[#F5F7FA]"
+              >
+                🛍️ Marketplace
+              </Link>
+
+              <Link
+                href="/ads"
+                onClick={() => setMenuOpen(false)}
+                className="rounded-xl px-4 py-3 font-semibold text-[#344054] hover:bg-[#F5F7FA]"
+              >
+                📢 Advertise
+              </Link>
+
+              <Link
+                href="/dashboard"
+                onClick={() => setMenuOpen(false)}
+                className="rounded-xl px-4 py-3 font-semibold text-[#344054] hover:bg-[#F5F7FA]"
+              >
+                👤 My Account
+              </Link>
+
+              {/* MOBILE CURRENCY */}
+              <div className="mt-2 flex items-center gap-3 rounded-xl bg-[#F5F7FA] p-3">
+
+                <span className="text-sm font-bold text-[#344054]">
+                  Currency
+                </span>
+
+                <select
+                  value={currency}
+                  onChange={(e) => setCurrency(e.target.value)}
+                  className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-bold outline-none"
+                >
+                  <option value="GHS">GH₵ GHS</option>
+                  <option value="USD">$ USD</option>
+                  <option value="EUR">€ EUR</option>
+                  <option value="GBP">£ GBP</option>
+                  <option value="CNY">¥ CNY</option>
+                </select>
+
+              </div>
+
+              {/* MOBILE SELL */}
+              <Link
+                href="/ads"
+                onClick={() => setMenuOpen(false)}
+                className="mt-2 rounded-xl bg-[#155EEF] px-4 py-4 text-center font-extrabold text-white shadow-md"
+              >
+                + Sell an Item
+              </Link>
+
+            </nav>
+
+          </div>
+        )}
+
       </div>
     </header>
   );
