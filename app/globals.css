@@ -1,39 +1,137 @@
-@import "tailwindcss";
+/* ================================
+   POST AN AD PAGE
+================================ */
 
-:root {
-  --background: #ffffff;
-  --foreground: #111827;
+.post-ad-page {
+  min-height: 100vh;
+  background: #f5f7fb;
+  padding: 40px 20px 80px;
 }
 
-* {
+.post-ad-container {
+  width: 100%;
+  max-width: 850px;
+  margin: 0 auto;
+  background: #ffffff;
+  padding: 40px;
+  border-radius: 20px;
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.08);
+}
+
+.post-ad-container h1 {
+  margin: 0 0 10px;
+  font-size: 38px;
+  font-weight: 800;
+  color: #111827;
+}
+
+.post-ad-subtitle {
+  margin: 0 0 35px;
+  color: #64748b;
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+.ad-form {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.ad-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #111827;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.ad-form input,
+.ad-form select,
+.ad-form textarea {
+  width: 100%;
   box-sizing: border-box;
+  padding: 15px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #111827;
+  font-size: 16px;
+  outline: none;
 }
 
-html,
-body {
-  margin: 0;
-  padding: 0;
-  min-height: 100%;
+.ad-form input:focus,
+.ad-form select:focus,
+.ad-form textarea:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+.ad-form textarea {
+  resize: vertical;
+  min-height: 150px;
 }
 
-a {
-  color: inherit;
-  text-decoration: none;
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
 }
 
-button,
-input,
-select,
-textarea {
-  font: inherit;
+.ad-form input[type="file"] {
+  padding: 12px;
+  background: #f8fafc;
 }
 
-button {
+.primary-button {
+  border: none;
+  border-radius: 12px;
+  padding: 17px 24px;
+  background: #2563eb;
+  color: white;
+  font-size: 17px;
+  font-weight: 800;
   cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.primary-button:hover {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+.success-box {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.success-box h2 {
+  color: #15803d;
+  margin-bottom: 12px;
+}
+
+.success-box p {
+  color: #64748b;
+  margin-bottom: 25px;
+}
+
+@media (max-width: 700px) {
+  .post-ad-page {
+    padding: 20px 12px 60px;
+  }
+
+  .post-ad-container {
+    padding: 24px 18px;
+    border-radius: 15px;
+  }
+
+  .post-ad-container h1 {
+    font-size: 30px;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: 22px;
+  }
 }
