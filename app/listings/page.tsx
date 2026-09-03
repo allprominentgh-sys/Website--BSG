@@ -1,272 +1,494 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import Header from "../../components/Header";
 
 type Listing = {
   id: number;
   title: string;
-  description: string | null;
+  description: string;
   price: number;
-  currency_code: string | null;
-  location: string | null;
+  currency: string;
+  location: string;
+  category: string;
+  seller: string;
+  phone: string;
+  image: string;
   featured: boolean;
 };
 
-export default function ListingPage() {
-  const params = useParams();
-  const id = params?.id;
+const listings: Listing[] = [
+  {
+    id: 1,
+    title: "iPhone 15 Pro",
+    description: "Clean and gently used iPhone 15 Pro.",
+    price: 12500,
+    currency: "GHS",
+    location: "Accra, Ghana",
+    category: "Phones & Tablets",
+    seller: "All Prominent Seller",
+    phone: "+233240000000",
+    image: "https://images.unsplash.com/photo-1696446701796-da61225697cc",
+    featured: true,
+  },
+  {
+    id: 2,
+    title: "Toyota Camry",
+    description: "Neat and well-maintained Toyota Camry.",
+    price: 185000,
+    currency: "GHS",
+    location: "Kumasi, Ghana",
+    category: "Cars",
+    seller: "Ghana Auto Seller",
+    phone: "+233240000001",
+    image: "https://images.unsplash.com/photo-1550355291-bbee04a92027",
+    featured: true,
+  },
+  {
+    id: 3,
+    title: "Modern House",
+    description: "Beautiful property available for sale.",
+    price: 850000,
+    currency: "GHS",
+    location: "East Legon, Accra",
+    category: "Property",
+    seller: "Prominent Properties",
+    phone: "+233240000002",
+    image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c",
+    featured: false,
+  },
+  {
+    id: 4,
+    title: "Designer Fashion",
+    description: "Quality fashion items at affordable prices.",
+    price: 850,
+    currency: "GHS",
+    location: "Accra, Ghana",
+    category: "Fashion",
+    seller: "Prominent Fashion",
+    phone: "+233240000003",
+    image: "https://images.unsplash.com/photo-1445205170230-053b83016050",
+    featured: false,
+  },
+];
 
-  const [listing, setListing] = useState<Listing | null>(null);
-  const [loading, setLoading] = useState(true);
+export default function ListingsPage() {
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("All");
 
-  useEffect(() => {
-    // Temporary listing data.
-    // This removes the broken Supabase dependency so the site can build.
-    const demoListings: Listing[] = [
-      {
-        id: 1,
-        title: "iPhone 15 Pro",
-        description:
-          "Clean and fairly used iPhone 15 Pro available in Ghana.",
-        price: 8500,
-        currency_code: "GHS",
-        location: "Accra, Ghana",
-        featured: true,
-      },
-      {
-        id: 2,
-        title: "Toyota Camry",
-        description:
-          "Reliable Toyota Camry available for sale.",
-        price: 180000,
-        currency_code: "GHS",
-        location: "Accra, Ghana",
-        featured: true,
-      },
-      {
-        id: 3,
-        title: "Modern House",
-        description:
-          "Beautiful property available for sale in Ghana.",
-        price: 950000,
-        currency_code: "GHS",
-        location: "East Legon, Accra",
-        featured: false,
-      },
-    ];
+  const categories = [
+    "All",
+    "Phones & Tablets",
+    "Cars",
+    "Property",
+    "Fashion",
+    "Jobs",
+    "Services",
+  ];
 
-    const found = demoListings.find(
-      (item) => String(item.id) === String(id)
-    );
+  const filteredListings = listings.filter((listing) => {
+    const matchesSearch =
+      listing.title.toLowerCase().includes(search.toLowerCase()) ||
+      listing.description.toLowerCase().includes(search.toLowerCase()) ||
+      listing.location.toLowerCase().includes(search.toLowerCase());
 
-    setListing(found || null);
-    setLoading(false);
-  }, [id]);
+    const matchesCategory =
+      category === "All" || listing.category === category;
 
-  if (loading) {
-    return (
-      <main className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-lg text-gray-600">
-          Loading listing...
-        </p>
-      </main>
-    );
-  }
+    return matchesSearch && matchesCategory;
+  });
 
-  if (!listing) {
-    return (
-      <main className="min-h-screen bg-gray-50">
-        <header className="bg-white border-b">
-          <div className="max-w-7xl mx-auto px-6 py-5">
-            <Link
-              href="/"
-              className="text-2xl font-black text-green-700"
-            >
-              ALL PROMINENT GHANA
-            </Link>
-          </div>
-        </header>
+  return (
+    <>
+      <Header />
 
-        <section className="max-w-4xl mx-auto px-6 py-20 text-center">
-          <div className="bg-white rounded-2xl shadow-sm border p-10">
-            <h1 className="text-3xl font-bold text-gray-900 mb-4">
-              Listing not found
-            </h1>
-
-            <p className="text-gray-600 mb-8">
-              The listing you are looking for does not exist.
+      <main className="listings-page">
+        <section className="listings-hero">
+          <div className="container">
+            <h1>Ghana Marketplace</h1>
+            <p>
+              Browse products, cars, property, fashion, jobs and services
+              from sellers across Ghana.
             </p>
 
-            <Link
-              href="/"
-              className="inline-block bg-green-700 text-white px-6 py-3 rounded-lg font-semibold"
-            >
-              Back to Marketplace
-            </Link>
+            <div className="search-box">
+              <input
+                type="text"
+                placeholder="Search products, cars, property, jobs..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+
+              <button type="button">Search</button>
+            </div>
+          </div>
+        </section>
+
+        <section className="container marketplace-section">
+          <div className="marketplace-layout">
+            <aside className="filters">
+              <h2>Categories</h2>
+
+              {categories.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  className={category === item ? "active" : ""}
+                  onClick={() => setCategory(item)}
+                >
+                  {item}
+                </button>
+              ))}
+            </aside>
+
+            <div className="results">
+              <div className="results-header">
+                <div>
+                  <h2>Available Listings</h2>
+                  <p>
+                    {filteredListings.length} listing
+                    {filteredListings.length !== 1 ? "s" : ""} found
+                  </p>
+                </div>
+
+                <Link href="/post-ad" className="post-button">
+                  + Post an Ad
+                </Link>
+              </div>
+
+              {filteredListings.length === 0 ? (
+                <div className="empty-state">
+                  <h3>No listings found</h3>
+                  <p>Try another search or category.</p>
+                </div>
+              ) : (
+                <div className="listing-grid">
+                  {filteredListings.map((listing) => (
+                    <article className="listing-card" key={listing.id}>
+                      <div className="listing-image">
+                        <img
+                          src={listing.image}
+                          alt={listing.title}
+                        />
+
+                        {listing.featured && (
+                          <span className="featured">FEATURED</span>
+                        )}
+                      </div>
+
+                      <div className="listing-content">
+                        <span className="category">
+                          {listing.category}
+                        </span>
+
+                        <h3>{listing.title}</h3>
+
+                        <p className="description">
+                          {listing.description}
+                        </p>
+
+                        <div className="price">
+                          {listing.currency}{" "}
+                          {listing.price.toLocaleString()}
+                        </div>
+
+                        <p className="location">
+                          📍 {listing.location}
+                        </p>
+
+                        <p className="seller">
+                          Seller: {listing.seller}
+                        </p>
+
+                        <div className="card-actions">
+                          <Link
+                            href={`/listings/${listing.id}`}
+                            className="view-button"
+                          >
+                            View Details
+                          </Link>
+
+                          <a
+                            href={`tel:${listing.phone}`}
+                            className="call-button"
+                          >
+                            Call Seller
+                          </a>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </section>
       </main>
-    );
-  }
 
-  const currency = listing.currency_code || "GHS";
+      <style jsx>{`
+        .listings-page {
+          min-height: 100vh;
+          background: #f6f8fb;
+          color: #172033;
+        }
 
-  return (
-    <main className="min-h-screen bg-gray-50">
-      {/* HEADER */}
-      <header className="sticky top-0 z-50 bg-white border-b shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between gap-6">
-          <Link
-            href="/"
-            className="text-xl md:text-2xl font-black text-green-700 whitespace-nowrap"
-          >
-            ALL PROMINENT GHANA
-          </Link>
+        .container {
+          width: 100%;
+          max-width: 1180px;
+          margin: 0 auto;
+          padding-left: 20px;
+          padding-right: 20px;
+        }
 
-          <nav className="hidden md:flex items-center gap-6">
-            <Link
-              href="/"
-              className="text-gray-700 hover:text-green-700 font-medium"
-            >
-              Home
-            </Link>
+        .listings-hero {
+          background: linear-gradient(135deg, #075d37, #087443);
+          color: white;
+          padding: 65px 0;
+        }
 
-            <Link
-              href="/"
-              className="text-gray-700 hover:text-green-700 font-medium"
-            >
-              Marketplace
-            </Link>
+        .listings-hero h1 {
+          margin: 0 0 12px;
+          font-size: 46px;
+          font-weight: 800;
+        }
 
-            <Link
-              href="/"
-              className="text-gray-700 hover:text-green-700 font-medium"
-            >
-              Post an Ad
-            </Link>
-          </nav>
-        </div>
-      </header>
+        .listings-hero p {
+          margin: 0 0 30px;
+          font-size: 20px;
+          line-height: 1.6;
+          max-width: 750px;
+        }
 
-      {/* CONTENT */}
-      <section className="max-w-6xl mx-auto px-6 py-10">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-2 text-green-700 font-semibold mb-8"
-        >
-          ← Back to Marketplace
-        </Link>
+        .search-box {
+          display: flex;
+          gap: 12px;
+          max-width: 900px;
+        }
 
-        <div className="grid md:grid-cols-2 gap-8">
-          {/* IMAGE PLACEHOLDER */}
-          <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
-            <div className="aspect-square bg-gray-100 flex items-center justify-center">
-              <div className="text-center px-6">
-                <div className="text-7xl mb-4">🛍️</div>
+        .search-box input {
+          flex: 1;
+          min-width: 0;
+          padding: 18px 20px;
+          border: none;
+          border-radius: 12px;
+          font-size: 17px;
+          outline: none;
+        }
 
-                <p className="text-gray-500">
-                  Product image
-                </p>
-              </div>
-            </div>
-          </div>
+        .search-box button {
+          border: none;
+          border-radius: 12px;
+          padding: 0 30px;
+          background: #f5b700;
+          color: #172033;
+          font-size: 17px;
+          font-weight: 700;
+          cursor: pointer;
+        }
 
-          {/* LISTING DETAILS */}
-          <div className="bg-white rounded-2xl border shadow-sm p-8">
-            {listing.featured && (
-              <span className="inline-block bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-bold mb-4">
-                FEATURED
-              </span>
-            )}
+        .marketplace-section {
+          padding-top: 45px;
+          padding-bottom: 70px;
+        }
 
-            <h1 className="text-3xl md:text-4xl font-black text-gray-900 mb-5">
-              {listing.title}
-            </h1>
+        .marketplace-layout {
+          display: grid;
+          grid-template-columns: 220px 1fr;
+          gap: 30px;
+        }
 
-            <div className="text-3xl font-black text-green-700 mb-6">
-              {currency}{" "}
-              {listing.price.toLocaleString()}
-            </div>
+        .filters {
+          background: white;
+          padding: 22px;
+          border-radius: 16px;
+          height: fit-content;
+          box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05);
+        }
 
-            <div className="border-t border-b py-5 mb-6">
-              <div className="mb-4">
-                <p className="text-sm text-gray-500">
-                  Location
-                </p>
+        .filters h2 {
+          margin: 0 0 15px;
+          font-size: 20px;
+        }
 
-                <p className="font-semibold text-gray-900">
-                  📍 {listing.location || "Ghana"}
-                </p>
-              </div>
+        .filters button {
+          display: block;
+          width: 100%;
+          padding: 12px 10px;
+          margin-bottom: 7px;
+          border: none;
+          border-radius: 8px;
+          background: transparent;
+          text-align: left;
+          cursor: pointer;
+          font-size: 15px;
+        }
 
-              <div>
-                <p className="text-sm text-gray-500">
-                  Listing ID
-                </p>
+        .filters button:hover,
+        .filters button.active {
+          background: #087443;
+          color: white;
+        }
 
-                <p className="font-semibold text-gray-900">
-                  #{listing.id}
-                </p>
-              </div>
-            </div>
+        .results-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 20px;
+          margin-bottom: 25px;
+        }
 
-            <h2 className="text-xl font-bold text-gray-900 mb-3">
-              Description
-            </h2>
+        .results-header h2 {
+          margin: 0 0 5px;
+          font-size: 30px;
+        }
 
-            <p className="text-gray-600 leading-7 mb-8">
-              {listing.description ||
-                "No description has been provided for this listing."}
-            </p>
+        .results-header p {
+          margin: 0;
+          color: #667085;
+        }
 
-            <div className="grid gap-3">
-              <button
-                type="button"
-                className="w-full bg-green-700 hover:bg-green-800 text-white py-4 rounded-xl font-bold text-lg"
-                onClick={() => {
-                  alert(
-                    "Seller contact feature will be connected next."
-                  );
-                }}
-              >
-                Contact Seller
-              </button>
+        .post-button {
+          background: #087443;
+          color: white;
+          text-decoration: none;
+          padding: 13px 20px;
+          border-radius: 10px;
+          font-weight: 700;
+        }
 
-              <button
-                type="button"
-                className="w-full border-2 border-green-700 text-green-700 hover:bg-green-50 py-4 rounded-xl font-bold"
-                onClick={() => {
-                  alert(
-                    "Save listing feature will be connected next."
-                  );
-                }}
-              >
-                ♡ Save Listing
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
+        .listing-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 22px;
+        }
 
-      {/* FOOTER */}
-      <footer className="mt-16 bg-gray-900 text-white">
-        <div className="max-w-7xl mx-auto px-6 py-10">
-          <h2 className="text-xl font-bold mb-2">
-            ALL PROMINENT GHANA
-          </h2>
+        .listing-card {
+          background: white;
+          border-radius: 16px;
+          overflow: hidden;
+          box-shadow: 0 5px 20px rgba(0, 0, 0, 0.06);
+        }
 
-          <p className="text-gray-400">
-            Buy • Sell • Advertise • Connect
-          </p>
+        .listing-image {
+          position: relative;
+          height: 220px;
+          background: #e9edf2;
+        }
 
-          <p className="text-gray-500 text-sm mt-6">
-            © {new Date().getFullYear()} All Prominent Ghana.
-            All rights reserved.
-          </p>
-        </div>
-      </footer>
-    </main>
+        .listing-image img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+        }
+
+        .featured {
+          position: absolute;
+          top: 12px;
+          left: 12px;
+          background: #f5b700;
+          color: #172033;
+          padding: 6px 10px;
+          border-radius: 6px;
+          font-size: 11px;
+          font-weight: 800;
+        }
+
+        .listing-content {
+          padding: 20px;
+        }
+
+        .category {
+          color: #087443;
+          font-size: 13px;
+          font-weight: 700;
+        }
+
+        .listing-content h3 {
+          margin: 8px 0;
+          font-size: 22px;
+        }
+
+        .description {
+          color: #667085;
+          min-height: 45px;
+          line-height: 1.5;
+        }
+
+        .price {
+          margin-top: 15px;
+          font-size: 23px;
+          font-weight: 800;
+          color: #087443;
+        }
+
+        .location,
+        .seller {
+          color: #667085;
+          font-size: 14px;
+        }
+
+        .card-actions {
+          display: flex;
+          gap: 10px;
+          margin-top: 18px;
+        }
+
+        .view-button,
+        .call-button {
+          flex: 1;
+          text-align: center;
+          text-decoration: none;
+          padding: 11px;
+          border-radius: 9px;
+          font-weight: 700;
+        }
+
+        .view-button {
+          background: #087443;
+          color: white;
+        }
+
+        .call-button {
+          border: 1px solid #087443;
+          color: #087443;
+        }
+
+        .empty-state {
+          background: white;
+          padding: 50px;
+          border-radius: 16px;
+          text-align: center;
+        }
+
+        @media (max-width: 800px) {
+          .marketplace-layout {
+            grid-template-columns: 1fr;
+          }
+
+          .listing-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .results-header {
+            align-items: flex-start;
+            flex-direction: column;
+          }
+
+          .listings-hero h1 {
+            font-size: 36px;
+          }
+
+          .search-box {
+            flex-direction: column;
+          }
+
+          .search-box button {
+            padding: 15px;
+          }
+        }
+      `}</style>
+    </>
   );
 }
