@@ -136,7 +136,7 @@ export default function ListingDetailsPage() {
 
           .box a {
             display: inline-block;
-            background: #087443;
+            background: #1557c0;
             color: white;
             padding: 15px 25px;
             border-radius: 10px;
@@ -254,7 +254,7 @@ export default function ListingDetailsPage() {
 
         .back {
           display: inline-block;
-          color: #087443;
+          color: #1557c0;
           text-decoration: none;
           font-weight: 700;
           margin-bottom: 25px;
@@ -287,7 +287,7 @@ export default function ListingDetailsPage() {
         }
 
         .category {
-          color: #087443;
+          color: #1557c0;
           font-weight: 800;
           font-size: 14px;
           text-transform: uppercase;
@@ -300,7 +300,7 @@ export default function ListingDetailsPage() {
         }
 
         .price {
-          color: #087443;
+          color: #1557c0;
           font-size: 30px;
           font-weight: 800;
           margin: 15px 0;
@@ -356,7 +356,7 @@ export default function ListingDetailsPage() {
         }
 
         .call {
-          background: #087443;
+          background: #1557c0;
           color: white;
         }
 
