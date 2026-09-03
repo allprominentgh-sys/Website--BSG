@@ -1,4 +1,18 @@
-# All Prominent Ghana
-Stable Next.js marketplace foundation. Run `npm install`, then `npm run dev`.
-Includes responsive Royal Blue/Sky Blue design, homepage, marketplace search/filter, 21 marketplace categories with subcategories, listing details, Post an Ad, Account and Contact pages.
-This is a clean baseline intended to prevent accidental overwrites. Database, authentication, image storage, payments, maps and admin features should be added in separate stages.
+# All Prominent Ghana — Clean Marketplace Foundation
+
+This package is the clean replacement for the current GitHub project. It keeps the marketplace pages and category structure while fixing the Next.js/Tailwind build configuration and duplicate root files.
+
+## Main routes
+- `/` — marketplace home
+- `/listings` — marketplace listings
+- `/listings/[id]` — product details
+- `/post-ad` — post an ad
+- `/account` — account
+
+## Categories
+Industrial Machinery, Printing Equipment, Construction Equipment, Vehicles & Transportation, Electrical & Electronics, Agriculture & Food, Tools & Hardware, Building Materials, Home & Furniture, Apparel & Textiles, Beauty & Personal Care, Sports & Entertainment, Packaging & Printing, Chemicals, Energy & Renewable Energy, Consumer Electronics, Phones & Tablets, Cars & Auto Parts, Property, Jobs and Services.
+
+## Build
+Run `npm install` then `npm run build`.
+
+Tailwind CSS v4 is configured through `@tailwindcss/postcss`; do not remove that dependency or the `postcss.config.mjs` file.
