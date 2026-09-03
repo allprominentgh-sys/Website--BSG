@@ -14,17 +14,16 @@ export default function Header() {
     <header className={styles.header}>
       <div className={styles.headerInner}>
 
-        {/* LOGO */}
         <Link href="/" className={styles.logo} onClick={closeMenu}>
           <div className={styles.logoTitle}>
             ALL PROMINENT GHANA
           </div>
+
           <div className={styles.logoTagline}>
             Buy • Sell • Advertise • Connect
           </div>
         </Link>
 
-        {/* DESKTOP NAVIGATION */}
         <nav className={styles.desktopNav}>
           <Link href="/" className={styles.activeLink}>
             Home
@@ -43,14 +42,12 @@ export default function Header() {
           </Link>
         </nav>
 
-        {/* DESKTOP RIGHT SIDE */}
         <div className={styles.desktopRight}>
-
           <select
             value={currency}
             onChange={(e) => setCurrency(e.target.value)}
-            aria-label="Select currency"
             className={styles.currency}
+            aria-label="Select currency"
           >
             <option value="GHS">GH₵ GHS</option>
             <option value="USD">$ USD</option>
@@ -64,7 +61,6 @@ export default function Header() {
           </Link>
         </div>
 
-        {/* MOBILE BUTTON */}
         <button
           type="button"
           onClick={() => setMenuOpen(!menuOpen)}
@@ -76,7 +72,6 @@ export default function Header() {
         </button>
       </div>
 
-      {/* MOBILE MENU */}
       {menuOpen && (
         <div className={styles.mobileMenu}>
 
