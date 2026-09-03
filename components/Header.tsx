@@ -46,14 +46,14 @@ export default function Header() {
             </Link>
 
             <Link
-              href="/ads"
+              href="/post-ad"
               className="font-semibold text-[#344054] transition hover:text-[#155EEF]"
             >
               Advertise
             </Link>
 
             <Link
-              href="/dashboard"
+              href="/account"
               className="font-semibold text-[#344054] transition hover:text-[#155EEF]"
             >
               My Account
@@ -80,7 +80,7 @@ export default function Header() {
 
             {/* SELL BUTTON */}
             <Link
-              href="/ads"
+              href="/post-ad"
               className="rounded-xl bg-[#155EEF] px-5 py-3 text-sm font-extrabold text-white shadow-md shadow-blue-100 transition hover:bg-[#0F4BC9]"
             >
               + Sell an Item
@@ -126,7 +126,7 @@ export default function Header() {
               </Link>
 
               <Link
-                href="/ads"
+                href="/post-ad"
                 onClick={() => setMenuOpen(false)}
                 className="rounded-xl px-4 py-3 font-semibold text-[#344054] hover:bg-[#F5F7FA]"
               >
@@ -134,7 +134,7 @@ export default function Header() {
               </Link>
 
               <Link
-                href="/dashboard"
+                href="/account"
                 onClick={() => setMenuOpen(false)}
                 className="rounded-xl px-4 py-3 font-semibold text-[#344054] hover:bg-[#F5F7FA]"
               >
@@ -164,7 +164,7 @@ export default function Header() {
 
               {/* MOBILE SELL */}
               <Link
-                href="/ads"
+                href="/post-ad"
                 onClick={() => setMenuOpen(false)}
                 className="mt-2 rounded-xl bg-[#155EEF] px-4 py-4 text-center font-extrabold text-white shadow-md"
               >
