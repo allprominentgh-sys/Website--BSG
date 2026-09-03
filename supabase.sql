@@ -4,7 +4,7 @@ create table if not exists public.currencies(code text primary key,name text not
 insert into public.currencies(code,name,symbol) values ('GHS','Ghana Cedi','GH₵'),('USD','US Dollar','$'),('EUR','Euro','€'),('GBP','British Pound','£'),('CNY','Chinese Yuan','¥') on conflict do nothing;
 create table if not exists public.profiles(id uuid primary key references auth.users(id) on delete cascade,full_name text,phone text,location text,avatar_url text,verified boolean default false,created_at timestamptz default now());
 create table if not exists public.categories(id bigint generated always as identity primary key,name text unique not null);
-create table if not exists public.listings(id bigint generated always as identity primary key,seller_id uuid references auth.users(id) on delete cascade,category_id bigint references public.categories(id),title text not null,description text,price numeric(14,2) not null,currency_code text references public.currencies(code) default 'GHS',location text,status text default 'active',featured boolean default false,created_at timestamptz default now());
+create table if not exists public.listings(id bigint generated always as identity primary key,seller_id uuid references auth.users(id) on delete cascade,category_id bigint references public.categories(id),title text not null,description text,price numeric(14,2) not null,currency_code text references public.currencies(code) default 'GHS',location text,subcategory text,seller_name text,seller_phone text,status text default 'active',featured boolean default false,created_at timestamptz default now());
 create table if not exists public.listing_images(id bigint generated always as identity primary key,listing_id bigint references public.listings(id) on delete cascade,image_url text not null);
 create table if not exists public.listing_videos(id bigint generated always as identity primary key,listing_id bigint references public.listings(id) on delete cascade,video_url text not null,thumbnail_url text,created_at timestamptz default now());
 create table if not exists public.stores(id bigint generated always as identity primary key,owner_id uuid references auth.users(id) on delete cascade,name text not null,description text,logo_url text,verified boolean default false,created_at timestamptz default now());
@@ -25,3 +25,29 @@ create policy "favorites own" on public.favorites for all to authenticated using
 create policy "reviews public read" on public.reviews for select using(true); create policy "reviewer insert" on public.reviews for insert to authenticated with check(auth.uid()=reviewer_id);
 create policy "active ads public read" on public.video_ads for select using(status='active'); create policy "advertiser manage own ads" on public.video_ads for all to authenticated using(auth.uid()=advertiser_id) with check(auth.uid()=advertiser_id);
 create policy "ad events insert" on public.ad_events for insert with check(auth.uid()=viewer_id or viewer_id is null); create policy "ad events advertiser read" on public.ad_events for select to authenticated using(exists(select 1 from public.video_ads a where a.id=ad_id and a.advertiser_id=auth.uid()));
+
+
+-- Marketplace image storage for /post-ad
+alter table public.listings add column if not exists subcategory text;
+alter table public.listings add column if not exists seller_name text;
+alter table public.listings add column if not exists seller_phone text;
+
+insert into storage.buckets (id, name, public)
+values ('listing-images', 'listing-images', true)
+on conflict (id) do update set public = true;
+
+create policy "listing images public read" on storage.objects
+for select using (bucket_id = 'listing-images');
+
+create policy "users upload listing images" on storage.objects
+for insert to authenticated
+with check (bucket_id = 'listing-images' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "users update listing images" on storage.objects
+for update to authenticated
+using (bucket_id = 'listing-images' and (storage.foldername(name))[1] = auth.uid()::text)
+with check (bucket_id = 'listing-images' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "users delete listing images" on storage.objects
+for delete to authenticated
+using (bucket_id = 'listing-images' and (storage.foldername(name))[1] = auth.uid()::text);
