@@ -5,46 +5,35 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://prominent.mkt"),
 
   title: {
-    default: "All Prominent Ghana | Buy, Sell & Advertise",
+    default: "All Prominent Ghana",
     template: "%s | All Prominent Ghana",
   },
 
   description:
-    "All Prominent Ghana is a Ghanaian marketplace to buy, sell, advertise and connect. Discover vehicles, machinery, electronics, agriculture equipment, tools, property and more.",
+    "All Prominent Ghana is a Ghanaian marketplace for buying, selling, advertising and connecting businesses and customers.",
 
   keywords: [
-    "All Prominent Ghana",
     "Ghana marketplace",
     "buy and sell Ghana",
-    "Ghana classifieds",
-    "vehicles Ghana",
+    "Ghana business marketplace",
     "industrial machinery Ghana",
+    "vehicles Ghana",
     "electronics Ghana",
     "agriculture equipment Ghana",
-    "advertise Ghana",
-    "online marketplace Ghana",
+    "printing equipment Ghana",
+    "tools Ghana",
+    "All Prominent Ghana",
   ],
 
-  authors: [{ name: "All Prominent Ghana" }],
+  authors: [
+    {
+      name: "All Prominent Ghana",
+    },
+  ],
+
   creator: "All Prominent Ghana",
+
   publisher: "All Prominent Ghana",
-
-  openGraph: {
-    type: "website",
-    locale: "en_GH",
-    url: "https://prominent.mkt",
-    siteName: "All Prominent Ghana",
-    title: "All Prominent Ghana | Buy, Sell & Advertise",
-    description:
-      "Buy, sell, advertise and connect across Ghana with All Prominent Ghana.",
-  },
-
-  twitter: {
-    card: "summary_large_image",
-    title: "All Prominent Ghana | Buy, Sell & Advertise",
-    description:
-      "Buy, sell, advertise and connect across Ghana.",
-  },
 
   robots: {
     index: true,
@@ -52,7 +41,27 @@ export const metadata: Metadata = {
     googleBot: {
       index: true,
       follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
     },
+  },
+
+  openGraph: {
+    type: "website",
+    locale: "en_GH",
+    url: "https://prominent.mkt",
+    siteName: "All Prominent Ghana",
+    title: "All Prominent Ghana",
+    description:
+      "Buy, sell, advertise and connect across Ghana.",
+  },
+
+  twitter: {
+    card: "summary_large_image",
+    title: "All Prominent Ghana",
+    description:
+      "Buy, sell, advertise and connect across Ghana.",
   },
 };
 
@@ -63,24 +72,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en-GH">
-      <head>
-        <meta
-          name="viewport"
-          content="width=device-width, initial-scale=1, maximum-scale=5"
-        />
-        <meta name="theme-color" content="#155EEF" />
-        <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta
-          name="apple-mobile-web-app-status-bar-style"
-          content="default"
-        />
-        <meta
-          name="apple-mobile-web-app-title"
-          content="All Prominent Ghana"
-        />
-      </head>
-
       <body>{children}</body>
     </html>
   );
