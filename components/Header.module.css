@@ -1,0 +1,276 @@
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  width: 100%;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+}
+
+.headerInner {
+  width: 100%;
+  max-width: 1280px;
+  min-height: 76px;
+  margin: 0 auto;
+  padding: 0 24px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 25px;
+}
+
+.logo {
+  flex-shrink: 0;
+  text-decoration: none;
+}
+
+.logoTitle {
+  color: #155eef;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  line-height: 1.15;
+}
+
+.logoTagline {
+  margin-top: 4px;
+  color: #667085;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.desktopNav {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  margin-left: auto;
+}
+
+.desktopNav a {
+  text-decoration: none;
+  font-size: 15px;
+  font-weight: 700;
+  transition: 0.2s ease;
+}
+
+.activeLink {
+  color: #155eef;
+}
+
+.navLink {
+  color: #344054;
+}
+
+.navLink:hover,
+.activeLink:hover {
+  color: #0f4bc9;
+}
+
+.desktopRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.currency {
+  height: 44px;
+  padding: 0 12px;
+  border: 1px solid #d0d5dd;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #344054;
+  font-size: 14px;
+  font-weight: 700;
+  outline: none;
+}
+
+.currency:focus {
+  border-color: #155eef;
+  box-shadow: 0 0 0 3px rgba(21, 94, 239, 0.12);
+}
+
+.sellButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  min-height: 44px;
+  padding: 0 20px;
+
+  border-radius: 10px;
+  background: #155eef;
+  color: #ffffff;
+
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 800;
+
+  box-shadow: 0 4px 10px rgba(21, 94, 239, 0.18);
+  transition: 0.2s ease;
+}
+
+.sellButton:hover {
+  background: #0f4bc9;
+  transform: translateY(-1px);
+}
+
+.menuButton {
+  display: none;
+
+  width: 46px;
+  height: 46px;
+
+  border: 1px solid #d0d5dd;
+  border-radius: 10px;
+
+  background: #ffffff;
+  color: #155eef;
+
+  font-size: 25px;
+  cursor: pointer;
+}
+
+.mobileMenu {
+  display: none;
+}
+
+/* =========================
+   MOBILE
+========================= */
+
+@media (max-width: 900px) {
+
+  .headerInner {
+    min-height: 68px;
+    padding: 0 16px;
+  }
+
+  .desktopNav,
+  .desktopRight {
+    display: none;
+  }
+
+  .menuButton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .logoTitle {
+    font-size: 19px;
+  }
+
+  .logoTagline {
+    font-size: 11px;
+  }
+
+  .mobileMenu {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    padding: 14px 16px 18px;
+
+    border-top: 1px solid #f0f2f5;
+    background: #ffffff;
+  }
+
+  .mobileLink {
+    display: block;
+
+    padding: 14px 16px;
+
+    border-radius: 10px;
+
+    color: #344054;
+    text-decoration: none;
+
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  .mobileLink:hover {
+    background: #f5f7fa;
+  }
+
+  .mobileActive {
+    background: #dcebff;
+    color: #155eef;
+  }
+
+  .mobileCurrency {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    margin-top: 5px;
+    padding: 12px;
+
+    border-radius: 10px;
+    background: #f5f7fa;
+
+    color: #344054;
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .mobileSelect {
+    flex: 1;
+
+    min-width: 0;
+    padding: 10px;
+
+    border: 1px solid #d0d5dd;
+    border-radius: 8px;
+
+    background: #ffffff;
+    color: #344054;
+
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .mobileSell {
+    display: block;
+
+    margin-top: 5px;
+    padding: 15px;
+
+    border-radius: 10px;
+
+    background: #155eef;
+    color: #ffffff;
+
+    text-align: center;
+    text-decoration: none;
+
+    font-size: 16px;
+    font-weight: 800;
+  }
+
+  .mobileSell:hover {
+    background: #0f4bc9;
+  }
+}
+
+@media (max-width: 480px) {
+
+  .headerInner {
+    padding: 0 12px;
+  }
+
+  .logoTitle {
+    font-size: 17px;
+  }
+
+  .logoTagline {
+    font-size: 10px;
+  }
+
+  .menuButton {
+    width: 42px;
+    height: 42px;
+  }
+}
