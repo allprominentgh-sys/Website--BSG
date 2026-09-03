@@ -376,7 +376,7 @@ export default function HomePage() {
             </Link>
 
             <Link
-              href="/post"
+              href="/post-ad"
               className="rounded-2xl bg-sky-400 px-8 py-5 text-center text-xl font-bold text-slate-900 shadow-lg transition hover:scale-[1.02]"
             >
               Post an Ad
@@ -488,7 +488,7 @@ export default function HomePage() {
 
             <div className="mt-5">
               <Link
-                href="/post"
+                href="/post-ad"
                 className="text-lg font-semibold text-blue-700 hover:underline"
               >
                 + Post an Ad
