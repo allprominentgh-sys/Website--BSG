@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import Header from "../Header";
 
 export const metadata: Metadata = {
   title: "All Prominent Ghana",
   description:
-    "All Prominent Ghana marketplace for industrial machinery, printing equipment, vehicles, electronics, agriculture, tools and more.",
+    "All Prominent Ghana marketplace for buying and selling products and services.",
 };
 
 export default function RootLayout({
@@ -14,7 +15,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <Header />
+        {children}
+      </body>
     </html>
   );
 }
