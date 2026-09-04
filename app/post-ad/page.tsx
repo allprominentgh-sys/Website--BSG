@@ -17,8 +17,10 @@ export default function PostAdPage() {
   const [subcategory, setSubcategory] = useState("");
   const [image, setImage] = useState<File | null>(null);
 
-  const subcategories =
-    categories.find((item) => item.name === category)?.subcategories ?? [];
+  const selectedCategory = categories.find(
+    (item) => item.name.trim().toLowerCase() === category.trim().toLowerCase()
+  );
+  const subcategories = selectedCategory?.subcategories ?? [];
 
   const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] ?? null;
@@ -147,9 +149,20 @@ export default function PostAdPage() {
 
               <label>
                 Subcategory
-                <select name="subcategory" value={subcategory} onChange={(e) => setSubcategory(e.target.value)} disabled={!category}>
-                  <option value="">Select subcategory</option>
-                  {subcategories.map((item) => <option key={item} value={item}>{item}</option>)}
+                <select
+                  name="subcategory"
+                  value={subcategory}
+                  onChange={(e) => setSubcategory(e.target.value)}
+                  disabled={!selectedCategory}
+                >
+                  <option value="">
+                    {selectedCategory ? "Select subcategory" : "Select category first"}
+                  </option>
+                  {subcategories.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
                 </select>
               </label>
 
