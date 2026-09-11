@@ -1,235 +1,413 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState } from "react";
+import Link from "next/link";
 
-const products = [
+type Listing = {
+  id: number;
+  title: string;
+  description: string;
+  price: number;
+  location: string;
+  category: string;
+  seller: string;
+  image: string;
+  verified?: boolean;
+  featured?: boolean;
+};
+
+const listings: Listing[] = [
   {
     id: 1,
     title: "iPhone 15 Pro",
-    price: "GH₵12,500",
-    location: "Accra",
+    description: "Clean and gently used iPhone 15 Pro.",
+    price: 12500,
+    location: "Accra, Ghana",
     category: "Phones & Tablets",
-    image:
-      "https://images.unsplash.com/photo-1696446701796-da61225697cc?auto=format&fit=crop&w=800&q=80",
+    seller: "All Prominent Seller",
+    image: "📱",
+    verified: true,
+    featured: true,
   },
   {
     id: 2,
-    title: "Toyota Camry",
-    price: "GH₵185,000",
-    location: "Kumasi",
+    title: "Toyota Corolla",
+    description: "Reliable Toyota Corolla in good condition.",
+    price: 185000,
+    location: "Kumasi, Ghana",
     category: "Cars & Vehicles",
-    image:
-      "https://images.unsplash.com/photo-1621007947382-bb3c3994e3fb?auto=format&fit=crop&w=800&q=80",
+    seller: "Ghana Auto Hub",
+    image: "🚗",
+    verified: true,
+    featured: true,
   },
   {
     id: 3,
     title: "3 Bedroom House",
-    price: "GH₵950,000",
-    location: "East Legon",
+    description: "Modern 3 bedroom property available for sale.",
+    price: 950000,
+    location: "East Legon, Accra",
     category: "Property",
-    image:
-      "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80",
+    seller: "Prime Properties GH",
+    image: "🏠",
+    verified: true,
   },
   {
     id: 4,
-    title: "Premium Laptop",
-    price: "GH₵8,500",
-    location: "Tema",
+    title: "Business Laptop",
+    description: "High-performance laptop for business and school.",
+    price: 8500,
+    location: "Tema, Ghana",
     category: "Electronics",
-    image:
-      "https://images.unsplash.com/photo-1496181133206-80ce9b88a853?auto=format&fit=crop&w=800&q=80",
+    seller: "Tech World Ghana",
+    image: "💻",
+    verified: true,
   },
   {
     id: 5,
-    title: "Designer Sneakers",
-    price: "GH₵1,200",
-    location: "Accra",
+    title: "Men's Fashion Collection",
+    description: "Quality shirts, trousers and accessories.",
+    price: 450,
+    location: "Accra, Ghana",
     category: "Fashion",
-    image:
-      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+    seller: "Prominent Fashion",
+    image: "👕",
+    verified: true,
   },
   {
     id: 6,
-    title: "Modern Sofa",
-    price: "GH₵6,500",
-    location: "Tema",
-    category: "Home & Garden",
-    image:
-      "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?auto=format&fit=crop&w=800&q=80",
+    title: "Agricultural Equipment",
+    description: "Farm equipment available for businesses and farmers.",
+    price: 18500,
+    location: "Tamale, Ghana",
+    category: "Agriculture",
+    seller: "Agri Solutions GH",
+    image: "🌾",
+    verified: true,
+  },
+  {
+    id: 7,
+    title: "Professional Plumbing Service",
+    description: "Professional plumbing services across Accra.",
+    price: 300,
+    location: "Accra, Ghana",
+    category: "Jobs & Services",
+    seller: "Pro Services GH",
+    image: "🛠️",
+    verified: true,
+  },
+  {
+    id: 8,
+    title: "Office Space",
+    description: "Modern commercial office space available.",
+    price: 6500,
+    location: "Airport, Accra",
+    category: "Business",
+    seller: "Business Properties GH",
+    image: "🏢",
+    verified: true,
   },
 ];
 
 const categories = [
-  "All",
+  "All Categories",
   "Phones & Tablets",
   "Cars & Vehicles",
   "Property",
   "Electronics",
   "Fashion",
-  "Home & Garden",
+  "Jobs & Services",
+  "Agriculture",
+  "Business",
 ];
 
-export default function Marketplace() {
+export default function MarketplacePage() {
   const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("All");
+  const [category, setCategory] = useState("All Categories");
+  const [location, setLocation] = useState("All Ghana");
 
-  const filteredProducts = useMemo(() => {
-    return products.filter((product) => {
+  const filteredListings = useMemo(() => {
+    return listings.filter((item) => {
       const matchesSearch =
-        product.title.toLowerCase().includes(search.toLowerCase()) ||
-        product.category.toLowerCase().includes(search.toLowerCase()) ||
-        product.location.toLowerCase().includes(search.toLowerCase());
+        item.title.toLowerCase().includes(search.toLowerCase()) ||
+        item.description.toLowerCase().includes(search.toLowerCase()) ||
+        item.category.toLowerCase().includes(search.toLowerCase());
 
       const matchesCategory =
-        category === "All" || product.category === category;
+        category === "All Categories" ||
+        item.category === category;
 
-      return matchesSearch && matchesCategory;
+      const matchesLocation =
+        location === "All Ghana" ||
+        item.location.toLowerCase().includes(location.toLowerCase());
+
+      return matchesSearch && matchesCategory && matchesLocation;
     });
-  }, [search, category]);
+  }, [search, category, location]);
 
   return (
-    <main className="min-h-screen bg-slate-50">
+    <main className="site">
 
       {/* HEADER */}
-      <header className="border-b bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
+      <header className="header">
+        <div className="container header-inner">
 
-          <Link href="/" className="font-extrabold text-blue-700">
+          <Link href="/" className="logo">
             ALL PROMINENT GHANA
+            <span>Buy • Sell • Advertise • Connect</span>
           </Link>
 
-          <div className="flex gap-4">
-            <Link href="/" className="font-semibold">
-              Home
-            </Link>
+          <nav className="desktop-nav">
+            <Link href="/">Home</Link>
+            <Link href="/listings">Marketplace</Link>
+            <Link href="/post-ad">Sell</Link>
+            <Link href="/account">My Account</Link>
+          </nav>
 
-            <Link
-              href="/post-ad"
-              className="rounded-xl bg-blue-600 px-4 py-2 font-bold text-white"
-            >
-              + Sell
-            </Link>
-          </div>
+          <Link href="/account" className="signin">
+            Sign In
+          </Link>
 
         </div>
       </header>
 
-      {/* TITLE */}
-      <section className="bg-gradient-to-r from-blue-700 to-sky-500 px-4 py-12">
-        <div className="mx-auto max-w-7xl text-white">
+      {/* MARKETPLACE HERO */}
+      <section className="marketplace-hero">
+        <div className="container">
 
-          <p className="font-bold text-blue-100">
-            ALL PROMINENT MARKETPLACE
-          </p>
+          <div className="marketplace-heading">
+            <span>ALL PROMINENT MARKETPLACE</span>
 
-          <h1 className="mt-2 text-4xl font-extrabold md:text-5xl">
-            Find what you need.
-          </h1>
+            <h1>
+              Find what you need.
+              <br />
+              Sell what you have.
+            </h1>
 
-          <p className="mt-3 text-blue-50">
-            Buy and sell products, vehicles, property and services.
-          </p>
-
-        </div>
-      </section>
-
-      {/* SEARCH + FILTER */}
-      <section className="mx-auto max-w-7xl px-4 py-8">
-
-        <div className="flex flex-col gap-3 md:flex-row">
-
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search marketplace..."
-            className="flex-1 rounded-xl border bg-white px-5 py-4 outline-none focus:border-blue-500"
-          />
-
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className="rounded-xl border bg-white px-5 py-4 outline-none"
-          >
-            {categories.map((item) => (
-              <option key={item}>{item}</option>
-            ))}
-          </select>
-
-        </div>
-
-        {/* RESULTS */}
-        <div className="mt-8 flex items-center justify-between">
-
-          <h2 className="text-2xl font-extrabold">
-            Marketplace
-          </h2>
-
-          <span className="text-sm text-slate-500">
-            {filteredProducts.length} listings
-          </span>
-
-        </div>
-
-        <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-
-          {filteredProducts.map((product) => (
-            <Link
-              href={`/listings/${product.id}`}
-              key={product.id}
-              className="overflow-hidden rounded-2xl border bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
-            >
-
-              <div className="aspect-[4/3] overflow-hidden">
-                <img
-                  src={product.image}
-                  alt={product.title}
-                  className="h-full w-full object-cover"
-                />
-              </div>
-
-              <div className="p-5">
-
-                <p className="text-xs font-bold uppercase text-blue-600">
-                  {product.category}
-                </p>
-
-                <h3 className="mt-2 text-xl font-bold">
-                  {product.title}
-                </h3>
-
-                <p className="mt-3 text-2xl font-extrabold">
-                  {product.price}
-                </p>
-
-                <p className="mt-2 text-sm text-slate-500">
-                  📍 {product.location}, Ghana
-                </p>
-
-                <div className="mt-4 border-t pt-4 text-sm font-semibold text-blue-600">
-                  ✓ Verified Seller
-                </div>
-
-              </div>
-
-            </Link>
-          ))}
-
-        </div>
-
-        {filteredProducts.length === 0 && (
-          <div className="mt-10 rounded-2xl border border-dashed bg-white p-12 text-center">
-            <div className="text-4xl">🔎</div>
-            <h3 className="mt-3 text-xl font-bold">
-              No listings found
-            </h3>
-            <p className="mt-2 text-slate-500">
-              Try another search or category.
+            <p>
+              Shop products, vehicles, property, services and business
+              opportunities from sellers across Ghana.
             </p>
           </div>
-        )}
 
+          {/* SEARCH */}
+          <div className="marketplace-search">
+
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search products, cars, property, services..."
+            />
+
+            <select
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+            >
+              <option>All Ghana</option>
+              <option>Accra</option>
+              <option>Kumasi</option>
+              <option>Tema</option>
+              <option>Tamale</option>
+            </select>
+
+            <button type="button">
+              Search
+            </button>
+
+          </div>
+
+        </div>
       </section>
+
+      {/* MARKETPLACE BODY */}
+      <section className="marketplace-section">
+        <div className="container marketplace-layout">
+
+          {/* SIDEBAR */}
+          <aside className="marketplace-sidebar">
+
+            <div className="filter-box">
+
+              <h3>Categories</h3>
+
+              <div className="category-filter">
+
+                {categories.map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    className={
+                      category === item
+                        ? "active-filter"
+                        : ""
+                    }
+                    onClick={() => setCategory(item)}
+                  >
+                    {item}
+                  </button>
+                ))}
+
+              </div>
+
+            </div>
+
+            <Link
+              href="/post-ad"
+              className="sell-box"
+            >
+              <span>SELL ON ALL PROMINENT</span>
+              <strong>+ Post an Ad</strong>
+              <p>
+                Reach customers across Ghana.
+              </p>
+            </Link>
+
+          </aside>
+
+          {/* PRODUCTS */}
+          <div className="marketplace-results">
+
+            <div className="results-header">
+
+              <div>
+                <span>MARKETPLACE</span>
+                <h2>
+                  {category === "All Categories"
+                    ? "All Listings"
+                    : category}
+                </h2>
+              </div>
+
+              <div className="results-count">
+                {filteredListings.length} listings
+              </div>
+
+            </div>
+
+            {filteredListings.length === 0 ? (
+
+              <div className="empty-results">
+                <div>🔎</div>
+
+                <h3>
+                  No listings found
+                </h3>
+
+                <p>
+                  Try another search or category.
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearch("");
+                    setCategory("All Categories");
+                    setLocation("All Ghana");
+                  }}
+                >
+                  Clear filters
+                </button>
+              </div>
+
+            ) : (
+
+              <div className="marketplace-grid">
+
+                {filteredListings.map((item) => (
+
+                  <Link
+                    href={`/listings/${item.id}`}
+                    className="marketplace-card"
+                    key={item.id}
+                  >
+
+                    <div className="marketplace-image">
+
+                      {item.featured && (
+                        <span className="featured-badge">
+                          TOP AD
+                        </span>
+                      )}
+
+                      <span>
+                        {item.image}
+                      </span>
+
+                    </div>
+
+                    <div className="marketplace-card-body">
+
+                      <div className="card-category">
+                        {item.category}
+                      </div>
+
+                      <h3>
+                        {item.title}
+                      </h3>
+
+                      <strong className="card-price">
+                        GH₵{" "}
+                        {item.price.toLocaleString()}
+                      </strong>
+
+                      <p className="card-description">
+                        {item.description}
+                      </p>
+
+                      <div className="card-location">
+                        📍 {item.location}
+                      </div>
+
+                      <div className="card-seller">
+
+                        <span>
+                          {item.seller}
+                        </span>
+
+                        {item.verified && (
+                          <span className="verified">
+                            ✓ Verified
+                          </span>
+                        )}
+
+                      </div>
+
+                    </div>
+
+                  </Link>
+
+                ))}
+
+              </div>
+
+            )}
+
+          </div>
+
+        </div>
+      </section>
+
+      {/* FOOTER */}
+      <footer className="footer">
+        <div className="container footer-inner">
+
+          <div>
+            <strong>ALL PROMINENT GHANA</strong>
+            <p>
+              Buy • Sell • Advertise • Connect
+            </p>
+          </div>
+
+          <div className="footer-links">
+            <Link href="/">Home</Link>
+            <Link href="/listings">Marketplace</Link>
+            <Link href="/post-ad">Sell an Item</Link>
+            <Link href="/account">My Account</Link>
+          </div>
+
+        </div>
+      </footer>
 
     </main>
   );
