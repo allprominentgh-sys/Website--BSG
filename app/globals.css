@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+by@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
 
 :root {
   --blue: #1769e0;
@@ -747,5 +747,292 @@ select {
 
   .hero h1 {
     font-size: 55px;
+  }
+}
+/* =========================================
+   ACCOUNT / LOGIN PAGE
+   ALL PROMINENT GHANA
+   ========================================= */
+
+.account-page {
+  min-height: 100vh;
+  background: #f5f9ff;
+  color: #14213d;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Header */
+
+.account-header {
+  background: #ffffff;
+  border-bottom: 1px solid #dbe7f5;
+  padding: 22px 6%;
+}
+
+.account-header .brand {
+  color: #1264d8;
+  font-size: 28px;
+  font-weight: 800;
+  text-decoration: none;
+  letter-spacing: -0.5px;
+}
+
+.account-header p {
+  margin: 5px 0 0;
+  color: #64748b;
+  font-size: 16px;
+}
+
+/* Login area */
+
+.login-card {
+  width: min(520px, 92%);
+  margin: 55px auto;
+  background: #ffffff;
+  padding: 42px;
+  border-radius: 24px;
+  border: 1px solid #dce8f6;
+  box-shadow: 0 15px 45px rgba(15, 72, 130, 0.10);
+}
+
+.login-icon {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: #e7f2ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  margin-bottom: 20px;
+}
+
+.login-card h1 {
+  margin: 0;
+  font-size: 44px;
+  line-height: 1.05;
+  letter-spacing: -1.5px;
+}
+
+.login-subtitle {
+  color: #64748b;
+  font-size: 18px;
+  line-height: 1.5;
+  margin: 14px 0 30px;
+}
+
+/* Google and Apple */
+
+.social-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.social-button {
+  height: 56px;
+  border: 1px solid #cbd8e8;
+  background: #ffffff;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #14213d;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.social-button span {
+  margin-right: 8px;
+  font-weight: 900;
+}
+
+.social-button:hover {
+  border-color: #1264d8;
+  background: #f5f9ff;
+}
+
+/* Divider */
+
+.or-divider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 28px 0;
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.or-divider::before,
+.or-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #dbe5f0;
+}
+
+/* Phone */
+
+.login-card label {
+  display: block;
+  margin-bottom: 9px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.phone-box {
+  display: flex;
+  align-items: center;
+  height: 56px;
+  border: 1px solid #cbd8e8;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.phone-box span {
+  padding: 0 15px;
+  color: #14213d;
+  font-weight: 700;
+  border-right: 1px solid #dbe5f0;
+}
+
+.phone-box input {
+  flex: 1;
+  height: 100%;
+  border: none;
+  outline: none;
+  padding: 0 15px;
+  font-size: 16px;
+  color: #14213d;
+}
+
+.phone-box input::placeholder {
+  color: #a3afbf;
+}
+
+/* Continue button */
+
+.phone-button {
+  width: 100%;
+  height: 56px;
+  margin-top: 14px;
+  border: none;
+  border-radius: 12px;
+  background: #1264d8;
+  color: #ffffff;
+  font-size: 17px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.phone-button:hover {
+  background: #0b4fae;
+}
+
+/* Signup */
+
+.signup {
+  text-align: center;
+  margin-top: 28px;
+}
+
+.signup p {
+  margin: 0 0 8px;
+  color: #64748b;
+}
+
+.signup a {
+  color: #1264d8;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+/* Bottom information */
+
+.account-bottom {
+  background: linear-gradient(135deg, #0758c9, #27b6e8);
+  color: #ffffff;
+  padding: 55px 6%;
+  text-align: center;
+}
+
+.account-bottom h2 {
+  margin: 0 0 12px;
+  font-size: 30px;
+}
+
+.account-bottom p {
+  max-width: 700px;
+  margin: auto;
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+/* =========================================
+   TABLET
+   ========================================= */
+
+@media (max-width: 768px) {
+  .account-header {
+    padding: 18px 5%;
+  }
+
+  .account-header .brand {
+    font-size: 23px;
+  }
+
+  .login-card {
+    margin: 35px auto;
+    padding: 30px;
+  }
+
+  .login-card h1 {
+    font-size: 38px;
+  }
+}
+
+/* =========================================
+   PHONE
+   ========================================= */
+
+@media (max-width: 520px) {
+  .account-header .brand {
+    font-size: 21px;
+  }
+
+  .account-header p {
+    font-size: 14px;
+  }
+
+  .login-card {
+    width: 92%;
+    padding: 25px 20px;
+    margin: 25px auto;
+    border-radius: 18px;
+  }
+
+  .login-card h1 {
+    font-size: 34px;
+  }
+
+  .login-subtitle {
+    font-size: 16px;
+  }
+
+  .social-buttons {
+    grid-template-columns: 1fr;
+  }
+
+  .social-button {
+    width: 100%;
+  }
+
+  .account-bottom {
+    padding: 40px 20px;
+  }
+
+  .account-bottom h2 {
+    font-size: 24px;
   }
 }
