@@ -1,7 +1,7 @@
-use client";
+"use client";
 
-import { useState } from "react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import Header from "../../components/Header";
 
 type Listing = {
@@ -22,470 +22,380 @@ const listings: Listing[] = [
   {
     id: 1,
     title: "iPhone 15 Pro",
-    description: "Clean and gently used iPhone 15 Pro.",
+    description:
+      "Clean and gently used iPhone 15 Pro in excellent condition.",
     price: 12500,
     currency: "GHS",
     location: "Accra, Ghana",
     category: "Phones & Tablets",
     seller: "All Prominent Seller",
     phone: "+233240000000",
-    image: "https://images.unsplash.com/photo-1696446701796-da61225697cc",
+    image:
+      "https://images.unsplash.com/photo-1696446701796-da61225697cc?auto=format&fit=crop&w=1200&q=80",
     featured: true,
   },
   {
     id: 2,
     title: "Toyota Camry",
-    description: "Neat and well-maintained Toyota Camry.",
+    description:
+      "Neat and well-maintained Toyota Camry available for sale.",
     price: 185000,
     currency: "GHS",
     location: "Kumasi, Ghana",
     category: "Cars",
     seller: "Ghana Auto Seller",
     phone: "+233240000001",
-    image: "https://images.unsplash.com/photo-1550355291-bbee04a92027",
+    image:
+      "https://images.unsplash.com/photo-1621007947382-bb3c3994e3fb?auto=format&fit=crop&w=1200&q=80",
     featured: true,
   },
   {
     id: 3,
-    title: "Modern House",
-    description: "Beautiful property available for sale.",
-    price: 850000,
+    title: "Modern 3 Bedroom House",
+    description:
+      "Beautiful modern house in a good residential location.",
+    price: 950000,
     currency: "GHS",
     location: "East Legon, Accra",
     category: "Property",
     seller: "Prominent Properties",
     phone: "+233240000002",
-    image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c",
+    image:
+      "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80",
     featured: false,
   },
   {
     id: 4,
-    title: "Designer Fashion",
-    description: "Quality fashion items at affordable prices.",
-    price: 850,
+    title: "Samsung 55-inch Smart TV",
+    description:
+      "Samsung Smart TV with excellent picture quality.",
+    price: 8500,
     currency: "GHS",
     location: "Accra, Ghana",
-    category: "Fashion",
-    seller: "Prominent Fashion",
+    category: "Electronics",
+    seller: "Tech Ghana",
     phone: "+233240000003",
-    image: "https://images.unsplash.com/photo-1445205170230-053b83016050",
+    image:
+      "https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?auto=format&fit=crop&w=1200&q=80",
     featured: false,
   },
 ];
 
-export default function ListingsPage() {
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("All");
+export default function ListingDetailsPage() {
+  const params = useParams();
 
-  const categories = [
-    "All",
-    "Phones & Tablets",
-    "Cars",
-    "Property",
-    "Fashion",
-    "Jobs",
-    "Services",
-  ];
+  const id = Number(params.id);
 
-  const filteredListings = listings.filter((listing) => {
-    const matchesSearch =
-      listing.title.toLowerCase().includes(search.toLowerCase()) ||
-      listing.description.toLowerCase().includes(search.toLowerCase()) ||
-      listing.location.toLowerCase().includes(search.toLowerCase());
+  const listing = listings.find((item) => item.id === id);
 
-    const matchesCategory =
-      category === "All" || listing.category === category;
+  if (!listing) {
+    return (
+      <>
+        <Header />
 
-    return matchesSearch && matchesCategory;
-  });
+        <main className="details-page">
+          <div className="container">
+            <div className="not-found">
+              <h1>Listing Not Found</h1>
+              <p>
+                Sorry, the product or property you are looking for
+                could not be found.
+              </p>
+
+              <Link href="/listings" className="back-button">
+                ← Back to Marketplace
+              </Link>
+            </div>
+          </div>
+        </main>
+
+        <style jsx>{`
+          .details-page {
+            min-height: 100vh;
+            background: #f6f8fb;
+            padding: 60px 0;
+          }
+
+          .container {
+            width: 100%;
+            max-width: 1180px;
+            margin: 0 auto;
+            padding: 0 20px;
+          }
+
+          .not-found {
+            background: white;
+            border-radius: 20px;
+            padding: 60px 30px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+          }
+
+          .not-found h1 {
+            margin-bottom: 12px;
+          }
+
+          .not-found p {
+            color: #667085;
+            margin-bottom: 25px;
+          }
+
+          .back-button {
+            display: inline-block;
+            padding: 13px 20px;
+            border-radius: 10px;
+            background: #172033;
+            color: white;
+            text-decoration: none;
+            font-weight: 700;
+          }
+        `}</style>
+      </>
+    );
+  }
 
   return (
     <>
       <Header />
 
-      <main className="listings-page">
-        <section className="listings-hero">
-          <div className="container">
-            <h1>Ghana Marketplace</h1>
-            <p>
-              Browse products, cars, property, fashion, jobs and services
-              from sellers across Ghana.
-            </p>
+      <main className="details-page">
+        <div className="container">
 
-            <div className="search-box">
-              <input
-                type="text"
-                placeholder="Search products, cars, property, jobs..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+          <Link href="/listings" className="back-link">
+            ← Back to Marketplace
+          </Link>
+
+          <div className="details-card">
+
+            <div className="image-section">
+              <img
+                src={listing.image}
+                alt={listing.title}
               />
 
-              <button type="button">Search</button>
-            </div>
-          </div>
-        </section>
-
-        <section className="container marketplace-section">
-          <div className="marketplace-layout">
-            <aside className="filters">
-              <h2>Categories</h2>
-
-              {categories.map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  className={category === item ? "active" : ""}
-                  onClick={() => setCategory(item)}
-                >
-                  {item}
-                </button>
-              ))}
-            </aside>
-
-            <div className="results">
-              <div className="results-header">
-                <div>
-                  <h2>Available Listings</h2>
-                  <p>
-                    {filteredListings.length} listing
-                    {filteredListings.length !== 1 ? "s" : ""} found
-                  </p>
-                </div>
-
-                <Link href="/post-ad" className="post-button">
-                  + Post an Ad
-                </Link>
-              </div>
-
-              {filteredListings.length === 0 ? (
-                <div className="empty-state">
-                  <h3>No listings found</h3>
-                  <p>Try another search or category.</p>
-                </div>
-              ) : (
-                <div className="listing-grid">
-                  {filteredListings.map((listing) => (
-                    <article className="listing-card" key={listing.id}>
-                      <div className="listing-image">
-                        <img
-                          src={listing.image}
-                          alt={listing.title}
-                        />
-
-                        {listing.featured && (
-                          <span className="featured">FEATURED</span>
-                        )}
-                      </div>
-
-                      <div className="listing-content">
-                        <span className="category">
-                          {listing.category}
-                        </span>
-
-                        <h3>{listing.title}</h3>
-
-                        <p className="description">
-                          {listing.description}
-                        </p>
-
-                        <div className="price">
-                          {listing.currency}{" "}
-                          {listing.price.toLocaleString()}
-                        </div>
-
-                        <p className="location">
-                          📍 {listing.location}
-                        </p>
-
-                        <p className="seller">
-                          Seller: {listing.seller}
-                        </p>
-
-                        <div className="card-actions">
-                          <Link
-                            href={`/listings/${listing.id}`}
-                            className="view-button"
-                          >
-                            View Details
-                          </Link>
-
-                          <a
-                            href={`tel:${listing.phone}`}
-                            className="call-button"
-                          >
-                            Call Seller
-                          </a>
-                        </div>
-                      </div>
-                    </article>
-                  ))}
-                </div>
+              {listing.featured && (
+                <span className="featured">
+                  Featured
+                </span>
               )}
             </div>
+
+            <div className="details-section">
+
+              <span className="category">
+                {listing.category}
+              </span>
+
+              <h1>{listing.title}</h1>
+
+              <div className="price">
+                {listing.currency}{" "}
+                {listing.price.toLocaleString()}
+              </div>
+
+              <p className="description">
+                {listing.description}
+              </p>
+
+              <div className="info">
+                <div>
+                  <strong>Location</strong>
+                  <span>{listing.location}</span>
+                </div>
+
+                <div>
+                  <strong>Seller</strong>
+                  <span>{listing.seller}</span>
+                </div>
+
+                <div>
+                  <strong>Category</strong>
+                  <span>{listing.category}</span>
+                </div>
+              </div>
+
+              <div className="actions">
+
+                <a
+                  href={`tel:${listing.phone}`}
+                  className="call-button"
+                >
+                  📞 Call Seller
+                </a>
+
+                <a
+                  href={`https://wa.me/${listing.phone.replace(
+                    /[^0-9]/g,
+                    ""
+                  )}`}
+                  className="whatsapp-button"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  💬 WhatsApp Seller
+                </a>
+
+              </div>
+
+            </div>
           </div>
-        </section>
+        </div>
       </main>
 
       <style jsx>{`
-        .listings-page {
+        .details-page {
           min-height: 100vh;
           background: #f6f8fb;
-          color: #172033;
+          padding: 40px 0 80px;
         }
 
         .container {
           width: 100%;
           max-width: 1180px;
           margin: 0 auto;
-          padding-left: 20px;
-          padding-right: 20px;
+          padding: 0 20px;
         }
 
-        .listings-hero {
-          background: linear-gradient(135deg, #075d37, #087443);
-          color: white;
-          padding: 65px 0;
-        }
-
-        .listings-hero h1 {
-          margin: 0 0 12px;
-          font-size: 46px;
-          font-weight: 800;
-        }
-
-        .listings-hero p {
-          margin: 0 0 30px;
-          font-size: 20px;
-          line-height: 1.6;
-          max-width: 750px;
-        }
-
-        .search-box {
-          display: flex;
-          gap: 12px;
-          max-width: 900px;
-        }
-
-        .search-box input {
-          flex: 1;
-          min-width: 0;
-          padding: 18px 20px;
-          border: none;
-          border-radius: 12px;
-          font-size: 17px;
-          outline: none;
-        }
-
-        .search-box button {
-          border: none;
-          border-radius: 12px;
-          padding: 0 30px;
-          background: #f5b700;
-          color: #172033;
-          font-size: 17px;
-          font-weight: 700;
-          cursor: pointer;
-        }
-
-        .marketplace-section {
-          padding-top: 45px;
-          padding-bottom: 70px;
-        }
-
-        .marketplace-layout {
-          display: grid;
-          grid-template-columns: 220px 1fr;
-          gap: 30px;
-        }
-
-        .filters {
-          background: white;
-          padding: 22px;
-          border-radius: 16px;
-          height: fit-content;
-          box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05);
-        }
-
-        .filters h2 {
-          margin: 0 0 15px;
-          font-size: 20px;
-        }
-
-        .filters button {
-          display: block;
-          width: 100%;
-          padding: 12px 10px;
-          margin-bottom: 7px;
-          border: none;
-          border-radius: 8px;
-          background: transparent;
-          text-align: left;
-          cursor: pointer;
-          font-size: 15px;
-        }
-
-        .filters button:hover,
-        .filters button.active {
-          background: #087443;
-          color: white;
-        }
-
-        .results-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 20px;
+        .back-link {
+          display: inline-block;
           margin-bottom: 25px;
-        }
-
-        .results-header h2 {
-          margin: 0 0 5px;
-          font-size: 30px;
-        }
-
-        .results-header p {
-          margin: 0;
-          color: #667085;
-        }
-
-        .post-button {
-          background: #087443;
-          color: white;
-          text-decoration: none;
-          padding: 13px 20px;
-          border-radius: 10px;
+          color: #172033;
           font-weight: 700;
+          text-decoration: none;
         }
 
-        .listing-grid {
+        .details-card {
           display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 22px;
-        }
-
-        .listing-card {
+          grid-template-columns: 1.1fr 1fr;
+          gap: 40px;
           background: white;
-          border-radius: 16px;
-          overflow: hidden;
-          box-shadow: 0 5px 20px rgba(0, 0, 0, 0.06);
+          border-radius: 24px;
+          padding: 25px;
+          box-shadow: 0 12px 35px rgba(0, 0, 0, 0.08);
         }
 
-        .listing-image {
+        .image-section {
           position: relative;
-          height: 220px;
-          background: #e9edf2;
         }
 
-        .listing-image img {
+        .image-section img {
           width: 100%;
-          height: 100%;
+          height: 520px;
           object-fit: cover;
+          border-radius: 18px;
           display: block;
         }
 
         .featured {
           position: absolute;
-          top: 12px;
-          left: 12px;
-          background: #f5b700;
-          color: #172033;
-          padding: 6px 10px;
-          border-radius: 6px;
-          font-size: 11px;
+          top: 18px;
+          left: 18px;
+          background: #ff7a00;
+          color: white;
+          padding: 8px 13px;
+          border-radius: 20px;
+          font-size: 13px;
           font-weight: 800;
         }
 
-        .listing-content {
-          padding: 20px;
+        .details-section {
+          padding: 20px 10px;
         }
 
         .category {
-          color: #087443;
+          display: inline-block;
+          background: #eef2ff;
+          color: #3843d0;
+          padding: 7px 12px;
+          border-radius: 20px;
           font-size: 13px;
           font-weight: 700;
+          margin-bottom: 18px;
         }
 
-        .listing-content h3 {
-          margin: 8px 0;
-          font-size: 22px;
+        h1 {
+          font-size: 38px;
+          line-height: 1.15;
+          margin: 0 0 18px;
+          color: #172033;
+        }
+
+        .price {
+          font-size: 30px;
+          font-weight: 900;
+          color: #0f7b45;
+          margin-bottom: 20px;
         }
 
         .description {
           color: #667085;
-          min-height: 45px;
-          line-height: 1.5;
+          line-height: 1.7;
+          font-size: 16px;
+          margin-bottom: 30px;
         }
 
-        .price {
-          margin-top: 15px;
-          font-size: 23px;
-          font-weight: 800;
-          color: #087443;
+        .info {
+          border-top: 1px solid #e5e7eb;
+          border-bottom: 1px solid #e5e7eb;
+          padding: 20px 0;
+          display: grid;
+          gap: 18px;
         }
 
-        .location,
-        .seller {
-          color: #667085;
-          font-size: 14px;
-        }
-
-        .card-actions {
+        .info div {
           display: flex;
-          gap: 10px;
-          margin-top: 18px;
+          flex-direction: column;
+          gap: 5px;
         }
 
-        .view-button,
-        .call-button {
-          flex: 1;
+        .info strong {
+          color: #172033;
+        }
+
+        .info span {
+          color: #667085;
+        }
+
+        .actions {
+          display: grid;
+          gap: 12px;
+          margin-top: 30px;
+        }
+
+        .actions a {
           text-align: center;
+          padding: 15px 20px;
+          border-radius: 12px;
           text-decoration: none;
-          padding: 11px;
-          border-radius: 9px;
-          font-weight: 700;
+          font-weight: 800;
         }
 
-        .view-button {
-          background: #087443;
+        .call-button {
+          background: #172033;
           color: white;
         }
 
-        .call-button {
-          border: 1px solid #087443;
-          color: #087443;
-        }
-
-        .empty-state {
-          background: white;
-          padding: 50px;
-          border-radius: 16px;
-          text-align: center;
+        .whatsapp-button {
+          background: #20b15a;
+          color: white;
         }
 
         @media (max-width: 800px) {
-          .marketplace-layout {
+          .details-card {
             grid-template-columns: 1fr;
-          }
-
-          .listing-grid {
-            grid-template-columns: 1fr;
-          }
-
-          .results-header {
-            align-items: flex-start;
-            flex-direction: column;
-          }
-
-          .listings-hero h1 {
-            font-size: 36px;
-          }
-
-          .search-box {
-            flex-direction: column;
-          }
-
-          .search-box button {
             padding: 15px;
+          }
+
+          .image-section img {
+            height: 350px;
+          }
+
+          h1 {
+            font-size: 30px;
+          }
+
+          .details-section {
+            padding: 10px;
           }
         }
       `}</style>
