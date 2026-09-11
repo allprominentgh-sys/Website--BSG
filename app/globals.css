@@ -1010,3 +1010,85 @@ button {
     font-size: 43px;
   }
 }
+
+/* =========================
+   HOME PAGE — CLEAN RESPONSIVE LAYOUT
+========================= */
+.home-page { background: #f6f8fb; overflow-x: hidden; }
+.home-page .container { width: min(1180px, calc(100% - 32px)); }
+.home-hero { background: linear-gradient(135deg, #155eef 0%, #0879ce 58%, #38bdf8 100%); color: #fff; padding: 64px 0; }
+.home-hero-inner { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(280px, .65fr); gap: 42px; align-items: center; }
+.hero-kicker, .section-kicker { display: block; font-size: 12px; font-weight: 900; letter-spacing: 1.4px; }
+.hero-copy h1 { margin: 12px 0 18px; max-width: 760px; font-size: clamp(42px, 6vw, 72px); line-height: .98; letter-spacing: -2.5px; }
+.hero-copy p { max-width: 680px; margin: 0; font-size: 18px; line-height: 1.6; opacity: .95; }
+.hero-search { display: flex; align-items: center; gap: 10px; max-width: 720px; margin-top: 30px; padding: 7px 8px 7px 16px; background: #fff; border-radius: 14px; box-shadow: 0 12px 35px rgba(0,0,0,.16); }
+.hero-search span { color: #667085; font-size: 26px; line-height: 1; }
+.hero-search input { flex: 1; min-width: 0; border: 0; outline: 0; padding: 12px 4px; color: #172033; background: transparent; }
+.hero-search button { border: 0; border-radius: 10px; padding: 13px 20px; background: #155eef; color: #fff; font-weight: 900; }
+.hero-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 18px; }
+.button-primary, .button-secondary { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 20px; border-radius: 11px; text-decoration: none; font-weight: 900; }
+.button-primary { background: #155eef; color: #fff; }
+.home-hero .button-primary { background: #fff; color: #155eef; }
+.button-secondary { background: #e8f1ff; color: #155eef; }
+.home-hero .button-secondary { background: rgba(255,255,255,.15); color: #fff; border: 1px solid rgba(255,255,255,.45); }
+.hero-panel { padding: 28px; border: 1px solid rgba(255,255,255,.25); border-radius: 22px; background: rgba(255,255,255,.12); backdrop-filter: blur(8px); }
+.hero-panel-badge { font-size: 12px; font-weight: 900; letter-spacing: 1px; }
+.hero-panel h2 { margin: 14px 0 8px; font-size: 30px; }
+.hero-panel p { margin: 0; line-height: 1.55; opacity: .92; }
+.hero-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 28px; }
+.hero-stats div { padding: 12px 8px; border-radius: 12px; background: rgba(255,255,255,.12); text-align: center; }
+.hero-stats strong, .hero-stats span { display: block; }
+.hero-stats strong { font-size: 17px; }
+.hero-stats span { margin-top: 3px; font-size: 11px; opacity: .85; }
+.category-section, .marketplace-home-section { padding: 54px 0; }
+.marketplace-home-section { padding-top: 12px; }
+.section-heading { display: flex; justify-content: space-between; align-items: end; gap: 18px; margin-bottom: 22px; }
+.section-heading h2 { margin: 5px 0 0; font-size: clamp(28px, 4vw, 40px); letter-spacing: -1px; }
+.section-heading a { color: #155eef; font-weight: 900; text-decoration: none; white-space: nowrap; }
+.category-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; }
+.category-card { min-width: 0; min-height: 112px; padding: 18px; border: 1px solid #e2e8f0; border-radius: 16px; background: #fff; color: #172033; text-align: left; font-weight: 900; box-shadow: 0 4px 16px rgba(15,23,42,.04); }
+.category-card:hover, .category-card.active { border-color: #155eef; box-shadow: 0 8px 22px rgba(21,94,239,.12); }
+.category-icon { display: block; margin-bottom: 12px; font-size: 28px; }
+.subcategory-panel { margin-top: 14px; padding: 18px; border: 1px solid #e2e8f0; border-radius: 16px; background: #fff; }
+.subcategory-title { font-weight: 900; margin-bottom: 12px; }
+.subcategory-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.subcategory-list button { border: 1px solid #d0d5dd; border-radius: 999px; padding: 8px 12px; background: #fff; font-weight: 700; }
+.subcategory-list button.selected { border-color: #155eef; background: #eef4ff; color: #155eef; }
+.home-listing-grid { grid-template-columns: repeat(4, minmax(0,1fr)); margin-top: 0; }
+.listing-image-link { display: block; text-decoration: none; }
+.listing-category { display: inline-block; color: #155eef; font-size: 12px; font-weight: 900; }
+.listing-location { margin: 7px 0 0 !important; font-size: 13px; }
+.listing-bottom { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 16px; }
+.listing-bottom strong { color: #155eef; font-size: 18px; }
+.listing-bottom a { color: #172033; text-decoration: none; font-weight: 900; }
+.sell-cta { padding: 26px 0 70px; }
+.sell-cta-inner { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding: 34px; border-radius: 22px; background: #eaf2ff; border: 1px solid #cfe0ff; }
+.sell-cta h2 { margin: 7px 0; font-size: 32px; }
+.sell-cta p { margin: 0; max-width: 700px; color: #667085; line-height: 1.55; }
+@media (max-width: 1000px) {
+  .home-hero-inner { grid-template-columns: 1fr; }
+  .hero-panel { display: none; }
+  .category-grid, .home-listing-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+}
+@media (max-width: 620px) {
+  .home-page .container { width: min(100% - 24px, 1180px); }
+  .home-hero { padding: 42px 0; }
+  .hero-copy h1 { font-size: 43px; letter-spacing: -1.7px; }
+  .hero-copy p { font-size: 16px; }
+  .hero-search { margin-top: 22px; }
+  .hero-search button { padding: 12px 14px; }
+  .hero-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .button-primary, .button-secondary { width: 100%; padding: 0 12px; }
+  .category-grid { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 9px; }
+  .category-card { min-height: 100px; padding: 14px; font-size: 14px; }
+  .category-icon { font-size: 24px; }
+  .section-heading { align-items: start; }
+  .section-heading a { font-size: 13px; }
+  .home-listing-grid { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+  .listing-image { height: 150px; }
+  .card-content { padding: 12px; }
+  .card-content h3 { font-size: 16px; margin: 6px 0; }
+  .listing-bottom { align-items: flex-start; flex-direction: column; }
+  .listing-bottom strong { font-size: 15px; }
+  .sell-cta-inner { align-items: stretch; flex-direction: column; padding: 24px; }
+}
