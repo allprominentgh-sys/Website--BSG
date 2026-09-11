@@ -2,403 +2,228 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import Header from "../../components/Header";
 
-type Listing = {
-  id: number;
-  title: string;
-  description: string;
-  price: number;
-  currency: string;
-  location: string;
-  category: string;
-  seller: string;
-  phone: string;
-  image: string;
-  featured: boolean;
-};
-
-const listings: Listing[] = [
+const products = [
   {
-    id: 1,
+    id: "1",
     title: "iPhone 15 Pro",
-    description:
-      "Clean and gently used iPhone 15 Pro in excellent condition.",
-    price: 12500,
-    currency: "GHS",
+    price: "GH₵12,500",
     location: "Accra, Ghana",
     category: "Phones & Tablets",
-    seller: "All Prominent Seller",
-    phone: "+233240000000",
+    description:
+      "Premium smartphone offered by a verified seller. Contact the seller for availability, specifications and delivery arrangements.",
     image:
       "https://images.unsplash.com/photo-1696446701796-da61225697cc?auto=format&fit=crop&w=1200&q=80",
-    featured: true,
+    seller: "All Prominent Seller",
   },
   {
-    id: 2,
+    id: "2",
     title: "Toyota Camry",
-    description:
-      "Neat and well-maintained Toyota Camry available for sale.",
-    price: 185000,
-    currency: "GHS",
+    price: "GH₵185,000",
     location: "Kumasi, Ghana",
-    category: "Cars",
-    seller: "Ghana Auto Seller",
-    phone: "+233240000001",
+    category: "Cars & Vehicles",
+    description:
+      "Well-presented Toyota Camry available from a verified seller in Ghana.",
     image:
       "https://images.unsplash.com/photo-1621007947382-bb3c3994e3fb?auto=format&fit=crop&w=1200&q=80",
-    featured: true,
+    seller: "Ghana Auto Seller",
   },
   {
-    id: 3,
+    id: "3",
     title: "Modern 3 Bedroom House",
-    description:
-      "Beautiful modern house in a good residential location.",
-    price: 950000,
-    currency: "GHS",
+    price: "GH₵950,000",
     location: "East Legon, Accra",
     category: "Property",
-    seller: "Prominent Properties",
-    phone: "+233240000002",
+    description:
+      "Modern three bedroom property in a prime Accra location. Contact the seller for viewing and additional property information.",
     image:
       "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80",
-    featured: false,
+    seller: "Prominent Properties",
   },
   {
-    id: 4,
-    title: "Samsung 55-inch Smart TV",
-    description:
-      "Samsung Smart TV with excellent picture quality.",
-    price: 8500,
-    currency: "GHS",
-    location: "Accra, Ghana",
+    id: "4",
+    title: "Premium Laptop",
+    price: "GH₵8,500",
+    location: "Tema, Ghana",
     category: "Electronics",
-    seller: "Tech Ghana",
-    phone: "+233240000003",
+    description:
+      "Premium laptop suitable for business, school and professional use.",
     image:
-      "https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?auto=format&fit=crop&w=1200&q=80",
-    featured: false,
+      "https://images.unsplash.com/photo-1496181133206-80ce9b88a853?auto=format&fit=crop&w=1200&q=80",
+    seller: "Tech Ghana",
   },
 ];
 
-export default function ListingDetailsPage() {
+export default function ProductDetails() {
   const params = useParams();
 
-  const id = Number(params.id);
+  const product = products.find(
+    (item) => item.id === String(params.id)
+  );
 
-  const listing = listings.find((item) => item.id === id);
-
-  if (!listing) {
+  if (!product) {
     return (
-      <>
-        <Header />
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+        <div className="text-center">
+          <h1 className="text-3xl font-extrabold">
+            Product not found
+          </h1>
 
-        <main className="details-page">
-          <div className="container">
-            <div className="not-found">
-              <h1>Listing Not Found</h1>
-              <p>
-                Sorry, the product or property you are looking for
-                could not be found.
-              </p>
+          <p className="mt-3 text-slate-500">
+            This listing may have been removed.
+          </p>
 
-              <Link href="/listings" className="back-button">
-                ← Back to Marketplace
-              </Link>
-            </div>
-          </div>
-        </main>
-
-        <style jsx>{`
-          .details-page {
-            min-height: 100vh;
-            background: #f6f8fb;
-            padding: 60px 0;
-          }
-
-          .container {
-            width: 100%;
-            max-width: 1180px;
-            margin: 0 auto;
-            padding: 0 20px;
-          }
-
-          .not-found {
-            background: white;
-            border-radius: 20px;
-            padding: 60px 30px;
-            text-align: center;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
-          }
-
-          .not-found h1 {
-            margin-bottom: 12px;
-          }
-
-          .not-found p {
-            color: #667085;
-            margin-bottom: 25px;
-          }
-
-          .back-button {
-            display: inline-block;
-            padding: 13px 20px;
-            border-radius: 10px;
-            background: #172033;
-            color: white;
-            text-decoration: none;
-            font-weight: 700;
-          }
-        `}</style>
-      </>
+          <Link
+            href="/listings"
+            className="mt-6 inline-block rounded-xl bg-blue-600 px-6 py-3 font-bold text-white"
+          >
+            Back to Marketplace
+          </Link>
+        </div>
+      </main>
     );
   }
 
   return (
-    <>
-      <Header />
+    <main className="min-h-screen bg-slate-50">
 
-      <main className="details-page">
-        <div className="container">
+      {/* HEADER */}
+      <header className="border-b bg-white">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
 
-          <Link href="/listings" className="back-link">
-            ← Back to Marketplace
+          <Link
+            href="/"
+            className="font-extrabold text-blue-700"
+          >
+            ALL PROMINENT GHANA
           </Link>
 
-          <div className="details-card">
+          <Link
+            href="/listings"
+            className="font-bold text-blue-600"
+          >
+            ← Marketplace
+          </Link>
 
-            <div className="image-section">
+        </div>
+      </header>
+
+      {/* PRODUCT */}
+      <section className="mx-auto max-w-7xl px-4 py-10">
+
+        <div className="grid gap-8 lg:grid-cols-2">
+
+          {/* IMAGE */}
+          <div className="overflow-hidden rounded-3xl bg-white shadow-sm">
+
+            <div className="aspect-square overflow-hidden">
               <img
-                src={listing.image}
-                alt={listing.title}
+                src={product.image}
+                alt={product.title}
+                className="h-full w-full object-cover"
               />
-
-              {listing.featured && (
-                <span className="featured">
-                  Featured
-                </span>
-              )}
             </div>
 
-            <div className="details-section">
+          </div>
 
-              <span className="category">
-                {listing.category}
+          {/* INFORMATION */}
+          <div className="rounded-3xl bg-white p-7 shadow-sm md:p-10">
+
+            <div className="flex items-center justify-between">
+
+              <span className="rounded-full bg-blue-50 px-4 py-2 text-sm font-bold text-blue-600">
+                {product.category}
               </span>
 
-              <h1>{listing.title}</h1>
+              <span className="text-sm font-bold text-green-600">
+                ✓ Verified
+              </span>
 
-              <div className="price">
-                {listing.currency}{" "}
-                {listing.price.toLocaleString()}
-              </div>
+            </div>
 
-              <p className="description">
-                {listing.description}
+            <h1 className="mt-6 text-4xl font-extrabold">
+              {product.title}
+            </h1>
+
+            <p className="mt-5 text-3xl font-extrabold text-blue-700">
+              {product.price}
+            </p>
+
+            <p className="mt-4 text-slate-500">
+              📍 {product.location}
+            </p>
+
+            <div className="my-8 border-t" />
+
+            <h2 className="text-xl font-extrabold">
+              Description
+            </h2>
+
+            <p className="mt-3 leading-7 text-slate-600">
+              {product.description}
+            </p>
+
+            {/* SELLER */}
+            <div className="mt-8 rounded-2xl bg-slate-50 p-5">
+
+              <p className="text-sm text-slate-500">
+                Seller
               </p>
 
-              <div className="info">
-                <div>
-                  <strong>Location</strong>
-                  <span>{listing.location}</span>
+              <div className="mt-2 flex items-center gap-3">
+
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 font-bold text-white">
+                  AP
                 </div>
 
                 <div>
-                  <strong>Seller</strong>
-                  <span>{listing.seller}</span>
+                  <h3 className="font-bold">
+                    {product.seller}
+                  </h3>
+
+                  <p className="text-sm font-semibold text-blue-600">
+                    ✓ Verified Seller
+                  </p>
                 </div>
-
-                <div>
-                  <strong>Category</strong>
-                  <span>{listing.category}</span>
-                </div>
-              </div>
-
-              <div className="actions">
-
-                <a
-                  href={`tel:${listing.phone}`}
-                  className="call-button"
-                >
-                  📞 Call Seller
-                </a>
-
-                <a
-                  href={`https://wa.me/${listing.phone.replace(
-                    /[^0-9]/g,
-                    ""
-                  )}`}
-                  className="whatsapp-button"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  💬 WhatsApp Seller
-                </a>
 
               </div>
 
             </div>
+
+            {/* ACTIONS */}
+            <div className="mt-8 grid gap-3 sm:grid-cols-2">
+
+              <button className="rounded-xl bg-blue-600 px-6 py-4 font-bold text-white hover:bg-blue-700">
+                Contact Seller
+              </button>
+
+              <button className="rounded-xl border-2 border-blue-600 px-6 py-4 font-bold text-blue-600 hover:bg-blue-50">
+                Buy / Make Offer
+              </button>
+
+            </div>
+
+            {/* DELIVERY */}
+            <div className="mt-6 rounded-2xl border border-sky-100 bg-sky-50 p-5">
+
+              <h3 className="font-bold text-blue-700">
+                🚚 Delivery Available
+              </h3>
+
+              <p className="mt-1 text-sm text-slate-600">
+                Delivery can be arranged using your pinned
+                location. Tracking integration will be added
+                to the marketplace.
+              </p>
+
+            </div>
+
           </div>
+
         </div>
-      </main>
 
-      <style jsx>{`
-        .details-page {
-          min-height: 100vh;
-          background: #f6f8fb;
-          padding: 40px 0 80px;
-        }
+      </section>
 
-        .container {
-          width: 100%;
-          max-width: 1180px;
-          margin: 0 auto;
-          padding: 0 20px;
-        }
-
-        .back-link {
-          display: inline-block;
-          margin-bottom: 25px;
-          color: #172033;
-          font-weight: 700;
-          text-decoration: none;
-        }
-
-        .details-card {
-          display: grid;
-          grid-template-columns: 1.1fr 1fr;
-          gap: 40px;
-          background: white;
-          border-radius: 24px;
-          padding: 25px;
-          box-shadow: 0 12px 35px rgba(0, 0, 0, 0.08);
-        }
-
-        .image-section {
-          position: relative;
-        }
-
-        .image-section img {
-          width: 100%;
-          height: 520px;
-          object-fit: cover;
-          border-radius: 18px;
-          display: block;
-        }
-
-        .featured {
-          position: absolute;
-          top: 18px;
-          left: 18px;
-          background: #ff7a00;
-          color: white;
-          padding: 8px 13px;
-          border-radius: 20px;
-          font-size: 13px;
-          font-weight: 800;
-        }
-
-        .details-section {
-          padding: 20px 10px;
-        }
-
-        .category {
-          display: inline-block;
-          background: #eef2ff;
-          color: #3843d0;
-          padding: 7px 12px;
-          border-radius: 20px;
-          font-size: 13px;
-          font-weight: 700;
-          margin-bottom: 18px;
-        }
-
-        h1 {
-          font-size: 38px;
-          line-height: 1.15;
-          margin: 0 0 18px;
-          color: #172033;
-        }
-
-        .price {
-          font-size: 30px;
-          font-weight: 900;
-          color: #0f7b45;
-          margin-bottom: 20px;
-        }
-
-        .description {
-          color: #667085;
-          line-height: 1.7;
-          font-size: 16px;
-          margin-bottom: 30px;
-        }
-
-        .info {
-          border-top: 1px solid #e5e7eb;
-          border-bottom: 1px solid #e5e7eb;
-          padding: 20px 0;
-          display: grid;
-          gap: 18px;
-        }
-
-        .info div {
-          display: flex;
-          flex-direction: column;
-          gap: 5px;
-        }
-
-        .info strong {
-          color: #172033;
-        }
-
-        .info span {
-          color: #667085;
-        }
-
-        .actions {
-          display: grid;
-          gap: 12px;
-          margin-top: 30px;
-        }
-
-        .actions a {
-          text-align: center;
-          padding: 15px 20px;
-          border-radius: 12px;
-          text-decoration: none;
-          font-weight: 800;
-        }
-
-        .call-button {
-          background: #172033;
-          color: white;
-        }
-
-        .whatsapp-button {
-          background: #20b15a;
-          color: white;
-        }
-
-        @media (max-width: 800px) {
-          .details-card {
-            grid-template-columns: 1fr;
-            padding: 15px;
-          }
-
-          .image-section img {
-            height: 350px;
-          }
-
-          h1 {
-            font-size: 30px;
-          }
-
-          .details-section {
-            padding: 10px;
-          }
-        }
-      `}</style>
-    </>
+    </main>
   );
 }
