@@ -1,7 +1,55 @@
-/* =========================================
-   MARKETPLACE — LISTINGS + PRODUCT DETAILS
-   ALL PROMINENT GHANA
-========================================= */
+/* =========================================================
+   ALL PROMINENT GHANA — GLOBAL STYLES
+   ACCOUNT + MARKETPLACE LISTINGS + PRODUCT DETAILS
+========================================================= */
+
+/* =========================================================
+   BASE
+========================================================= */
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family:
+    Arial,
+    Helvetica,
+    sans-serif;
+  background: #f6f9fc;
+  color: #14213d;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+
+/* =========================================================
+   SHARED
+========================================================= */
 
 .section-heading {
   display: flex;
@@ -11,9 +59,220 @@
   margin-bottom: 32px;
 }
 
-/* =========================================
+
+/* =========================================================
+   ACCOUNT / LOGIN
+========================================================= */
+
+.account-page {
+  min-height: 100vh;
+  background: #f5f9ff;
+  color: #14213d;
+}
+
+.account-header {
+  background: #ffffff;
+  border-bottom: 1px solid #dbe7f5;
+  padding: 22px 6%;
+}
+
+.account-header .brand {
+  color: #1264d8;
+  font-size: 28px;
+  font-weight: 800;
+  text-decoration: none;
+  letter-spacing: -0.5px;
+}
+
+.account-header p {
+  margin: 5px 0 0;
+  color: #64748b;
+  font-size: 16px;
+}
+
+.login-card {
+  width: min(520px, 92%);
+  margin: 55px auto;
+  background: #ffffff;
+  padding: 42px;
+  border-radius: 24px;
+  border: 1px solid #dce8f6;
+  box-shadow: 0 15px 45px rgba(15, 72, 130, 0.1);
+}
+
+.login-icon {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: #e7f2ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  margin-bottom: 20px;
+}
+
+.login-card h1 {
+  margin: 0;
+  font-size: 44px;
+  line-height: 1.05;
+  letter-spacing: -1.5px;
+}
+
+.login-subtitle {
+  color: #64748b;
+  font-size: 18px;
+  line-height: 1.5;
+  margin: 14px 0 30px;
+}
+
+.social-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.social-button {
+  height: 56px;
+  border: 1px solid #cbd8e8;
+  background: #ffffff;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #14213d;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.social-button:hover {
+  border-color: #1264d8;
+  background: #f5f9ff;
+}
+
+.social-button span {
+  margin-right: 8px;
+  font-weight: 900;
+}
+
+.or-divider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 28px 0;
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.or-divider::before,
+.or-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #dbe5f0;
+}
+
+.login-card label {
+  display: block;
+  margin-bottom: 9px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.phone-box {
+  display: flex;
+  align-items: center;
+  height: 56px;
+  border: 1px solid #cbd8e8;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.phone-box span {
+  padding: 0 15px;
+  color: #14213d;
+  font-weight: 700;
+  border-right: 1px solid #dbe5f0;
+  white-space: nowrap;
+}
+
+.phone-box input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: none;
+  outline: none;
+  padding: 0 15px;
+  font-size: 16px;
+  color: #14213d;
+  background: transparent;
+}
+
+.phone-box input::placeholder {
+  color: #a3afbf;
+}
+
+.phone-button {
+  width: 100%;
+  height: 56px;
+  margin-top: 14px;
+  border: none;
+  border-radius: 12px;
+  background: #1264d8;
+  color: #ffffff;
+  font-size: 17px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.phone-button:hover {
+  background: #0b4fae;
+}
+
+.signup {
+  text-align: center;
+  margin-top: 28px;
+}
+
+.signup p {
+  margin: 0 0 8px;
+  color: #64748b;
+}
+
+.signup a {
+  color: #1264d8;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.signup a:hover {
+  text-decoration: underline;
+}
+
+.account-bottom {
+  background: linear-gradient(135deg, #0758c9, #27b6e8);
+  color: #ffffff;
+  padding: 55px 6%;
+  text-align: center;
+}
+
+.account-bottom h2 {
+  margin: 0 0 12px;
+  font-size: 30px;
+}
+
+.account-bottom p {
+  max-width: 700px;
+  margin: auto;
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+
+/* =========================================================
    MARKETPLACE LISTINGS PAGE
-========================================= */
+========================================================= */
 
 .listings-page {
   min-height: 100vh;
@@ -25,10 +284,6 @@
   width: min(1180px, calc(100% - 40px));
   margin: 0 auto;
 }
-
-/* =========================================
-   LISTINGS HEADER
-========================================= */
 
 .listings-header {
   background: #ffffff;
@@ -56,23 +311,26 @@
 }
 
 .listings-heading .eyebrow {
-  display: block;
   color: #1769e0;
+  display: block;
   margin-bottom: 12px;
+  font-size: 14px;
+  font-weight: 800;
 }
 
 .listings-heading h1 {
+  margin: 0 0 16px;
   font-size: clamp(38px, 6vw, 64px);
   line-height: 1;
   letter-spacing: -2px;
-  margin-bottom: 16px;
 }
 
 .listings-heading p {
   max-width: 720px;
+  margin: 0;
   color: #667085;
   font-size: 18px;
-  line-height: 1.5;
+  line-height: 1.6;
 }
 
 .sell-button {
@@ -87,17 +345,19 @@
   font-weight: 800;
   white-space: nowrap;
   text-decoration: none;
+  border: none;
   transition: 0.2s ease;
 }
 
 .sell-button:hover {
   background: #0b4fae;
-  transform: translateY(-2px);
+  transform: translateY(-1px);
 }
 
-/* =========================================
-   FILTER PANEL
-========================================= */
+
+/* =========================================================
+   FILTERS
+========================================================= */
 
 .filter-panel {
   margin-top: 35px;
@@ -136,19 +396,16 @@
   outline: none;
 }
 
-.search-field input::placeholder {
-  color: #98a2b3;
-}
-
 .search-field input:focus,
 .filter-field select:focus {
   border-color: #1769e0;
   box-shadow: 0 0 0 3px rgba(23, 105, 224, 0.1);
 }
 
-/* =========================================
+
+/* =========================================================
    RESULTS
-========================================= */
+========================================================= */
 
 .results-section {
   padding: 60px 0 90px;
@@ -168,6 +425,7 @@
 }
 
 .results-top h2 {
+  margin: 0;
   font-size: clamp(32px, 4vw, 46px);
   line-height: 1;
   letter-spacing: -1.5px;
@@ -175,12 +433,13 @@
 
 .results-top p {
   color: #667085;
-  margin-top: 10px;
+  margin: 10px 0 0;
 }
 
-/* =========================================
+
+/* =========================================================
    LISTING GRID
-========================================= */
+========================================================= */
 
 .listing-grid-page {
   display: grid;
@@ -193,19 +452,13 @@
   background: #ffffff;
   border: 1px solid #dfe6ef;
   border-radius: 16px;
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
+  transition: 0.2s ease;
 }
 
 .listing-card-page:hover {
   transform: translateY(-4px);
   box-shadow: 0 14px 30px rgba(20, 33, 61, 0.1);
 }
-
-/* =========================================
-   LISTING IMAGE
-========================================= */
 
 .listing-image-page {
   height: 210px;
@@ -232,11 +485,8 @@
   border-radius: 6px;
   font-size: 11px;
   font-weight: 800;
+  z-index: 2;
 }
-
-/* =========================================
-   LISTING CONTENT
-========================================= */
 
 .listing-content-page {
   padding: 20px;
@@ -250,9 +500,9 @@
 }
 
 .listing-content-page h3 {
+  margin: 0 0 12px;
   font-size: 18px;
   line-height: 1.25;
-  margin-bottom: 12px;
 }
 
 .listing-content-page strong {
@@ -284,10 +534,6 @@
   font-weight: 800;
 }
 
-/* =========================================
-   VIEW BUTTON
-========================================= */
-
 .view-button {
   display: flex;
   align-items: center;
@@ -307,9 +553,10 @@
   background: #0b4fae;
 }
 
-/* =========================================
+
+/* =========================================================
    EMPTY STATE
-========================================= */
+========================================================= */
 
 .empty-state {
   padding: 70px 20px;
@@ -326,12 +573,12 @@
 
 .empty-state h3 {
   font-size: 25px;
-  margin-bottom: 8px;
+  margin: 0 0 8px;
 }
 
 .empty-state p {
   color: #667085;
-  margin-bottom: 20px;
+  margin: 0 0 20px;
 }
 
 .empty-state button {
@@ -341,16 +588,12 @@
   background: #1769e0;
   color: #ffffff;
   font-weight: 800;
-  cursor: pointer;
 }
 
-.empty-state button:hover {
-  background: #0b4fae;
-}
 
-/* =========================================
+/* =========================================================
    PRODUCT DETAILS PAGE
-========================================= */
+========================================================= */
 
 .product-page {
   min-height: 100vh;
@@ -362,10 +605,6 @@
   width: min(1180px, calc(100% - 40px));
   margin: 0 auto;
 }
-
-/* =========================================
-   PRODUCT TOP BAR
-========================================= */
 
 .product-topbar {
   background: #ffffff;
@@ -383,10 +622,6 @@
   text-decoration: underline;
 }
 
-/* =========================================
-   PRODUCT SECTION
-========================================= */
-
 .product-section {
   padding: 55px 0 90px;
 }
@@ -398,14 +633,9 @@
   align-items: start;
 }
 
-/* =========================================
-   PRODUCT IMAGE
-========================================= */
-
 .product-image {
   min-height: 500px;
   border-radius: 24px;
-
   background:
     radial-gradient(
       circle at 50% 30%,
@@ -413,13 +643,10 @@
       transparent 40%
     ),
     #eaf6ff;
-
   border: 1px solid #d9e7f5;
-
   display: flex;
   align-items: center;
   justify-content: center;
-
   position: relative;
   overflow: hidden;
 }
@@ -433,20 +660,13 @@
   position: absolute;
   top: 20px;
   left: 20px;
-
   background: #1769e0;
   color: #ffffff;
-
   padding: 7px 11px;
   border-radius: 7px;
-
   font-size: 11px;
   font-weight: 900;
 }
-
-/* =========================================
-   PRODUCT INFORMATION
-========================================= */
 
 .product-category {
   color: #1769e0;
@@ -457,7 +677,7 @@
 }
 
 .product-details h1 {
-  margin-top: 12px;
+  margin: 12px 0 0;
   font-size: clamp(38px, 5vw, 60px);
   line-height: 1;
   letter-spacing: -2px;
@@ -476,18 +696,17 @@
   font-size: 15px;
 }
 
-/* =========================================
-   SELLER CARD
-========================================= */
+
+/* =========================================================
+   SELLER
+========================================================= */
 
 .seller-card {
   margin-top: 30px;
   padding: 18px;
-
   background: #ffffff;
   border: 1px solid #dfe6ef;
   border-radius: 15px;
-
   display: flex;
   align-items: center;
   gap: 15px;
@@ -497,16 +716,12 @@
   width: 52px;
   height: 52px;
   min-width: 52px;
-
   border-radius: 50%;
-
   background: #1769e0;
   color: #ffffff;
-
   display: flex;
   align-items: center;
   justify-content: center;
-
   font-size: 21px;
   font-weight: 900;
 }
@@ -528,9 +743,10 @@
   font-weight: 800;
 }
 
-/* =========================================
+
+/* =========================================================
    PRODUCT ACTIONS
-========================================= */
+========================================================= */
 
 .product-actions {
   display: grid;
@@ -545,7 +761,7 @@
   border-radius: 10px;
   font-weight: 800;
   cursor: pointer;
-  font-size: 15px;
+  transition: 0.2s ease;
 }
 
 .contact-button {
@@ -565,21 +781,20 @@
 }
 
 .save-button:hover {
-  background: #f5f9ff;
+  background: #f0f7ff;
 }
 
-/* =========================================
+
+/* =========================================================
    PRODUCT DESCRIPTION
-========================================= */
+========================================================= */
 
 .product-description {
   margin-top: 55px;
   padding: 35px;
-
   background: #ffffff;
   border: 1px solid #dfe6ef;
   border-radius: 20px;
-
   display: grid;
   grid-template-columns: 1.5fr 1fr;
   gap: 40px;
@@ -593,8 +808,7 @@
 }
 
 .product-description h2 {
-  margin-top: 8px;
-  margin-bottom: 14px;
+  margin: 8px 0 14px;
   font-size: 30px;
 }
 
@@ -603,9 +817,10 @@
   line-height: 1.7;
 }
 
-/* =========================================
-   SAFETY CARD
-========================================= */
+
+/* =========================================================
+   SAFETY
+========================================================= */
 
 .safety-card {
   padding: 24px;
@@ -614,30 +829,28 @@
 }
 
 .safety-card h3 {
-  margin-bottom: 10px;
+  margin: 0 0 10px;
 }
 
 .safety-card p {
   font-size: 14px;
 }
 
-/* =========================================
-   DELIVERY CARD
-========================================= */
+
+/* =========================================================
+   DELIVERY
+========================================================= */
 
 .delivery-card {
   margin-top: 20px;
   padding: 25px;
-
   background: linear-gradient(
     135deg,
     #0b5fd7,
     #27b8ed
   );
-
   color: #ffffff;
   border-radius: 18px;
-
   display: flex;
   align-items: center;
   gap: 18px;
@@ -648,31 +861,29 @@
 }
 
 .delivery-card h3 {
-  margin-bottom: 4px;
+  margin: 0 0 4px;
 }
 
 .delivery-card p {
+  margin: 0;
   opacity: 0.9;
   font-size: 14px;
 }
 
 .coming-soon {
   margin-left: auto;
-
   background: rgba(255, 255, 255, 0.18);
-
   padding: 7px 10px;
   border-radius: 6px;
-
   font-size: 10px;
   font-weight: 900;
-
   white-space: nowrap;
 }
 
-/* =========================================
+
+/* =========================================================
    PRODUCT NOT FOUND
-========================================= */
+========================================================= */
 
 .not-found {
   padding: 120px 20px;
@@ -686,28 +897,22 @@
 
 .not-found h1 {
   font-size: 42px;
-  margin-bottom: 10px;
+  margin: 0 0 10px;
 }
 
 .not-found p {
   color: #667085;
-  margin-bottom: 25px;
+  margin: 0 0 25px;
 }
 
 .product-button {
   display: inline-flex;
   min-height: 50px;
-
   align-items: center;
-  justify-content: center;
-
   padding: 0 20px;
-
   border-radius: 9px;
-
   background: #1769e0;
   color: #ffffff;
-
   font-weight: 800;
   text-decoration: none;
 }
@@ -716,11 +921,13 @@
   background: #0b4fae;
 }
 
-/* =========================================
+
+/* =========================================================
    TABLET — LISTINGS
-========================================= */
+========================================================= */
 
 @media (max-width: 1000px) {
+
   .listing-grid-page {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -728,13 +935,16 @@
   .filter-panel {
     grid-template-columns: 1fr 1fr;
   }
+
 }
 
-/* =========================================
+
+/* =========================================================
    TABLET — PRODUCT
-========================================= */
+========================================================= */
 
 @media (max-width: 850px) {
+
   .product-layout {
     grid-template-columns: 1fr;
   }
@@ -746,15 +956,41 @@
   .product-description {
     grid-template-columns: 1fr;
   }
+
 }
 
-/* =========================================
-   PHONE — GENERAL
-========================================= */
+
+/* =========================================================
+   TABLET / MOBILE — ACCOUNT
+========================================================= */
+
+@media (max-width: 768px) {
+
+  .account-header {
+    padding: 18px 5%;
+  }
+
+  .account-header .brand {
+    font-size: 23px;
+  }
+
+  .login-card {
+    margin: 35px auto;
+    padding: 30px;
+  }
+
+  .login-card h1 {
+    font-size: 38px;
+  }
+
+}
+
+
+/* =========================================================
+   PHONE — LISTINGS
+========================================================= */
 
 @media (max-width: 600px) {
-
-  /* LISTINGS */
 
   .listings-container {
     width: min(100% - 28px, 1180px);
@@ -821,24 +1057,27 @@
     font-size: 12px;
   }
 
-  .verified-badge {
-    font-size: 10px;
+  .top-ad {
+    top: 9px;
+    left: 9px;
+    padding: 5px 7px;
+    font-size: 9px;
   }
 
   .view-button {
     min-height: 40px;
-    margin-top: 12px;
-    font-size: 12px;
+    font-size: 13px;
   }
 
-  /* PRODUCT */
+  .verified-badge {
+    font-size: 10px;
+  }
+
+
+  /* PRODUCT PHONE */
 
   .product-container {
     width: calc(100% - 28px);
-  }
-
-  .product-topbar {
-    padding: 20px 0;
   }
 
   .product-section {
@@ -852,11 +1091,6 @@
 
   .product-image > span {
     font-size: 100px;
-  }
-
-  .product-image-label {
-    top: 14px;
-    left: 14px;
   }
 
   .product-details h1 {
@@ -876,10 +1110,6 @@
     border-radius: 16px;
   }
 
-  .product-description h2 {
-    font-size: 26px;
-  }
-
   .delivery-card {
     align-items: flex-start;
     flex-wrap: wrap;
@@ -889,29 +1119,60 @@
     margin-left: 0;
   }
 
-  .seller-card {
-    align-items: flex-start;
-  }
-
-  .seller-avatar {
-    width: 46px;
-    height: 46px;
-    min-width: 46px;
-    font-size: 18px;
-  }
-
-  .not-found {
-    padding: 80px 20px;
-  }
-
-  .not-found h1 {
-    font-size: 34px;
-  }
 }
 
-/* =========================================
-   SMALL PHONES
-========================================= */
+
+/* =========================================================
+   PHONE — ACCOUNT
+========================================================= */
+
+@media (max-width: 520px) {
+
+  .account-header .brand {
+    font-size: 21px;
+  }
+
+  .account-header p {
+    font-size: 14px;
+  }
+
+  .login-card {
+    width: 92%;
+    padding: 25px 20px;
+    margin: 25px auto;
+    border-radius: 18px;
+  }
+
+  .login-card h1 {
+    font-size: 34px;
+  }
+
+  .login-subtitle {
+    font-size: 16px;
+  }
+
+  .social-buttons {
+    grid-template-columns: 1fr;
+  }
+
+  .social-button {
+    width: 100%;
+  }
+
+  .account-bottom {
+    padding: 40px 20px;
+  }
+
+  .account-bottom h2 {
+    font-size: 24px;
+  }
+
+}
+
+
+/* =========================================================
+   VERY SMALL PHONES
+========================================================= */
 
 @media (max-width: 380px) {
 
@@ -919,19 +1180,33 @@
     grid-template-columns: 1fr;
   }
 
-  .listings-heading h1 {
-    font-size: 36px;
+  .listing-image-page {
+    height: 190px;
+  }
+
+  .listing-emoji {
+    font-size: 65px;
+  }
+
+  .login-card h1 {
+    font-size: 30px;
   }
 
   .product-details h1 {
-    font-size: 35px;
+    font-size: 34px;
   }
 
-  .product-image {
-    min-height: 260px;
-  }
+}
 
-  .product-image > span {
-    font-size: 85px;
-  }
+
+/* =========================================================
+   ACCESSIBILITY
+========================================================= */
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 3px solid rgba(23, 105, 224, 0.3);
+  outline-offset: 2px;
 }
