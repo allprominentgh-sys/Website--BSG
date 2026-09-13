@@ -1,8 +1,9 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
 /* =========================================================
-   BEST SALES GHANA
+   ALL PROMINENT GHANA
    GLOBAL DESIGN SYSTEM
 ========================================================= */
 
@@ -56,7 +57,6 @@ body {
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
-
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -298,8 +298,7 @@ textarea:focus {
    LISTING CARDS
 ========================================================= */
 
-#latest-listings
-  a.group {
+#latest-listings a.group {
   border-color: var(--border);
   box-shadow: var(--shadow-sm);
 
@@ -309,8 +308,7 @@ textarea:focus {
     border-color 0.22s ease;
 }
 
-#latest-listings
-  a.group:hover {
+#latest-listings a.group:hover {
   border-color: #b9d2ef;
   box-shadow: var(--shadow-lg);
 }
@@ -459,7 +457,6 @@ textarea:focus {
 ========================================================= */
 
 @media (max-width: 640px) {
-
   .marketplace-page
     section:first-of-type {
     background:
@@ -527,7 +524,6 @@ textarea:focus {
 ========================================================= */
 
 @media (max-width: 390px) {
-
   .marketplace-page
     section:first-of-type
     h1 {
