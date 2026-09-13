@@ -1,5 +1,6 @@
-@import "tailwindcss";
-
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 /* =========================================================
    BEST SALES GHANA
    GLOBAL DESIGN SYSTEM
