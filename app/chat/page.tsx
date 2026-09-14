@@ -1,15 +1,34 @@
 "use client";
 
-import { Suspense, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
-function ChatContent() {
-  const searchParams = useSearchParams();
+export default function ChatPage() {
+  const [listing, setListing] = useState("");
+  const [seller, setSeller] = useState("Seller");
+  const [title, setTitle] = useState("Listing");
+  const [price, setPrice] = useState("");
+  const [message, setMessage] = useState("");
 
-  const listing = searchParams.get("listing") || "";
-  const seller = searchParams.get("seller") || "Seller";
-  const title = searchParams.get("title") || "Listing";
-  const price = searchParams.get("price") || "";
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+
+    setListing(params.get("listing") || "");
+    setSeller(params.get("seller") || "Seller");
+    setTitle(params.get("title") || "Listing");
+    setPrice(params.get("price") || "");
+  }, []);
+
+  function sendMessage() {
+    if (!message.trim()) {
+      alert("Please type a message first.");
+      return;
+    }
+
+    alert("Message sent successfully.");
+
+    setMessage("");
+  }
 
   return (
     <main
@@ -26,19 +45,19 @@ function ChatContent() {
           margin: "0 auto",
         }}
       >
-        {/* Header */}
+        {/* HEADER */}
         <div
           style={{
             background: "#1769e0",
-            color: "white",
-            padding: "20px",
+            color: "#ffffff",
+            padding: "22px",
             borderRadius: "16px 16px 0 0",
           }}
         >
           <Link
             href="/"
             style={{
-              color: "white",
+              color: "#ffffff",
               textDecoration: "none",
               fontSize: "14px",
             }}
@@ -48,8 +67,8 @@ function ChatContent() {
 
           <h1
             style={{
-              margin: "15px 0 5px",
-              fontSize: "26px",
+              margin: "18px 0 6px",
+              fontSize: "28px",
             }}
           >
             Chat with Seller
@@ -65,20 +84,20 @@ function ChatContent() {
           </p>
         </div>
 
-        {/* Listing information */}
+        {/* LISTING DETAILS */}
         <div
           style={{
-            background: "white",
-            padding: "20px",
+            background: "#ffffff",
+            padding: "22px",
             borderLeft: "1px solid #e5e7eb",
             borderRight: "1px solid #e5e7eb",
           }}
         >
           <h2
             style={{
-              marginTop: 0,
-              marginBottom: "8px",
-              fontSize: "22px",
+              margin: "0 0 10px",
+              fontSize: "23px",
+              color: "#111827",
             }}
           >
             {title}
@@ -86,8 +105,8 @@ function ChatContent() {
 
           <p
             style={{
-              margin: "5px 0",
-              color: "#555",
+              margin: "8px 0",
+              color: "#555555",
             }}
           >
             Seller: <strong>{seller}</strong>
@@ -110,7 +129,7 @@ function ChatContent() {
             <p
               style={{
                 margin: "8px 0",
-                color: "#777",
+                color: "#777777",
                 fontSize: "13px",
               }}
             >
@@ -119,11 +138,11 @@ function ChatContent() {
           )}
         </div>
 
-        {/* Chat area */}
+        {/* CHAT */}
         <div
           style={{
-            background: "white",
-            padding: "20px",
+            background: "#ffffff",
+            padding: "22px",
             border: "1px solid #e5e7eb",
             borderRadius: "0 0 16px 16px",
           }}
@@ -131,7 +150,7 @@ function ChatContent() {
           <div
             style={{
               background: "#f1f5f9",
-              padding: "15px",
+              padding: "16px",
               borderRadius: "12px",
               marginBottom: "20px",
             }}
@@ -141,15 +160,16 @@ function ChatContent() {
             <p
               style={{
                 margin: "8px 0 0",
-                color: "#444",
+                color: "#444444",
               }}
             >
               Hello! How can I help you with this listing?
             </p>
           </div>
 
-          {/* Message box */}
           <textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
             placeholder="Type your message to the seller..."
             rows={5}
             style={{
@@ -166,12 +186,13 @@ function ChatContent() {
 
           <button
             type="button"
+            onClick={sendMessage}
             style={{
               marginTop: "12px",
               width: "100%",
-              padding: "14px",
+              padding: "15px",
               background: "#1769e0",
-              color: "white",
+              color: "#ffffff",
               border: "none",
               borderRadius: "10px",
               fontSize: "16px",
@@ -202,27 +223,5 @@ function ChatContent() {
         </div>
       </div>
     </main>
-  );
-}
-
-export default function ChatPage() {
-  return (
-    <Suspense
-      fallback={
-        <main
-          style={{
-            minHeight: "100vh",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontFamily: "Arial, sans-serif",
-          }}
-        >
-          <p>Loading chat...</p>
-        </main>
-      }
-    >
-      <ChatContent />
-    </Suspense>
   );
 }
