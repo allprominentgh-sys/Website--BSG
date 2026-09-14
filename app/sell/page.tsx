@@ -3,75 +3,168 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
-type SellerType = "company" | "individual";
-
-const categoryData: Record<string, string[]> = {
-  Vehicles: [
-    "Cars",
-    "SUVs",
-    "Trucks",
-    "Buses",
-    "Motorcycles",
-    "Commercial Vehicles",
-    "Vehicle Parts",
-    "Vehicle Accessories",
-  ],
-
-  Property: [
-    "Houses",
-    "Apartments",
-    "Land",
-    "Commercial Property",
-    "Office Space",
-    "Warehouses",
-    "Shops",
-    "Rentals",
-  ],
-
-  Electronics: [
-    "Phones",
-    "Laptops",
-    "Televisions",
-    "Computers",
-    "Cameras",
-    "Audio Equipment",
-    "Accessories",
-    "Other Electronics",
-  ],
-
-  Machinery: [
-    "Industrial Machinery",
-    "Printing Equipment",
-    "Construction Equipment",
-    "Generators",
-    "Factory Equipment",
-    "Agricultural Machinery",
-    "Tools",
-    "Spare Parts",
-  ],
-
-  Agriculture: [
-    "Tractors",
-    "Farm Equipment",
-    "Irrigation",
-    "Livestock",
-    "Poultry",
-    "Seeds",
-    "Fertilizer",
-    "Agricultural Products",
-  ],
-
-  Services: [
-    "Business Services",
-    "Construction",
-    "Transport",
-    "Delivery",
-    "Graphic Design",
-    "Repairs",
-    "Professional Services",
-    "Other Services",
-  ],
+type Category = {
+  name: string;
+  subcategories: string[];
 };
+
+const categories: Category[] = [
+  {
+    name: "Vehicles",
+    subcategories: [
+      "Cars",
+      "SUVs",
+      "Pickup Trucks",
+      "Trucks",
+      "Buses",
+      "Motorcycles",
+      "Commercial Vehicles",
+      "Trailers",
+      "Vehicle Parts",
+      "Vehicle Accessories",
+      "Car Rentals",
+      "Other Vehicles",
+    ],
+  },
+  {
+    name: "Property",
+    subcategories: [
+      "Houses for Sale",
+      "Houses for Rent",
+      "Apartments",
+      "Rooms",
+      "Office Spaces",
+      "Shops",
+      "Warehouses",
+      "Industrial Property",
+      "Land",
+      "Commercial Land",
+      "Farm Land",
+      "Hotels",
+      "Guest Houses",
+      "Other Property",
+    ],
+  },
+  {
+    name: "Electronics",
+    subcategories: [
+      "Mobile Phones",
+      "Tablets",
+      "Laptops",
+      "Desktop Computers",
+      "Televisions",
+      "Cameras",
+      "Audio Equipment",
+      "Printers",
+      "Gaming",
+      "Networking Equipment",
+      "Computer Accessories",
+      "Other Electronics",
+    ],
+  },
+  {
+    name: "Machinery",
+    subcategories: [
+      "Industrial Machinery",
+      "Printing Equipment",
+      "DTF Printing Machines",
+      "DTG Printing Machines",
+      "UV Printing Machines",
+      "Laser Machines",
+      "CNC Machines",
+      "Construction Equipment",
+      "Excavators",
+      "Generators",
+      "Compressors",
+      "Welding Machines",
+      "Factory Equipment",
+      "Tools",
+      "Other Machinery",
+    ],
+  },
+  {
+    name: "Agriculture",
+    subcategories: [
+      "Tractors",
+      "Farm Machinery",
+      "Irrigation Equipment",
+      "Poultry Equipment",
+      "Livestock Equipment",
+      "Processing Machines",
+      "Harvesting Equipment",
+      "Planting Equipment",
+      "Greenhouse Equipment",
+      "Animal Feed",
+      "Seeds",
+      "Fertilizer",
+      "Livestock",
+      "Farm Produce",
+      "Other Agriculture",
+    ],
+  },
+  {
+    name: "Services",
+    subcategories: [
+      "Construction",
+      "Graphic Design",
+      "Printing Services",
+      "Transport",
+      "Delivery",
+      "Cleaning",
+      "Repairs",
+      "IT Services",
+      "Marketing",
+      "Business Consulting",
+      "Photography",
+      "Events",
+      "Security",
+      "Professional Services",
+      "Other Services",
+    ],
+  },
+  {
+    name: "Fashion",
+    subcategories: [
+      "Men's Clothing",
+      "Women's Clothing",
+      "Children's Clothing",
+      "Shoes",
+      "Bags",
+      "Watches",
+      "Jewelry",
+      "Accessories",
+      "Traditional Wear",
+      "Other Fashion",
+    ],
+  },
+  {
+    name: "Home & Garden",
+    subcategories: [
+      "Furniture",
+      "Kitchen Equipment",
+      "Home Appliances",
+      "Garden Equipment",
+      "Decorations",
+      "Building Materials",
+      "Lighting",
+      "Mattresses",
+      "Other Home & Garden",
+    ],
+  },
+  {
+    name: "Jobs & Business",
+    subcategories: [
+      "Jobs",
+      "Business Opportunities",
+      "Companies for Sale",
+      "Franchises",
+      "Investments",
+      "Partnerships",
+      "Business Equipment",
+      "Other Business",
+    ],
+  },
+];
 
 const regions = [
   "Greater Accra",
@@ -93,76 +186,61 @@ const regions = [
 ];
 
 export default function SellPage() {
-  const [sellerType, setSellerType] =
-    useState<SellerType>("individual");
+  const [sellerType, setSellerType] = useState<"individual" | "company">(
+    "individual"
+  );
 
   const [category, setCategory] = useState("");
 
   const [subcategory, setSubcategory] = useState("");
 
-  const [deliveryEnabled, setDeliveryEnabled] =
-    useState(false);
+  const [deliveryOption, setDeliveryOption] = useState<
+    "our-delivery" | "seller-delivery" | "pickup"
+  >("our-delivery");
 
-  const [locationStatus, setLocationStatus] =
-    useState("");
+  const [trackingNumber, setTrackingNumber] = useState("");
 
-  const [latitude, setLatitude] = useState("");
-
-  const [longitude, setLongitude] = useState("");
-
-  const subcategories = useMemo(() => {
-    return category ? categoryData[category] || [] : [];
-  }, [category]);
+  const selectedCategory = useMemo(
+    () => categories.find((item) => item.name === category),
+    [category]
+  );
 
   function handleCategoryChange(value: string) {
     setCategory(value);
     setSubcategory("");
   }
 
-  function useMyLocation() {
-    if (!navigator.geolocation) {
-      setLocationStatus(
-        "Location services are not supported on this device."
-      );
-      return;
-    }
+  function generateTrackingNumber() {
+    const random = Math.floor(100000 + Math.random() * 900000);
 
-    setLocationStatus("Getting your location...");
+    const generated = `BSG-${new Date().getFullYear()}-${random}`;
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setLatitude(position.coords.latitude.toFixed(6));
-        setLongitude(position.coords.longitude.toFixed(6));
+    setTrackingNumber(generated);
+  }
 
-        setLocationStatus(
-          "Your location has been captured."
-        );
-      },
-      () => {
-        setLocationStatus(
-          "Unable to get your location. Please allow location access."
-        );
-      }
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    alert(
+      "Your listing form is ready. Backend/database connection will be added in the next step."
     );
   }
 
   return (
-    <main className="min-h-screen bg-slate-50">
+    <main className="min-h-screen bg-slate-50 text-slate-900">
 
       {/* HEADER */}
       <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
 
-          <Link
-            href="/"
-            className="flex items-center gap-3"
-          >
+          <Link href="/" className="flex items-center gap-3">
+
             <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-700 text-2xl shadow-md">
               ⭐
             </div>
 
             <div>
-              <div className="text-lg font-black tracking-tight text-slate-900">
+              <div className="text-lg font-black tracking-tight">
                 BEST SALES GHANA
               </div>
 
@@ -170,306 +248,400 @@ export default function SellPage() {
                 Buy • Sell • Advertise • Connect
               </div>
             </div>
+
           </Link>
 
-          <Link
-            href="/"
-            className="font-bold text-blue-700 hover:text-blue-900"
-          >
-            ← Home
-          </Link>
+          <nav className="hidden items-center gap-6 md:flex">
+
+            <Link
+              href="/"
+              className="font-semibold text-slate-700 hover:text-blue-700"
+            >
+              Home
+            </Link>
+
+            <Link
+              href="/categories"
+              className="font-semibold text-slate-700 hover:text-blue-700"
+            >
+              Categories
+            </Link>
+
+            <Link
+              href="/listings"
+              className="font-semibold text-slate-700 hover:text-blue-700"
+            >
+              Listings
+            </Link>
+
+            <Link
+              href="/login"
+              className="rounded-xl border border-blue-700 px-5 py-3 font-bold text-blue-700 hover:bg-blue-50"
+            >
+              Login
+            </Link>
+
+          </nav>
 
         </div>
       </header>
 
-      {/* HERO */}
+      {/* PAGE HERO */}
       <section className="bg-gradient-to-br from-blue-800 via-blue-700 to-cyan-400 text-white">
+
         <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
 
-          <p className="text-sm font-black uppercase tracking-[0.2em] text-cyan-100">
+          <Link
+            href="/"
+            className="font-bold text-cyan-100 hover:text-white"
+          >
+            ← Back to Marketplace
+          </Link>
+
+          <p className="mt-8 text-sm font-black uppercase tracking-[0.2em] text-cyan-100">
             Sell on BEST SALES GHANA
           </p>
 
-          <h1 className="mt-3 text-4xl font-black sm:text-5xl">
-            Create Your Listing
+          <h1 className="mt-2 text-4xl font-black sm:text-5xl">
+            Create a Listing
           </h1>
 
           <p className="mt-4 max-w-3xl text-lg leading-8 text-white/90">
-            Post your product, vehicle, property, machinery or
-            service and connect with buyers across Ghana.
+            Advertise your product, vehicle, property, machinery or service
+            and connect with buyers across Ghana.
           </p>
 
         </div>
+
       </section>
 
       {/* FORM */}
-      <section className="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
+      <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
 
-        <form className="space-y-8">
+        <form onSubmit={handleSubmit} className="space-y-8">
 
           {/* SELLER TYPE */}
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
 
-            <h2 className="text-2xl font-black text-slate-900">
-              1. Seller Information
-            </h2>
+            <div className="mb-6">
+              <p className="text-sm font-black uppercase tracking-widest text-blue-700">
+                Step 1
+              </p>
 
-            <p className="mt-2 text-sm text-slate-500">
-              Tell buyers whether you are selling as a company
-              or individual.
-            </p>
+              <h2 className="mt-2 text-2xl font-black">
+                Seller Information
+              </h2>
 
-            <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              <p className="mt-2 text-sm text-slate-500">
+                Tell buyers whether you are selling as an individual or
+                registered business.
+              </p>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
 
               <button
                 type="button"
-                onClick={() => {
-                  setSellerType("company");
-                  setDeliveryEnabled(true);
-                }}
-                className={`rounded-2xl border-2 p-6 text-left transition ${
-                  sellerType === "company"
+                onClick={() => setSellerType("individual")}
+                className={`rounded-2xl border-2 p-5 text-left transition ${
+                  sellerType === "individual"
                     ? "border-blue-700 bg-blue-50"
-                    : "border-slate-200 bg-white"
+                    : "border-slate-200 hover:border-blue-300"
                 }`}
               >
-                <div className="text-3xl">
-                  🏢
+
+                <div className="text-3xl">👤</div>
+
+                <div className="mt-3 font-black">
+                  Individual Seller
                 </div>
 
-                <div className="mt-3 text-xl font-black text-slate-900">
-                  Company
-                </div>
-
-                <p className="mt-2 text-sm text-slate-500">
-                  Business, shop, dealer or registered company.
+                <p className="mt-1 text-sm text-slate-500">
+                  I am selling as an individual.
                 </p>
 
               </button>
 
               <button
                 type="button"
-                onClick={() => {
-                  setSellerType("individual");
-                  setDeliveryEnabled(false);
-                }}
-                className={`rounded-2xl border-2 p-6 text-left transition ${
-                  sellerType === "individual"
+                onClick={() => setSellerType("company")}
+                className={`rounded-2xl border-2 p-5 text-left transition ${
+                  sellerType === "company"
                     ? "border-blue-700 bg-blue-50"
-                    : "border-slate-200 bg-white"
+                    : "border-slate-200 hover:border-blue-300"
                 }`}
               >
-                <div className="text-3xl">
-                  👤
+
+                <div className="text-3xl">🏢</div>
+
+                <div className="mt-3 font-black">
+                  Company / Business
                 </div>
 
-                <div className="mt-3 text-xl font-black text-slate-900">
-                  Individual
-                </div>
-
-                <p className="mt-2 text-sm text-slate-500">
-                  Private seller listing an item.
+                <p className="mt-1 text-sm text-slate-500">
+                  I am selling on behalf of a company or business.
                 </p>
 
               </button>
 
             </div>
 
-          </div>
+            {sellerType === "company" && (
+              <div className="mt-5 rounded-2xl bg-blue-50 p-5">
 
-          {/* CATEGORY */}
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+                <label className="text-sm font-bold">
+                  Company / Business Name
+                </label>
 
-            <h2 className="text-2xl font-black text-slate-900">
-              2. Category
-            </h2>
+                <input
+                  name="companyName"
+                  type="text"
+                  placeholder="Enter company name"
+                  className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-blue-600"
+                />
 
-            <p className="mt-2 text-sm text-slate-500">
-              Select a main category and then a more specific
-              subcategory.
-            </p>
+              </div>
+            )}
 
-            <div className="mt-6 grid gap-5 sm:grid-cols-2">
+          </section>
 
+          {/* PRODUCT INFORMATION */}
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+
+            <div className="mb-6">
+              <p className="text-sm font-black uppercase tracking-widest text-blue-700">
+                Step 2
+              </p>
+
+              <h2 className="mt-2 text-2xl font-black">
+                Product / Advertisement
+              </h2>
+
+              <p className="mt-2 text-sm text-slate-500">
+                Select a broad category first, then select the appropriate
+                subcategory.
+              </p>
+            </div>
+
+            <div className="grid gap-5 md:grid-cols-2">
+
+              {/* CATEGORY */}
               <div>
-                <label className="mb-2 block text-sm font-bold text-slate-700">
-                  Main Category
+
+                <label className="text-sm font-bold">
+                  Main Category *
                 </label>
 
                 <select
-                  value={category}
-                  onChange={(e) =>
-                    handleCategoryChange(e.target.value)
-                  }
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-4 outline-none focus:border-blue-700"
                   required
+                  value={category}
+                  onChange={(e) => handleCategoryChange(e.target.value)}
+                  className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-blue-600"
                 >
+
                   <option value="">
                     Select category
                   </option>
 
-                  {Object.keys(categoryData).map((item) => (
-                    <option key={item} value={item}>
-                      {item}
+                  {categories.map((item) => (
+                    <option key={item.name} value={item.name}>
+                      {item.name}
                     </option>
                   ))}
+
                 </select>
+
               </div>
 
+              {/* SUBCATEGORY */}
               <div>
-                <label className="mb-2 block text-sm font-bold text-slate-700">
-                  Subcategory
+
+                <label className="text-sm font-bold">
+                  Subcategory *
                 </label>
 
                 <select
-                  value={subcategory}
-                  onChange={(e) =>
-                    setSubcategory(e.target.value)
-                  }
-                  disabled={!category}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-4 outline-none disabled:bg-slate-100 focus:border-blue-700"
                   required
+                  value={subcategory}
+                  onChange={(e) => setSubcategory(e.target.value)}
+                  disabled={!selectedCategory}
+                  className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none disabled:bg-slate-100 focus:border-blue-600"
                 >
+
                   <option value="">
-                    {category
+                    {selectedCategory
                       ? "Select subcategory"
                       : "Select category first"}
                   </option>
 
-                  {subcategories.map((item) => (
+                  {selectedCategory?.subcategories.map((item) => (
                     <option key={item} value={item}>
                       {item}
                     </option>
                   ))}
+
                 </select>
+
               </div>
 
             </div>
 
-          </div>
+            {/* TITLE */}
+            <div className="mt-5">
 
-          {/* ITEM DETAILS */}
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+              <label className="text-sm font-bold">
+                Advertisement Title *
+              </label>
 
-            <h2 className="text-2xl font-black text-slate-900">
-              3. Listing Details
-            </h2>
+              <input
+                required
+                name="title"
+                type="text"
+                placeholder="Example: Brand New DTF Printing Machine"
+                className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-600"
+              />
 
-            <div className="mt-6 space-y-5">
+            </div>
+
+            {/* DESCRIPTION */}
+            <div className="mt-5">
+
+              <label className="text-sm font-bold">
+                Description *
+              </label>
+
+              <textarea
+                required
+                name="description"
+                rows={6}
+                placeholder="Describe the product, condition, specifications, features and other important information..."
+                className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-600"
+              />
+
+            </div>
+
+            {/* PRICE */}
+            <div className="mt-5 grid gap-5 md:grid-cols-2">
 
               <div>
-                <label className="mb-2 block text-sm font-bold text-slate-700">
-                  Listing Title
+
+                <label className="text-sm font-bold">
+                  Price *
                 </label>
 
                 <input
-                  type="text"
-                  placeholder="Example: Toyota Corolla 2020"
-                  className="w-full rounded-xl border border-slate-300 px-4 py-4 outline-none focus:border-blue-700"
                   required
+                  name="price"
+                  type="number"
+                  min="0"
+                  placeholder="0.00"
+                  className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-600"
                 />
+
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-bold text-slate-700">
-                  Description
+
+                <label className="text-sm font-bold">
+                  Currency
                 </label>
 
-                <textarea
-                  rows={6}
-                  placeholder="Describe your item, condition, specifications and other important information..."
-                  className="w-full rounded-xl border border-slate-300 px-4 py-4 outline-none focus:border-blue-700"
-                  required
-                />
-              </div>
+                <select
+                  name="currency"
+                  defaultValue="GHS"
+                  className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-blue-600"
+                >
 
-              <div className="grid gap-5 sm:grid-cols-2">
+                  <option value="GHS">
+                    Ghana Cedi (GH₵)
+                  </option>
 
-                <div>
-                  <label className="mb-2 block text-sm font-bold text-slate-700">
-                    Price (GH₵)
-                  </label>
+                  <option value="USD">
+                    US Dollar ($)
+                  </option>
 
-                  <input
-                    type="number"
-                    placeholder="0.00"
-                    className="w-full rounded-xl border border-slate-300 px-4 py-4 outline-none focus:border-blue-700"
-                    required
-                  />
-                </div>
+                  <option value="EUR">
+                    Euro (€)
+                  </option>
 
-                <div>
-                  <label className="mb-2 block text-sm font-bold text-slate-700">
-                    Item Condition
-                  </label>
+                  <option value="GBP">
+                    British Pound (£)
+                  </option>
 
-                  <select
-                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-4 outline-none focus:border-blue-700"
-                    required
-                  >
-                    <option value="">
-                      Select condition
-                    </option>
-                    <option>Brand New</option>
-                    <option>Used - Like New</option>
-                    <option>Used - Good</option>
-                    <option>Used - Fair</option>
-                    <option>For Parts / Repair</option>
-                  </select>
-                </div>
+                  <option value="CNY">
+                    Chinese Yuan (¥)
+                  </option>
+
+                </select>
 
               </div>
 
             </div>
 
-          </div>
+          </section>
 
           {/* LOCATION */}
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
 
-            <h2 className="text-2xl font-black text-slate-900">
-              4. Ghana Location
-            </h2>
+            <div className="mb-6">
 
-            <p className="mt-2 text-sm text-slate-500">
-              Buyers will use this information to know where the
-              item is located.
-            </p>
+              <p className="text-sm font-black uppercase tracking-widest text-blue-700">
+                Step 3
+              </p>
 
-            <div className="mt-6 grid gap-5 sm:grid-cols-2">
+              <h2 className="mt-2 text-2xl font-black">
+                Location
+              </h2>
+
+              <p className="mt-2 text-sm text-slate-500">
+                Buyers need an accurate location. GhanaPost GPS will be used
+                to make delivery and location finding easier.
+              </p>
+
+            </div>
+
+            <div className="grid gap-5 md:grid-cols-2">
 
               <div>
-                <label className="mb-2 block text-sm font-bold text-slate-700">
-                  Region
+
+                <label className="text-sm font-bold">
+                  Region *
                 </label>
 
                 <select
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-4 outline-none focus:border-blue-700"
                   required
+                  name="region"
+                  className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-blue-600"
                 >
+
                   <option value="">
                     Select region
                   </option>
 
                   {regions.map((region) => (
-                    <option key={region}>
+                    <option key={region} value={region}>
                       {region}
                     </option>
                   ))}
+
                 </select>
+
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-bold text-slate-700">
-                  City / Town
+
+                <label className="text-sm font-bold">
+                  City / Town *
                 </label>
 
                 <input
+                  required
+                  name="city"
                   type="text"
                   placeholder="Example: Accra"
-                  className="w-full rounded-xl border border-slate-300 px-4 py-4 outline-none focus:border-blue-700"
-                  required
+                  className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-600"
                 />
+
               </div>
 
             </div>
@@ -477,157 +649,244 @@ export default function SellPage() {
             {/* GHANA POST GPS */}
             <div className="mt-5">
 
-              <label className="mb-2 block text-sm font-bold text-slate-700">
-                Ghana Post GPS Address
+              <label className="text-sm font-bold">
+                GhanaPost GPS Address *
               </label>
 
-              <input
-                type="text"
-                placeholder="Example: GA-123-4567"
-                className="w-full rounded-xl border border-slate-300 px-4 py-4 uppercase outline-none focus:border-blue-700"
-              />
+              <div className="mt-2 flex flex-col gap-3 sm:flex-row">
 
-              <p className="mt-2 text-xs text-slate-500">
-                Enter the Ghana Post GPS digital address for the
-                item's exact location.
-              </p>
-
-            </div>
-
-            {/* GPS LOCATION */}
-            <div className="mt-6 rounded-2xl bg-blue-50 p-5">
-
-              <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-
-                <div>
-                  <div className="font-black text-slate-900">
-                    📍 Exact GPS Location
-                  </div>
-
-                  <p className="mt-1 text-sm text-slate-600">
-                    Allow BEST SALES GHANA to capture your
-                    current location.
-                  </p>
-                </div>
+                <input
+                  required
+                  name="ghanaPostGps"
+                  type="text"
+                  placeholder="Example: GA-123-4567"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 uppercase outline-none focus:border-blue-600"
+                />
 
                 <button
                   type="button"
-                  onClick={useMyLocation}
-                  className="rounded-xl bg-blue-700 px-5 py-3 font-bold text-white hover:bg-blue-800"
+                  className="shrink-0 rounded-xl border border-blue-700 px-5 py-3 font-bold text-blue-700 hover:bg-blue-50"
+                  onClick={() =>
+                    alert(
+                      "GhanaPost GPS/map integration will be connected in the delivery and maps step."
+                    )
+                  }
                 >
-                  Use My Location
+                  📍 Use My Location
                 </button>
 
               </div>
 
-              {locationStatus && (
-                <p className="mt-4 text-sm font-semibold text-blue-700">
-                  {locationStatus}
-                </p>
-              )}
-
-              <div className="mt-4 grid gap-4 sm:grid-cols-2">
-
-                <input
-                  type="text"
-                  value={latitude}
-                  onChange={(e) =>
-                    setLatitude(e.target.value)
-                  }
-                  placeholder="Latitude"
-                  className="rounded-xl border border-slate-300 bg-white px-4 py-3"
-                />
-
-                <input
-                  type="text"
-                  value={longitude}
-                  onChange={(e) =>
-                    setLongitude(e.target.value)
-                  }
-                  placeholder="Longitude"
-                  className="rounded-xl border border-slate-300 bg-white px-4 py-3"
-                />
-
-              </div>
+              <p className="mt-2 text-xs text-slate-500">
+                This address will help the delivery system locate the seller
+                accurately.
+              </p>
 
             </div>
 
-          </div>
+            {/* EXACT ADDRESS */}
+            <div className="mt-5">
+
+              <label className="text-sm font-bold">
+                Additional Location Details
+              </label>
+
+              <textarea
+                name="locationDetails"
+                rows={3}
+                placeholder="House number, street, landmark, shop number, building name..."
+                className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-600"
+              />
+
+            </div>
+
+          </section>
 
           {/* DELIVERY */}
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
 
-            <h2 className="text-2xl font-black text-slate-900">
-              5. Delivery
-            </h2>
+            <div className="mb-6">
 
-            <p className="mt-2 text-sm text-slate-500">
-              Choose how buyers can receive their items.
-            </p>
+              <p className="text-sm font-black uppercase tracking-widest text-blue-700">
+                Step 4
+              </p>
 
-            {sellerType === "company" ? (
-              <div className="mt-6 rounded-2xl border border-blue-200 bg-blue-50 p-5">
+              <h2 className="mt-2 text-2xl font-black">
+                Delivery Options
+              </h2>
 
-                <div className="flex gap-4">
+              <p className="mt-2 text-sm text-slate-500">
+                The seller can decide how the buyer receives the item.
+                Individual sellers can also choose our delivery service.
+              </p>
+
+            </div>
+
+            <div className="space-y-4">
+
+              {/* OUR DELIVERY */}
+              <button
+                type="button"
+                onClick={() => setDeliveryOption("our-delivery")}
+                className={`w-full rounded-2xl border-2 p-5 text-left transition ${
+                  deliveryOption === "our-delivery"
+                    ? "border-blue-700 bg-blue-50"
+                    : "border-slate-200 hover:border-blue-300"
+                }`}
+              >
+
+                <div className="flex items-start gap-4">
 
                   <div className="text-3xl">
                     🚚
                   </div>
 
                   <div>
-                    <h3 className="font-black text-slate-900">
-                      BEST SALES GHANA Delivery
-                    </h3>
 
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
-                      Company sellers can use the BEST SALES
-                      GHANA delivery system. Orders can be
-                      assigned a tracking number so the buyer
-                      can follow the delivery.
+                    <div className="font-black">
+                      BEST SALES GHANA Delivery
+                    </div>
+
+                    <p className="mt-1 text-sm text-slate-500">
+                      Let our delivery system collect and deliver the item to
+                      the buyer.
                     </p>
 
-                    <div className="mt-4 inline-flex rounded-full bg-blue-700 px-4 py-2 text-xs font-black text-white">
-                      DELIVERY ENABLED
-                    </div>
+                    <p className="mt-2 text-sm font-bold text-blue-700">
+                      ✓ Buyer can track delivery
+                    </p>
+
                   </div>
 
                 </div>
 
-              </div>
-            ) : (
-              <div className="mt-6 space-y-4">
+              </button>
 
-                <label className="flex cursor-pointer items-start gap-4 rounded-2xl border border-slate-200 p-5">
+              {/* SELLER DELIVERY */}
+              <button
+                type="button"
+                onClick={() => setDeliveryOption("seller-delivery")}
+                className={`w-full rounded-2xl border-2 p-5 text-left transition ${
+                  deliveryOption === "seller-delivery"
+                    ? "border-blue-700 bg-blue-50"
+                    : "border-slate-200 hover:border-blue-300"
+                }`}
+              >
 
-                  <input
-                    type="checkbox"
-                    checked={deliveryEnabled}
-                    onChange={(e) =>
-                      setDeliveryEnabled(e.target.checked)
-                    }
-                    className="mt-1 h-5 w-5"
-                  />
+                <div className="flex items-start gap-4">
+
+                  <div className="text-3xl">
+                    🏪
+                  </div>
 
                   <div>
-                    <div className="font-black text-slate-900">
-                      🚚 Offer BEST SALES GHANA Delivery
+
+                    <div className="font-black">
+                      Seller Handles Delivery
                     </div>
 
                     <p className="mt-1 text-sm text-slate-500">
-                      Individual sellers can optionally allow
-                      buyers to choose our delivery service.
+                      The seller or company will arrange delivery directly
+                      with the buyer.
                     </p>
+
                   </div>
 
-                </label>
+                </div>
 
-                <div className="rounded-2xl bg-slate-50 p-5">
+              </button>
 
-                  <p className="text-sm leading-6 text-slate-600">
-                    When the buyer chooses BEST SALES GHANA
-                    Delivery, the order can be collected,
-                    assigned a tracking number and tracked
-                    until delivery.
+              {/* PICKUP */}
+              <button
+                type="button"
+                onClick={() => setDeliveryOption("pickup")}
+                className={`w-full rounded-2xl border-2 p-5 text-left transition ${
+                  deliveryOption === "pickup"
+                    ? "border-blue-700 bg-blue-50"
+                    : "border-slate-200 hover:border-blue-300"
+                }`}
+              >
+
+                <div className="flex items-start gap-4">
+
+                  <div className="text-3xl">
+                    🤝
+                  </div>
+
+                  <div>
+
+                    <div className="font-black">
+                      Buyer Pickup
+                    </div>
+
+                    <p className="mt-1 text-sm text-slate-500">
+                      Buyer collects the item directly from the seller.
+                    </p>
+
+                  </div>
+
+                </div>
+
+              </button>
+
+            </div>
+
+            {/* TRACKING */}
+            {deliveryOption === "our-delivery" && (
+              <div className="mt-6 rounded-2xl border border-blue-200 bg-blue-50 p-5">
+
+                <div className="flex items-start gap-3">
+
+                  <div className="text-2xl">
+                    📦
+                  </div>
+
+                  <div>
+
+                    <h3 className="font-black text-slate-900">
+                      Delivery Tracking
+                    </h3>
+
+                    <p className="mt-1 text-sm text-slate-600">
+                      When our delivery service receives the item, a unique
+                      tracking number will be attached to the order.
+                    </p>
+
+                  </div>
+
+                </div>
+
+                <div className="mt-5">
+
+                  <label className="text-sm font-bold">
+                    Tracking Number
+                  </label>
+
+                  <div className="mt-2 flex flex-col gap-3 sm:flex-row">
+
+                    <input
+                      value={trackingNumber}
+                      onChange={(e) => setTrackingNumber(e.target.value)}
+                      name="trackingNumber"
+                      type="text"
+                      placeholder="Generated after delivery request"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-bold outline-none focus:border-blue-600"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={generateTrackingNumber}
+                      className="rounded-xl bg-blue-700 px-5 py-3 font-bold text-white hover:bg-blue-800"
+                    >
+                      Generate
+                    </button>
+
+                  </div>
+
+                  <p className="mt-2 text-xs text-slate-500">
+                    In the final system, this number will be generated
+                    automatically by BEST SALES GHANA when a delivery order
+                    is created.
                   </p>
 
                 </div>
@@ -635,71 +894,109 @@ export default function SellPage() {
               </div>
             )}
 
-          </div>
+          </section>
 
-          {/* TRACKING */}
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+          {/* CONTACT */}
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
 
-            <h2 className="text-2xl font-black text-slate-900">
-              6. Order Tracking
-            </h2>
+            <div className="mb-6">
 
-            <div className="mt-5 rounded-2xl bg-slate-950 p-6 text-white">
-
-              <div className="text-3xl">
-                📦
-              </div>
-
-              <h3 className="mt-3 text-xl font-black">
-                Tracking Number
-              </h3>
-
-              <p className="mt-2 text-sm leading-6 text-white/70">
-                A tracking number will be generated for orders
-                using BEST SALES GHANA Delivery.
+              <p className="text-sm font-black uppercase tracking-widest text-blue-700">
+                Step 5
               </p>
 
-              <div className="mt-5 rounded-xl border border-white/10 bg-white/5 p-4">
+              <h2 className="mt-2 text-2xl font-black">
+                Seller Contact
+              </h2>
 
-                <div className="text-xs uppercase tracking-widest text-cyan-400">
-                  Example
-                </div>
+            </div>
 
-                <div className="mt-2 font-mono text-lg font-bold">
-                  BSG-2026-000001
-                </div>
+            <div className="grid gap-5 md:grid-cols-2">
+
+              <div>
+
+                <label className="text-sm font-bold">
+                  Seller Name *
+                </label>
+
+                <input
+                  required
+                  name="sellerName"
+                  type="text"
+                  placeholder="Full name"
+                  className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-600"
+                />
+
+              </div>
+
+              <div>
+
+                <label className="text-sm font-bold">
+                  Phone Number *
+                </label>
+
+                <input
+                  required
+                  name="phone"
+                  type="tel"
+                  placeholder="024 XXX XXXX"
+                  className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-600"
+                />
 
               </div>
 
             </div>
 
-          </div>
+            <div className="mt-5">
 
-          {/* SUBMIT */}
-          <div className="rounded-3xl bg-slate-950 p-6 text-white shadow-xl sm:p-8">
+              <label className="text-sm font-bold">
+                Email Address
+              </label>
 
-            <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-center">
+              <input
+                name="email"
+                type="email"
+                placeholder="seller@example.com"
+                className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-600"
+              />
+
+            </div>
+
+          </section>
+
+          {/* FINAL SUBMIT */}
+          <section className="rounded-3xl bg-slate-950 p-6 text-white shadow-xl sm:p-8">
+
+            <div className="flex flex-col justify-between gap-6 md:flex-row md:items-center">
 
               <div>
-                <h2 className="text-2xl font-black">
-                  Ready to publish?
+
+                <p className="text-sm font-black uppercase tracking-widest text-cyan-400">
+                  Almost Done
+                </p>
+
+                <h2 className="mt-2 text-2xl font-black">
+                  Publish Your Advertisement
                 </h2>
 
-                <p className="mt-2 text-sm text-white/60">
-                  Your listing will be submitted for processing.
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
+                  Your listing will be reviewed before it becomes visible to
+                  buyers. Payment, advertising packages and seller dashboard
+                  controls will be connected in later steps.
                 </p>
+
               </div>
 
               <button
                 type="submit"
-                className="rounded-xl bg-blue-600 px-8 py-4 font-black text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-cyan-400 hover:text-slate-950"
+                className="shrink-0 rounded-xl bg-blue-600 px-8 py-4 font-black text-white shadow-lg transition hover:-translate-y-1 hover:bg-cyan-400 hover:text-slate-950"
               >
                 Publish Listing →
               </button>
 
             </div>
 
-          </div>
+          </section>
 
         </form>
 
