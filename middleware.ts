@@ -1,36 +1,49 @@
 import { NextRequest, NextResponse } from "next/server";
 
+const ADMIN_SESSION_COOKIE = "bsg_admin_session";
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Protect the admin area
-  if (pathname.startsWith("/admin") && pathname !== "/admin/login") {
-    const session = request.cookies.get("bsg_admin_session");
-
-    if (session?.value !== "authenticated") {
-      const loginUrl = new URL("/admin/login", request.url);
-
-      return NextResponse.redirect(loginUrl);
-    }
+  /*
+    Allow the admin login page without authentication.
+  */
+  if (pathname === "/admin/login") {
+    return NextResponse.next();
   }
 
-  // If an authenticated admin visits the login page,
-  // send them directly to the dashboard.
-  if (pathname === "/admin/login") {
-    const session = request.cookies.get("bsg_admin_session");
+  /*
+    Only protect pages inside /admin.
+  */
+  if (pathname.startsWith("/admin")) {
+    const session = request.cookies.get(
+      ADMIN_SESSION_COOKIE
+    )?.value;
 
-    if (session?.value === "authenticated") {
-      return NextResponse.redirect(
-        new URL("/admin", request.url)
+    /*
+      No admin session = send user to login.
+    */
+    if (!session) {
+      const loginUrl = new URL(
+        "/admin/login",
+        request.url
       );
+
+      loginUrl.searchParams.set(
+        "redirect",
+        pathname
+      );
+
+      return NextResponse.redirect(loginUrl);
     }
   }
 
   return NextResponse.next();
 }
 
+/*
+  Run middleware only on admin pages.
+*/
 export const config = {
-  matcher: [
-    "/admin/:path*",
-  ],
+  matcher: ["/admin/:path*"],
 };
