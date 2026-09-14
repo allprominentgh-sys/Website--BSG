@@ -1,17 +1,18 @@
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "All Prominent Ghana",
+  title: "BEST SALES GHANA | Buy • Sell • Advertise • Connect",
   description:
-    "Buy, sell, advertise and connect across Ghana with All Prominent Ghana.",
+    "Ghana's marketplace for products, vehicles, property, services, machinery, equipment and business opportunities.",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: {
+  children: ReactNode;
+}) {
   return (
     <html lang="en">
       <body>{children}</body>
