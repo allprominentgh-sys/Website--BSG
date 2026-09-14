@@ -1,92 +1,186 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
+import { FormEvent, useState } from "react";
 
 export default function LoginPage() {
-  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    // Login functionality will be connected to Supabase later.
+    console.log("Login attempt:", { email, password });
+  }
 
   return (
-    <main className="account-page">
-      <header className="account-header">
-        <a href="/" className="brand">
-          ALL PROMINENT GHANA
-        </a>
+    <main className="login-page">
+      <div className="login-background-circle circle-one" />
+      <div className="login-background-circle circle-two" />
 
-        <p>Buy • Sell • Advertise • Connect</p>
-      </header>
+      <section className="login-container">
+        {/* BRAND */}
+        <Link href="/" className="login-brand">
+          <div className="login-logo">
+            <div className="login-logo-ring">
+              <div className="login-logo-person">
+                <span className="login-logo-head" />
+                <span className="login-logo-arm login-logo-arm-left" />
+                <span className="login-logo-arm login-logo-arm-right" />
+                <span className="login-logo-body" />
+              </div>
+            </div>
+          </div>
 
-      <section className="login-card">
-        <div className="login-icon">👤</div>
+          <div>
+            <div className="login-brand-name">
+              BEST SALES GHANA
+            </div>
 
-        <h1>Welcome back</h1>
+            <div className="login-brand-tagline">
+              Buy • Sell • Advertise • Connect
+            </div>
+          </div>
+        </Link>
 
-        <p className="login-subtitle">
-          Sign in to buy, sell and manage your account.
-        </p>
+        {/* LOGIN CARD */}
+        <div className="login-card">
+          <div className="login-heading">
+            <h1>Welcome Back</h1>
 
-        <div className="social-buttons">
+            <p>
+              Sign in to your BEST SALES GHANA account.
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="login-form">
+            {/* EMAIL */}
+            <div className="login-field">
+              <label htmlFor="email">
+                Email Address
+              </label>
+
+              <input
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(event) =>
+                  setEmail(event.target.value)
+                }
+                required
+              />
+            </div>
+
+            {/* PASSWORD */}
+            <div className="login-field">
+              <div className="login-password-header">
+                <label htmlFor="password">
+                  Password
+                </label>
+
+                <Link
+                  href="/forgot-password"
+                  className="forgot-password"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+
+              <div className="password-input-wrapper">
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(event) =>
+                    setPassword(event.target.value)
+                  }
+                  required
+                />
+
+                <button
+                  type="button"
+                  className="show-password"
+                  onClick={() =>
+                    setShowPassword(!showPassword)
+                  }
+                  aria-label={
+                    showPassword
+                      ? "Hide password"
+                      : "Show password"
+                  }
+                >
+                  {showPassword ? "Hide" : "Show"}
+                </button>
+              </div>
+            </div>
+
+            {/* REMEMBER */}
+            <label className="remember-me">
+              <input type="checkbox" />
+
+              <span>
+                Remember me
+              </span>
+            </label>
+
+            {/* LOGIN BUTTON */}
+            <button
+              type="submit"
+              className="login-button"
+            >
+              Sign In
+            </button>
+          </form>
+
+          {/* DIVIDER */}
+          <div className="login-divider">
+            <span />
+            <p>OR</p>
+            <span />
+          </div>
+
+          {/* SOCIAL / OTHER LOGIN */}
           <button
             type="button"
-            className="social-button"
+            className="google-login"
           >
-            <span>G</span>
+            <span className="google-icon">
+              G
+            </span>
+
             Continue with Google
           </button>
 
-          <button
-            type="button"
-            className="social-button"
-          >
-            <span>●</span>
-            Continue with Apple
-          </button>
+          {/* REGISTER */}
+          <div className="register-section">
+            <p>
+              Don't have an account?
+            </p>
+
+            <Link
+              href="/register"
+              className="register-link"
+            >
+              Create an account
+            </Link>
+          </div>
         </div>
 
-        <div className="or-divider">
-          <span>OR</span>
-        </div>
-
-        <label htmlFor="phone">
-          Phone number
-        </label>
-
-        <div className="phone-box">
-          <span>+233</span>
-
-          <input
-            id="phone"
-            type="tel"
-            inputMode="numeric"
-            placeholder="24 000 0000"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-          />
-        </div>
-
-        <button
-          type="button"
-          className="phone-button"
+        {/* BACK HOME */}
+        <Link
+          href="/"
+          className="back-home"
         >
-          Continue with phone
-        </button>
+          ← Back to BEST SALES GHANA
+        </Link>
 
-        <div className="signup">
-          <p>New to All Prominent Ghana?</p>
-
-          <a href="/sell">
-            Start selling
-          </a>
-        </div>
-      </section>
-
-      <section className="account-bottom">
-        <h2>
-          Buy • Sell • Advertise • Connect
-        </h2>
-
-        <p>
-          Your Ghanaian marketplace for products,
-          brands, property, vehicles, jobs and services.
+        {/* COPYRIGHT */}
+        <p className="login-copyright">
+          © 2026 All Prominent Ghana Limited. All rights reserved.
         </p>
       </section>
     </main>
