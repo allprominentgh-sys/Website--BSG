@@ -1,58 +1,35 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { useState } from "react";
+
+type AccountType = "buyer" | "seller" | "business" | "";
 
 export default function RegisterPage() {
+  const [accountType, setAccountType] = useState<AccountType>("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    alert("Registration system will be connected in the next phase.");
-  }
-
   return (
-    <main className="min-h-screen bg-slate-50">
+    <main className="min-h-screen bg-slate-50 text-slate-800">
 
       {/* HEADER */}
-      <header className="border-b border-slate-200 bg-white">
+      <header className="border-b bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-5 sm:px-6 lg:px-8">
 
-          <Link
-            href="/"
-            className="flex items-center gap-3"
-            aria-label="BEST SALES GHANA Home"
-          >
-
-            {/* ANIMATED LOGO */}
-            <div className="logo-mark">
-              <div className="logo-ring">
-                <div className="logo-person">
-                  <span className="logo-head" />
-                  <span className="logo-arm logo-arm-left" />
-                  <span className="logo-arm logo-arm-right" />
-                  <span className="logo-body" />
-                </div>
-              </div>
+          <Link href="/" className="block">
+            <div className="text-xl font-black tracking-tight text-slate-900 sm:text-2xl">
+              BEST SALES GHANA
             </div>
 
-            <div>
-              <div className="text-lg font-black tracking-tight text-slate-900 sm:text-xl">
-                BEST SALES GHANA
-              </div>
-
-              <div className="text-xs font-medium text-slate-500 sm:text-sm">
-                Buy • Sell • Advertise • Connect
-              </div>
+            <div className="text-sm font-medium text-slate-500">
+              Buy • Sell • Advertise • Connect
             </div>
-
           </Link>
 
           <Link
             href="/login"
-            className="rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-bold text-white shadow-md transition hover:bg-blue-800"
+            className="rounded-xl bg-blue-700 px-5 py-3 font-bold text-white shadow-md hover:bg-blue-800"
           >
             Sign In
           </Link>
@@ -60,372 +37,440 @@ export default function RegisterPage() {
         </div>
       </header>
 
+      {/* HERO */}
+      <section className="bg-gradient-to-br from-blue-700 to-cyan-500 px-4 py-12 text-white sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-5xl">
 
-      {/* REGISTER SECTION */}
-      <section className="relative flex items-center justify-center overflow-hidden px-4 py-12 sm:py-16">
+          <p className="text-sm font-black uppercase tracking-[0.25em] text-cyan-100">
+            Join Our Marketplace
+          </p>
 
-        {/* BACKGROUND DECORATION */}
-        <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full bg-blue-100/60" />
+          <h1 className="mt-3 text-4xl font-black sm:text-5xl">
+            Create an account
+          </h1>
 
-        <div className="absolute -bottom-32 -left-32 h-96 w-96 rounded-full bg-cyan-100/60" />
+          <p className="mt-4 max-w-3xl text-lg leading-8 text-white/90">
+            Join BEST SALES GHANA and start buying, selling and connecting.
+          </p>
 
+        </div>
+      </section>
 
-        <div className="relative z-10 w-full max-w-2xl">
+      {/* FORM */}
+      <section className="mx-auto max-w-3xl px-4 py-10 sm:px-6 lg:px-8">
 
-          {/* CARD */}
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl sm:p-8 lg:p-10">
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-10">
 
-            {/* TITLE */}
-            <div className="mb-8 text-center">
+          {/* BASIC INFORMATION */}
+          <div>
+            <h2 className="text-2xl font-black text-slate-900">
+              Account Information
+            </h2>
 
-              <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-700 shadow-lg">
+            <p className="mt-2 text-slate-500">
+              Enter your information accurately.
+            </p>
+          </div>
 
-                <svg
-                  width="34"
-                  height="34"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="white"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                  <circle cx="9" cy="7" r="4" />
-                  <line x1="19" y1="8" x2="19" y2="14" />
-                  <line x1="22" y1="11" x2="16" y2="11" />
-                </svg>
+          {/* FULL NAME */}
+          <div className="mt-8">
+            <label className="text-sm font-black text-slate-700">
+              Full Name
+            </label>
 
+            <input
+              type="text"
+              placeholder="Enter your full name"
+              className="mt-2 w-full rounded-2xl border border-slate-300 px-5 py-4 text-base outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+            />
+          </div>
+
+          {/* EMAIL */}
+          <div className="mt-6">
+            <label className="text-sm font-black text-slate-700">
+              Email Address
+            </label>
+
+            <input
+              type="email"
+              placeholder="you@example.com"
+              className="mt-2 w-full rounded-2xl border border-slate-300 px-5 py-4 text-base outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+            />
+          </div>
+
+          {/* PHONE */}
+          <div className="mt-6">
+            <label className="text-sm font-black text-slate-700">
+              Phone Number
+            </label>
+
+            <input
+              type="tel"
+              placeholder="e.g. 024 000 0000"
+              className="mt-2 w-full rounded-2xl border border-slate-300 px-5 py-4 text-base outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+            />
+          </div>
+
+          {/* ACCOUNT TYPE */}
+          <div className="mt-6">
+            <label className="text-sm font-black text-slate-700">
+              Account Type
+            </label>
+
+            <select
+              value={accountType}
+              onChange={(e) =>
+                setAccountType(e.target.value as AccountType)
+              }
+              className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-5 py-4 text-base outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+            >
+              <option value="">Select account type</option>
+              <option value="buyer">Buyer — Registered Buyer</option>
+              <option value="seller">Seller — Individual</option>
+              <option value="business">Business / Company</option>
+            </select>
+          </div>
+
+          {/* BUYER VERIFICATION */}
+          {accountType === "buyer" && (
+            <div className="mt-8 rounded-2xl border border-blue-100 bg-blue-50 p-6">
+
+              <h3 className="text-xl font-black text-slate-900">
+                Buyer Verification
+              </h3>
+
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Registered buyers must provide a valid phone number and
+                passport picture for account verification.
+              </p>
+
+              <div className="mt-5">
+                <label className="text-sm font-black text-slate-700">
+                  Passport Picture
+                </label>
+
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="mt-2 block w-full rounded-2xl border border-slate-300 bg-white px-4 py-4 text-sm"
+                />
+
+                <p className="mt-2 text-xs text-slate-500">
+                  Upload a clear recent passport-size photograph.
+                </p>
               </div>
-
-              <p className="text-sm font-black uppercase tracking-[0.2em] text-blue-700">
-                Join Our Marketplace
-              </p>
-
-              <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">
-                Create an account
-              </h1>
-
-              <p className="mt-2 text-sm leading-6 text-slate-500">
-                Join BEST SALES GHANA and start buying, selling and connecting.
-              </p>
 
             </div>
+          )}
 
+          {/* INDIVIDUAL SELLER VERIFICATION */}
+          {accountType === "seller" && (
+            <div className="mt-8 rounded-2xl border border-blue-100 bg-blue-50 p-6">
 
-            {/* FORM */}
-            <form onSubmit={handleSubmit} className="space-y-5">
+              <h3 className="text-xl font-black text-slate-900">
+                Individual Seller Verification
+              </h3>
 
-              {/* FULL NAME */}
-              <div>
-                <label
-                  htmlFor="fullName"
-                  className="mb-2 block text-sm font-bold text-slate-700"
-                >
-                  Full Name
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Individual sellers must verify their identity before selling
+                on BEST SALES GHANA.
+              </p>
+
+              <div className="mt-5">
+                <label className="text-sm font-black text-slate-700">
+                  Identification Type
                 </label>
 
-                <input
-                  id="fullName"
-                  name="fullName"
-                  type="text"
-                  autoComplete="name"
-                  required
-                  placeholder="Enter your full name"
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
-                />
-              </div>
-
-
-              {/* EMAIL */}
-              <div>
-                <label
-                  htmlFor="email"
-                  className="mb-2 block text-sm font-bold text-slate-700"
-                >
-                  Email Address
-                </label>
-
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  placeholder="you@example.com"
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
-                />
-              </div>
-
-
-              {/* PHONE */}
-              <div>
-                <label
-                  htmlFor="phone"
-                  className="mb-2 block text-sm font-bold text-slate-700"
-                >
-                  Phone Number
-                </label>
-
-                <input
-                  id="phone"
-                  name="phone"
-                  type="tel"
-                  autoComplete="tel"
-                  required
-                  placeholder="e.g. 024 000 0000"
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
-                />
-              </div>
-
-
-              {/* ACCOUNT TYPE */}
-              <div>
-                <label
-                  htmlFor="accountType"
-                  className="mb-2 block text-sm font-bold text-slate-700"
-                >
-                  Account Type
-                </label>
-
-                <select
-                  id="accountType"
-                  name="accountType"
-                  defaultValue=""
-                  required
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-slate-900 outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
-                >
-                  <option value="" disabled>
-                    Select account type
+                <select className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-5 py-4 outline-none">
+                  <option value="">Select identification type</option>
+                  <option value="ghana-card">
+                    Ghana Card / NIA
                   </option>
-
-                  <option value="buyer">
-                    Buyer
-                  </option>
-
-                  <option value="seller">
-                    Seller
-                  </option>
-
-                  <option value="business">
-                    Business
+                  <option value="passport">
+                    Passport
                   </option>
                 </select>
               </div>
 
-
-              {/* PASSWORD */}
-              <div>
-
-                <label
-                  htmlFor="password"
-                  className="mb-2 block text-sm font-bold text-slate-700"
-                >
-                  Password
+              <div className="mt-5">
+                <label className="text-sm font-black text-slate-700">
+                  Upload Identification Document
                 </label>
 
-                <div className="relative">
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  className="mt-2 block w-full rounded-2xl border border-slate-300 bg-white px-4 py-4 text-sm"
+                />
+              </div>
 
-                  <input
-                    id="password"
-                    name="password"
-                    type={showPassword ? "text" : "password"}
-                    autoComplete="new-password"
-                    required
-                    minLength={8}
-                    placeholder="Create a password"
-                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 pr-20 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
-                  />
+              <div className="mt-5">
+                <label className="text-sm font-black text-slate-700">
+                  Passport Picture
+                </label>
 
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg px-2 py-1 text-sm font-bold text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-                  >
-                    {showPassword ? "Hide" : "Show"}
-                  </button>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="mt-2 block w-full rounded-2xl border border-slate-300 bg-white px-4 py-4 text-sm"
+                />
+              </div>
 
-                </div>
+              <div className="mt-5 rounded-xl bg-white p-4 text-sm text-slate-600">
+                <strong>Important:</strong> Individual sellers are subject to
+                identity verification and do not receive direct platform
+                payouts.
+              </div>
 
-                <p className="mt-2 text-xs text-slate-400">
-                  Password must contain at least 8 characters.
+            </div>
+          )}
+
+          {/* BUSINESS VERIFICATION */}
+          {accountType === "business" && (
+            <div className="mt-8 rounded-2xl border border-blue-100 bg-blue-50 p-6">
+
+              <h3 className="text-xl font-black text-slate-900">
+                Business / Company Verification
+              </h3>
+
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Registered businesses and companies must provide valid
+                corporate credentials before receiving platform payment
+                privileges.
+              </p>
+
+              {/* BUSINESS NAME */}
+              <div className="mt-5">
+                <label className="text-sm font-black text-slate-700">
+                  Registered Business / Company Name
+                </label>
+
+                <input
+                  type="text"
+                  placeholder="Enter registered company name"
+                  className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-5 py-4 outline-none focus:border-blue-600"
+                />
+              </div>
+
+              {/* BUSINESS CERTIFICATE */}
+              <div className="mt-5">
+                <label className="text-sm font-black text-slate-700">
+                  Business Registration Certificate
+                </label>
+
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  className="mt-2 block w-full rounded-2xl border border-slate-300 bg-white px-4 py-4 text-sm"
+                />
+              </div>
+
+              {/* TAX */}
+              <div className="mt-5">
+                <label className="text-sm font-black text-slate-700">
+                  Tax Identification Details
+                </label>
+
+                <input
+                  type="text"
+                  placeholder="Enter tax identification details"
+                  className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-5 py-4 outline-none focus:border-blue-600"
+                />
+              </div>
+
+              {/* REPRESENTATIVE */}
+              <div className="mt-5">
+                <label className="text-sm font-black text-slate-700">
+                  Authorized Representative
+                </label>
+
+                <input
+                  type="text"
+                  placeholder="Name of authorized representative"
+                  className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-5 py-4 outline-none focus:border-blue-600"
+                />
+              </div>
+
+              {/* REPRESENTATIVE ID */}
+              <div className="mt-5">
+                <label className="text-sm font-black text-slate-700">
+                  Representative Identification
+                </label>
+
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  className="mt-2 block w-full rounded-2xl border border-slate-300 bg-white px-4 py-4 text-sm"
+                />
+              </div>
+
+              {/* COMPANY CREDENTIALS */}
+              <div className="mt-5">
+                <label className="text-sm font-black text-slate-700">
+                  Company Credentials / Supporting Documents
+                </label>
+
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*,.pdf"
+                  className="mt-2 block w-full rounded-2xl border border-slate-300 bg-white px-4 py-4 text-sm"
+                />
+
+                <p className="mt-2 text-xs text-slate-500">
+                  Upload relevant company credentials required for verification.
+                </p>
+              </div>
+
+              {/* PAYMENT NOTICE */}
+              <div className="mt-6 rounded-xl border border-blue-200 bg-white p-5">
+
+                <h4 className="font-black text-blue-700">
+                  Platform Payment Eligibility
+                </h4>
+
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Verified registered businesses and companies are eligible
+                  to receive client payments through the BEST SALES GHANA
+                  platform.
+                </p>
+
+                <p className="mt-3 text-sm leading-6 text-slate-600">
+                  A 2.15% platform processing fee is automatically deducted
+                  from eligible transactions before the seller's net amount
+                  enters the payout process.
+                </p>
+
+                <p className="mt-3 text-sm leading-6 text-slate-600">
+                  Eligible payouts are subject to the applicable five (5)
+                  business-day processing period and any active dispute,
+                  compliance or verification review.
                 </p>
 
               </div>
 
+            </div>
+          )}
 
-              {/* CONFIRM PASSWORD */}
-              <div>
+          {/* PASSWORD */}
+          <div className="mt-8">
+            <label className="text-sm font-black text-slate-700">
+              Password
+            </label>
 
-                <label
-                  htmlFor="confirmPassword"
-                  className="mb-2 block text-sm font-bold text-slate-700"
-                >
-                  Confirm Password
-                </label>
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="Create a password"
+                className="mt-2 w-full rounded-2xl border border-slate-300 px-5 py-4 pr-20 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+              />
 
-                <div className="relative">
-
-                  <input
-                    id="confirmPassword"
-                    name="confirmPassword"
-                    type={showConfirmPassword ? "text" : "password"}
-                    autoComplete="new-password"
-                    required
-                    minLength={8}
-                    placeholder="Confirm your password"
-                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 pr-20 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
-                  />
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setShowConfirmPassword(!showConfirmPassword)
-                    }
-                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg px-2 py-1 text-sm font-bold text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-                  >
-                    {showConfirmPassword ? "Hide" : "Show"}
-                  </button>
-
-                </div>
-
-              </div>
-
-
-              {/* TERMS */}
-              <div className="flex items-start gap-3 pt-2">
-
-                <input
-                  id="terms"
-                  name="terms"
-                  type="checkbox"
-                  required
-                  className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-700 focus:ring-blue-600"
-                />
-
-                <label
-                  htmlFor="terms"
-                  className="text-sm leading-6 text-slate-600"
-                >
-                  I agree to the{" "}
-                  <Link
-                    href="/terms"
-                    className="font-bold text-blue-700 hover:text-blue-900"
-                  >
-                    Terms & Conditions
-                  </Link>{" "}
-                  and{" "}
-                  <Link
-                    href="/privacy"
-                    className="font-bold text-blue-700 hover:text-blue-900"
-                  >
-                    Privacy Policy
-                  </Link>
-                  .
-                </label>
-
-              </div>
-
-
-              {/* CREATE ACCOUNT */}
               <button
-                type="submit"
-                className="w-full rounded-xl bg-blue-700 px-5 py-4 font-black text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-blue-800 hover:shadow-xl"
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 mt-1 -translate-y-1/2 font-bold text-slate-500"
               >
-                Create Account
+                {showPassword ? "Hide" : "Show"}
               </button>
-
-            </form>
-
-
-            {/* DIVIDER */}
-            <div className="my-7 flex items-center gap-4">
-
-              <div className="h-px flex-1 bg-slate-200" />
-
-              <span className="text-sm font-bold text-slate-400">
-                OR
-              </span>
-
-              <div className="h-px flex-1 bg-slate-200" />
-
             </div>
 
+            <p className="mt-2 text-xs text-slate-400">
+              Password must contain at least 8 characters.
+            </p>
+          </div>
 
-            {/* GOOGLE */}
-            <button
-              type="button"
-              className="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-300 bg-white px-5 py-3.5 font-bold text-slate-700 transition hover:bg-slate-50 hover:shadow-md"
-            >
+          {/* CONFIRM PASSWORD */}
+          <div className="mt-6">
+            <label className="text-sm font-black text-slate-700">
+              Confirm Password
+            </label>
 
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
+            <div className="relative">
+              <input
+                type={showConfirmPassword ? "text" : "password"}
+                placeholder="Confirm your password"
+                className="mt-2 w-full rounded-2xl border border-slate-300 px-5 py-4 pr-20 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+              />
+
+              <button
+                type="button"
+                onClick={() =>
+                  setShowConfirmPassword(!showConfirmPassword)
+                }
+                className="absolute right-4 top-1/2 mt-1 -translate-y-1/2 font-bold text-slate-500"
               >
-                <path
-                  fill="#4285F4"
-                  d="M21.35 12.23c0-.72-.06-1.42-.18-2.09H12v3.95h5.24a4.48 4.48 0 0 1-1.94 2.94v2.45h3.14c1.84-1.69 2.91-4.18 2.91-7.25Z"
-                />
+                {showConfirmPassword ? "Hide" : "Show"}
+              </button>
+            </div>
+          </div>
 
-                <path
-                  fill="#34A853"
-                  d="M12 21.7c2.63 0 4.84-.87 6.45-2.37l-3.14-2.45c-.87.58-1.98.92-3.31.92-2.54 0-4.69-1.72-5.46-4.03H3.29v2.53A9.74 9.74 0 0 0 12 21.7Z"
-                />
+          {/* TERMS */}
+          <div className="mt-8 flex items-start gap-3">
 
-                <path
-                  fill="#FBBC05"
-                  d="M6.54 13.77A5.86 5.86 0 0 1 6.23 12c0-.61.1-1.2.31-1.77V7.7H3.29A9.72 9.72 0 0 0 2.25 12c0 1.57.38 3.05 1.04 4.3l3.25-2.53Z"
-                />
+            <input
+              type="checkbox"
+              className="mt-1 h-5 w-5 rounded border-slate-300"
+            />
 
-                <path
-                  fill="#EA4335"
-                  d="M12 6.2c1.43 0 2.71.49 3.72 1.46l2.79-2.79C16.83 3.28 14.63 2.3 12 2.3a9.74 9.74 0 0 0-8.71 5.4l3.25 2.53C7.31 7.92 9.46 6.2 12 6.2Z"
-                />
-              </svg>
-
-              Continue with Google
-
-            </button>
-
-
-            {/* LOGIN LINK */}
-            <div className="mt-8 border-t border-slate-200 pt-7 text-center">
-
-              <p className="text-sm text-slate-500">
-                Already have an account?
-              </p>
-
+            <p className="text-sm leading-6 text-slate-600">
+              I agree to the{" "}
               <Link
-                href="/login"
-                className="mt-2 inline-block font-black text-blue-700 hover:text-blue-900"
+                href="/terms"
+                className="font-bold text-blue-700 hover:underline"
               >
-                Sign in to your account
+                Terms & Conditions
+              </Link>{" "}
+              and{" "}
+              <Link
+                href="/privacy"
+                className="font-bold text-blue-700 hover:underline"
+              >
+                Privacy Policy
               </Link>
-
-            </div>
-
-
-            {/* BACK HOME */}
-            <Link
-              href="/"
-              className="mt-6 flex items-center justify-center gap-2 text-sm font-bold text-slate-500 transition hover:text-blue-700"
-            >
-              ← Back to BEST SALES GHANA
-            </Link>
+              .
+            </p>
 
           </div>
 
-        </div>
+          {/* CREATE ACCOUNT */}
+          <button
+            type="button"
+            className="mt-8 w-full rounded-2xl bg-blue-700 px-6 py-5 text-lg font-black text-white shadow-lg transition hover:bg-blue-800"
+          >
+            Create Account
+          </button>
 
+          {/* LOGIN */}
+          <p className="mt-6 text-center text-sm text-slate-500">
+            Already have an account?{" "}
+            <Link
+              href="/login"
+              className="font-black text-blue-700 hover:underline"
+            >
+              Sign In
+            </Link>
+          </p>
+
+        </div>
       </section>
 
-
       {/* FOOTER */}
-      <footer className="border-t border-slate-200 bg-slate-950 px-4 py-6 text-center text-sm text-slate-400">
+      <footer className="bg-slate-950 text-white">
+        <div className="mx-auto max-w-7xl px-4 py-10 text-center">
 
-        © 2026 All Prominent Ghana Limited. All rights reserved.
+          <div className="text-xl font-black">
+            BEST SALES GHANA
+          </div>
 
+          <p className="mt-2 text-sm text-slate-400">
+            Buy • Sell • Advertise • Connect
+          </p>
+
+          <p className="mt-6 text-sm text-slate-500">
+            © 2026 All Prominent Ghana Limited. All rights reserved.
+          </p>
+
+        </div>
       </footer>
 
     </main>
