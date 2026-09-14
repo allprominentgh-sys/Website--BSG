@@ -1,12 +1,261 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* =========================================================
    ALL PROMINENT GHANA
-   ANIMATED LOGO SYSTEM
+   BEST SALES GHANA
+   GLOBAL DESIGN SYSTEM
 ========================================================= */
 
-/* Logo wrapper */
+:root {
+  /* Brand Palette */
+  --primary-royal-blue: #4169e1;
+  --royal-blue: #4169e1;
+
+  --accent-cyan: #00ffff;
+  --sky-blue: #25a9e8;
+
+  --secondary-sea-blue: #006994;
+  --dark-blue: #071b3a;
+
+  /* UI */
+  --bg-dark: #071527;
+  --bg-card: #0d223a;
+
+  --text-primary: #ffffff;
+  --text-secondary: #a0c4df;
+
+  --text: #172b4d;
+  --muted: #667895;
+
+  --light: #f5f8fc;
+  --border: #dce6f2;
+
+  --white: #ffffff;
+
+  /* Functional */
+  --btn-bg: var(--primary-royal-blue);
+  --btn-hover: var(--accent-cyan);
+
+  --header-bg: var(--secondary-sea-blue);
+
+  --accent-glow: rgba(0, 255, 255, 0.2);
+
+  --success: #159447;
+  --warning: #f5b700;
+
+  /* Shadows */
+  --shadow-sm: 0 4px 16px rgba(16, 55, 105, 0.06);
+  --shadow: 0 12px 35px rgba(16, 55, 105, 0.09);
+  --shadow-lg: 0 20px 50px rgba(16, 55, 105, 0.14);
+
+  --radius: 18px;
+}
+
+/* =========================================================
+   GLOBAL RESET
+========================================================= */
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  background: var(--light);
+  color: var(--text);
+
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
+
+  line-height: 1.5;
+
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+::selection {
+  background: var(--primary-royal-blue);
+  color: #ffffff;
+}
+
+/* =========================================================
+   FORM ELEMENTS
+========================================================= */
+
+input,
+select,
+textarea {
+  color: var(--text);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #94a3b8;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+}
+
+/* =========================================================
+   SCROLLBAR
+========================================================= */
+
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+::-webkit-scrollbar-track {
+  background: #edf2f7;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #b9c8dc;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-royal-blue);
+}
+
+/* =========================================================
+   MARKETPLACE PAGE
+========================================================= */
+
+.marketplace-page {
+  min-height: 100vh;
+  background: var(--light);
+}
+
+/* =========================================================
+   BEST SALES GHANA HEADER
+========================================================= */
+
+.marketplace-page header,
+.header,
+.site-header {
+  background: rgba(255, 255, 255, 0.97);
+
+  color: var(--text);
+
+  border-bottom: 2px solid var(--primary-royal-blue);
+
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+
+  position: relative;
+  z-index: 50;
+}
+
+.marketplace-page header a,
+.header a,
+.site-header a {
+  transition:
+    color 0.2s ease,
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.marketplace-page header a:hover,
+.header a:hover,
+.site-header a:hover {
+  color: var(--primary-royal-blue);
+}
+
+/* =========================================================
+   HEADER CONTAINER
+========================================================= */
+
+.header-container {
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 1rem;
+}
+
+@media (min-width: 768px) {
+  .header-container {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+}
+
+/* =========================================================
+   LOGO
+========================================================= */
+
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+
+  font-weight: 900;
+  font-size: 1.3rem;
+
+  color: var(--primary-royal-blue);
+
+  text-decoration: none;
+}
+
+/* =========================================================
+   ANIMATED ALL PROMINENT LOGO
+========================================================= */
+
 .animated-logo {
   position: relative;
+
   display: inline-flex;
+
   align-items: center;
   justify-content: center;
 
@@ -15,17 +264,20 @@
 
   overflow: visible;
 
+  transform-origin: center;
+
   animation:
     logo-entrance 1.2s cubic-bezier(0.22, 1, 0.36, 1) forwards,
     logo-float 4s ease-in-out 1.2s infinite;
 
-  transform-origin: center center;
-
-  will-change: transform, opacity, filter;
+  will-change: transform, opacity;
 }
 
-/* Actual logo image */
 .animated-logo img {
+  position: relative;
+
+  z-index: 2;
+
   display: block;
 
   width: 100%;
@@ -33,26 +285,14 @@
 
   object-fit: contain;
 
-  position: relative;
-  z-index: 2;
-
-  /* Allows the white background of the uploaded logo
-     to blend better with a white/light header */
   mix-blend-mode: multiply;
 
-  animation:
-    logo-image-reveal 1.4s ease-out forwards;
+  animation: logo-image-reveal 1.4s ease-out forwards;
 
   transition:
     transform 0.35s ease,
     filter 0.35s ease;
-
-  will-change: transform, filter;
 }
-
-/* =========================================================
-   GLOW / AURA BEHIND LOGO
-========================================================= */
 
 .animated-logo::before {
   content: "";
@@ -86,10 +326,6 @@
     logo-glow-pulse 3.5s ease-in-out 1.8s infinite;
 }
 
-/* =========================================================
-   ROTATING LIGHT RING
-========================================================= */
-
 .animated-logo::after {
   content: "";
 
@@ -108,7 +344,7 @@
       from 0deg,
       transparent 0deg,
       transparent 230deg,
-      rgba(65, 105, 225, 0.0) 250deg,
+      rgba(65, 105, 225, 0) 250deg,
       rgba(0, 255, 255, 0.85) 285deg,
       rgba(65, 105, 225, 0.55) 315deg,
       transparent 345deg,
@@ -138,10 +374,6 @@
     logo-ring-spin 7s linear 1.8s infinite;
 }
 
-/* =========================================================
-   HOVER EFFECT
-========================================================= */
-
 .animated-logo:hover img {
   transform: scale(1.06);
 
@@ -150,17 +382,35 @@
     drop-shadow(0 0 18px rgba(0, 255, 255, 0.18));
 }
 
-.animated-logo:hover::before {
-  animation:
-    logo-glow-pulse-hover 1.5s ease-in-out infinite;
+/* =========================================================
+   LOGO SIZES
+========================================================= */
+
+.logo-large {
+  width: 220px;
+  height: 220px;
+}
+
+.logo-medium {
+  width: 170px;
+  height: 170px;
+}
+
+.logo-header {
+  width: 78px;
+  height: 78px;
+}
+
+.logo-small {
+  width: 58px;
+  height: 58px;
 }
 
 /* =========================================================
-   LOGO ENTRANCE
+   LOGO ANIMATIONS
 ========================================================= */
 
 @keyframes logo-entrance {
-
   0% {
     opacity: 0;
 
@@ -196,12 +446,7 @@
   }
 }
 
-/* =========================================================
-   CONTINUOUS FLOAT
-========================================================= */
-
 @keyframes logo-float {
-
   0% {
     transform: translateY(0);
   }
@@ -215,12 +460,7 @@
   }
 }
 
-/* =========================================================
-   IMAGE REVEAL
-========================================================= */
-
 @keyframes logo-image-reveal {
-
   0% {
     opacity: 0;
 
@@ -246,12 +486,7 @@
   }
 }
 
-/* =========================================================
-   GLOW ENTRANCE
-========================================================= */
-
 @keyframes logo-glow-in {
-
   0% {
     opacity: 0;
     transform: scale(0.5);
@@ -268,12 +503,7 @@
   }
 }
 
-/* =========================================================
-   GLOW PULSE
-========================================================= */
-
 @keyframes logo-glow-pulse {
-
   0% {
     opacity: 0.35;
     transform: scale(0.94);
@@ -290,30 +520,7 @@
   }
 }
 
-@keyframes logo-glow-pulse-hover {
-
-  0% {
-    opacity: 0.4;
-    transform: scale(0.95);
-  }
-
-  50% {
-    opacity: 1;
-    transform: scale(1.12);
-  }
-
-  100% {
-    opacity: 0.4;
-    transform: scale(0.95);
-  }
-}
-
-/* =========================================================
-   ROTATING RING
-========================================================= */
-
 @keyframes ring-appear {
-
   0% {
     opacity: 0;
     transform: scale(0.7);
@@ -326,7 +533,6 @@
 }
 
 @keyframes logo-ring-spin {
-
   from {
     transform: rotate(0deg);
   }
@@ -337,31 +543,533 @@
 }
 
 /* =========================================================
-   LOGO SIZES
+   NAVIGATION
 ========================================================= */
 
-/* Desktop */
-.animated-logo.logo-large {
-  width: 220px;
-  height: 220px;
+.nav-links {
+  display: flex;
+
+  flex-wrap: wrap;
+
+  align-items: center;
+
+  gap: 1rem;
 }
 
-/* Standard */
-.animated-logo.logo-medium {
-  width: 170px;
-  height: 170px;
+.nav-links a {
+  color: var(--text);
+
+  font-size: 0.95rem;
+
+  font-weight: 600;
 }
 
-/* Header */
-.animated-logo.logo-header {
-  width: 78px;
-  height: 78px;
+.nav-links a:hover {
+  color: var(--primary-royal-blue);
 }
 
-/* Small/mobile */
-.animated-logo.logo-small {
-  width: 58px;
-  height: 58px;
+/* =========================================================
+   MAIN CONTENT
+========================================================= */
+
+.main-content {
+  width: 100%;
+
+  max-width: 1240px;
+
+  margin: 0 auto;
+
+  padding: 2rem 1.5rem;
+}
+
+/* =========================================================
+   HERO
+========================================================= */
+
+.marketplace-page section:first-of-type,
+.hero {
+  position: relative;
+
+  overflow: hidden;
+
+  background:
+    radial-gradient(
+      circle at 85% 15%,
+      rgba(37, 169, 232, 0.35),
+      transparent 30%
+    ),
+    linear-gradient(
+      135deg,
+      #0754c9 0%,
+      #147be1 50%,
+      #25a9e8 100%
+    );
+}
+
+.marketplace-page section:first-of-type::before,
+.hero::before {
+  content: "";
+
+  position: absolute;
+
+  width: 520px;
+  height: 520px;
+
+  right: -250px;
+  top: -180px;
+
+  border-radius: 50%;
+
+  background: rgba(255, 255, 255, 0.08);
+
+  pointer-events: none;
+}
+
+.marketplace-page section:first-of-type::after,
+.hero::after {
+  content: "";
+
+  position: absolute;
+
+  width: 340px;
+  height: 340px;
+
+  left: -190px;
+  bottom: -220px;
+
+  border-radius: 50%;
+
+  background: rgba(255, 255, 255, 0.06);
+
+  pointer-events: none;
+}
+
+/* =========================================================
+   HERO TEXT
+========================================================= */
+
+.marketplace-page section:first-of-type h1,
+.hero h1 {
+  color: #ffffff;
+
+  font-size: clamp(
+    2.25rem,
+    6vw,
+    4.5rem
+  );
+
+  font-weight: 900;
+
+  line-height: 1.05;
+
+  letter-spacing: -0.055em;
+
+  margin-bottom: 1rem;
+}
+
+.marketplace-page section:first-of-type h1 span {
+  color: #ffffff;
+}
+
+.hero-subtext,
+.marketplace-page section:first-of-type p.mt-6.max-w-3xl {
+  color: rgba(255, 255, 255, 0.92);
+
+  font-size: 1rem;
+
+  max-width: 700px;
+
+  margin-bottom: 1.5rem;
+}
+
+/* =========================================================
+   SEARCH BAR
+========================================================= */
+
+.hero-search-bar,
+.marketplace-page section:first-of-type div.mt-8.rounded-2xl {
+  position: relative;
+
+  z-index: 5;
+
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 0.75rem;
+
+  padding: 0.75rem;
+
+  border-radius: 14px;
+
+  border: 1px solid rgba(255, 255, 255, 0.3);
+
+  background: rgba(255, 255, 255, 0.15);
+
+  box-shadow:
+    0 18px 45px rgba(0, 37, 92, 0.18);
+
+  backdrop-filter: blur(14px);
+
+  -webkit-backdrop-filter: blur(14px);
+}
+
+@media (min-width: 640px) {
+  .hero-search-bar {
+    flex-direction: row;
+
+    align-items: center;
+  }
+}
+
+.marketplace-page section:first-of-type input,
+.marketplace-page section:first-of-type select {
+  background: #ffffff;
+
+  border-color: transparent;
+}
+
+.input-group {
+  display: flex;
+
+  align-items: center;
+
+  flex: 1;
+
+  background: #ffffff;
+
+  padding: 0.5rem 0.75rem;
+
+  border-radius: 8px;
+}
+
+.input-group input {
+  width: 100%;
+
+  border: none;
+
+  outline: none;
+
+  background: transparent;
+
+  margin-left: 0.5rem;
+}
+
+/* =========================================================
+   BUTTONS
+========================================================= */
+
+.btn-primary,
+.marketplace-page section:first-of-type button {
+  background: var(--primary-royal-blue);
+
+  color: #ffffff;
+
+  border: none;
+
+  padding: 0.7rem 1.35rem;
+
+  border-radius: 8px;
+
+  font-weight: 700;
+
+  cursor: pointer;
+
+  white-space: nowrap;
+
+  transition:
+    transform 0.25s ease,
+    background 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.btn-primary:hover,
+.marketplace-page section:first-of-type button:hover {
+  background: var(--accent-cyan);
+
+  color: #000000;
+
+  transform: translateY(-2px);
+
+  box-shadow:
+    0 0 16px var(--accent-glow);
+}
+
+/* =========================================================
+   FILTER SECTION
+========================================================= */
+
+.filter-section,
+#latest-listings aside {
+  background: #ffffff;
+
+  padding: 1.5rem;
+
+  border-radius: var(--radius);
+
+  border: 1px solid var(--border);
+
+  margin-bottom: 2.5rem;
+
+  box-shadow: var(--shadow-sm);
+}
+
+.filter-section h2 {
+  font-size: 1.25rem;
+
+  margin-bottom: 1rem;
+
+  color: var(--dark-blue);
+}
+
+.filters-grid {
+  display: grid;
+
+  grid-template-columns: 1fr;
+
+  gap: 1rem;
+}
+
+@media (min-width: 640px) {
+  .filters-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .filters-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.filter-group {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 0.35rem;
+}
+
+.filter-group label {
+  font-size: 0.85rem;
+
+  font-weight: 700;
+
+  color: var(--text);
+}
+
+.action-group {
+  justify-content: flex-end;
+}
+
+/* =========================================================
+   LISTINGS
+========================================================= */
+
+#latest-listings {
+  background: var(--light);
+}
+
+.listings-section .badge {
+  font-size: 0.75rem;
+
+  letter-spacing: 0.08em;
+
+  color: var(--primary-royal-blue);
+
+  font-weight: 800;
+}
+
+.listings-section h2 {
+  font-size: 1.75rem;
+
+  color: var(--dark-blue);
+
+  font-weight: 900;
+}
+
+.listings-section .meta {
+  color: var(--muted);
+
+  font-size: 0.9rem;
+
+  margin-top: 0.25rem;
+}
+
+/* =========================================================
+   LISTING CARDS
+========================================================= */
+
+#latest-listings a.group {
+  border-color: var(--border);
+
+  box-shadow: var(--shadow-sm);
+
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    border-color 0.22s ease;
+}
+
+#latest-listings a.group:hover {
+  border-color: #b9d2ef;
+
+  box-shadow: var(--shadow-lg);
+
+  transform: translateY(-3px);
+}
+
+/* =========================================================
+   PRODUCT IMAGE AREA
+========================================================= */
+
+#latest-listings a.group > div:first-child {
+  background:
+    radial-gradient(
+      circle at center,
+      rgba(37, 169, 232, 0.12),
+      transparent 55%
+    ),
+    linear-gradient(
+      145deg,
+      #eaf4ff,
+      #f8fbff
+    );
+}
+
+#latest-listings a.group:hover > div:first-child {
+  background:
+    radial-gradient(
+      circle at center,
+      rgba(37, 169, 232, 0.2),
+      transparent 55%
+    ),
+    linear-gradient(
+      145deg,
+      #e5f2ff,
+      #f8fcff
+    );
+}
+
+/* =========================================================
+   TOP ADS
+========================================================= */
+
+#latest-listings
+  div.mb-8.overflow-hidden.rounded-2xl {
+  position: relative;
+
+  overflow: hidden;
+
+  background:
+    radial-gradient(
+      circle at 90% 10%,
+      rgba(37, 169, 232, 0.45),
+      transparent 30%
+    ),
+    linear-gradient(
+      120deg,
+      #063f9e,
+      #1557c0 50%,
+      #1e94df
+    );
+
+  box-shadow:
+    0 18px 40px rgba(21, 87, 192, 0.2);
+}
+
+/* =========================================================
+   SELLER CTA
+========================================================= */
+
+.marketplace-page section.border-y {
+  background:
+    linear-gradient(
+      180deg,
+      #ffffff 0%,
+      #f5f9ff 100%
+    );
+}
+
+.marketplace-page section.border-y a {
+  box-shadow:
+    0 10px 25px rgba(21, 87, 192, 0.18);
+
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.marketplace-page section.border-y a:hover {
+  transform: translateY(-2px);
+
+  box-shadow:
+    0 14px 30px rgba(21, 87, 192, 0.25);
+}
+
+/* =========================================================
+   FEATURE CARDS
+========================================================= */
+
+.card {
+  background-color: var(--bg-card);
+
+  border: 1px solid var(--secondary-sea-blue);
+
+  border-radius: var(--radius);
+
+  padding: 20px;
+
+  box-shadow: var(--shadow);
+
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease,
+    border-color 0.25s ease;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+
+  border-color: var(--accent-cyan);
+
+  box-shadow:
+    0 15px 40px var(--accent-glow);
+}
+
+.card-title {
+  color: var(--primary-royal-blue);
+
+  font-weight: 800;
+}
+
+.card-highlight {
+  color: var(--accent-cyan);
+}
+
+/* =========================================================
+   FOOTER
+========================================================= */
+
+.marketplace-page footer {
+  background:
+    radial-gradient(
+      circle at 85% 10%,
+      rgba(23, 105, 224, 0.18),
+      transparent 30%
+    ),
+    #061426;
+
+  color: #ffffff;
+}
+
+.marketplace-page footer a {
+  transition:
+    color 0.2s ease;
+}
+
+.marketplace-page footer a:hover {
+  color: var(--accent-cyan);
 }
 
 /* =========================================================
@@ -375,48 +1083,129 @@
     height: 130px;
   }
 
-  .animated-logo.logo-large {
+  .logo-large {
     width: 155px;
     height: 155px;
   }
 
-  .animated-logo.logo-medium {
+  .logo-medium {
     width: 130px;
     height: 130px;
   }
 
-  .animated-logo.logo-header {
+  .logo-header {
     width: 62px;
     height: 62px;
   }
 
-  .animated-logo.logo-small {
+  .logo-small {
     width: 52px;
     height: 52px;
+  }
+
+  .marketplace-page section:first-of-type {
+    background:
+      radial-gradient(
+        circle at 100% 0%,
+        rgba(37, 169, 232, 0.4),
+        transparent 35%
+      ),
+      linear-gradient(
+        145deg,
+        #0754c9,
+        #1684df 55%,
+        #25a9e8
+      );
+  }
+
+  .marketplace-page section:first-of-type h1,
+  .hero h1 {
+    font-size: clamp(
+      46px,
+      15vw,
+      68px
+    );
+
+    line-height: 0.98;
+
+    letter-spacing: -0.06em;
+  }
+
+  .marketplace-page section:first-of-type p.mt-6.max-w-3xl {
+    font-size: 16px;
+
+    line-height: 1.6;
+  }
+
+  .marketplace-page section:first-of-type
+    div.mt-8.rounded-2xl {
+    padding: 8px;
+
+    border-radius: 16px;
+  }
+
+  #latest-listings {
+    padding-top: 38px;
+  }
+
+  #latest-listings
+    a.group
+    > div:first-child {
+    height: 210px;
+  }
+
+  .marketplace-page footer {
+    text-align: left;
   }
 }
 
 /* =========================================================
-   REDUCED MOTION ACCESSIBILITY
+   SMALL PHONES
+========================================================= */
+
+@media (max-width: 390px) {
+
+  .marketplace-page section:first-of-type h1,
+  .hero h1 {
+    font-size: 47px;
+  }
+
+  .marketplace-page header {
+    position: relative;
+  }
+
+  #latest-listings {
+    padding-left: 14px;
+
+    padding-right: 14px;
+  }
+}
+
+/* =========================================================
+   ACCESSIBILITY
 ========================================================= */
 
 @media (prefers-reduced-motion: reduce) {
 
-  .animated-logo,
-  .animated-logo img,
-  .animated-logo::before,
-  .animated-logo::after {
-    animation: none !important;
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+
     transition: none !important;
+
+    animation: none !important;
   }
 
   .animated-logo {
     opacity: 1;
+
     transform: none;
   }
 
   .animated-logo img {
     opacity: 1;
+
     filter: none;
   }
 
