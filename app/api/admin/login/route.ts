@@ -1,54 +1,95 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const ADMIN_EMAIL = "admin@bestsalesgh.com";
-const ADMIN_PASSWORD = "senakwame";
+
+/*
+  IMPORTANT:
+  For production, the password should be stored in Vercel Environment
+  Variables instead of inside this file.
+
+  Vercel:
+  ADMIN_PASSWORD = your-admin-password
+*/
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+
+const COOKIE_NAME = "bsg_admin_session";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    const email = String(body.email || "").trim().toLowerCase();
-    const password = String(body.password || "");
+    const email =
+      typeof body.email === "string"
+        ? body.email.trim().toLowerCase()
+        : "";
+
+    const password =
+      typeof body.password === "string"
+        ? body.password
+        : "";
+
+    const rememberMe = body.rememberMe === true;
 
     if (!email || !password) {
       return NextResponse.json(
         {
-          message: "Please enter your admin email and password.",
+          success: false,
+          message: "Email and password are required.",
         },
         { status: 400 }
       );
     }
 
+    /*
+      Check administrator credentials.
+    */
     if (
-      email !== ADMIN_EMAIL.toLowerCase() ||
+      email !== ADMIN_EMAIL ||
+      !ADMIN_PASSWORD ||
       password !== ADMIN_PASSWORD
     ) {
       return NextResponse.json(
         {
-          message: "Invalid admin email or password.",
+          success: false,
+          message: "Invalid administrator email or password.",
         },
         { status: 401 }
       );
     }
 
+    /*
+      Create a simple signed-in session marker.
+
+      The admin area will use this cookie to determine whether
+      the administrator has successfully logged in.
+    */
+    const sessionValue = `admin-${Date.now()}-${crypto.randomUUID()}`;
+
     const response = NextResponse.json({
       success: true,
-      message: "Admin login successful.",
+      message: "Administrator login successful.",
     });
 
-    response.cookies.set("bsg_admin_session", "authenticated", {
+    response.cookies.set({
+      name: COOKIE_NAME,
+      value: sessionValue,
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      maxAge: 60 * 60 * 24,
+      maxAge: rememberMe
+        ? 60 * 60 * 24 * 30
+        : 60 * 60 * 8,
     });
 
     return response;
-  } catch {
+  } catch (error) {
+    console.error("ADMIN LOGIN ERROR:", error);
+
     return NextResponse.json(
       {
-        message: "Something went wrong. Please try again.",
+        success: false,
+        message: "Unable to process administrator login.",
       },
       { status: 500 }
     );
