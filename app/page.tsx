@@ -1,493 +1,618 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
 
-type CategoryData = {
-  name: string;
-  icon: string;
-  description: string;
-  listings: {
-    title: string;
-    description: string;
-    icon: string;
-    price: string;
-    location: string;
-  }[];
-};
+export default function HomePage() {
+  const categories = [
+    {
+      icon: "🚗",
+      name: "Vehicles",
+      href: "/categories/vehicles",
+    },
+    {
+      icon: "🏠",
+      name: "Property",
+      href: "/categories/property",
+    },
+    {
+      icon: "📱",
+      name: "Electronics",
+      href: "/categories/electronics",
+    },
+    {
+      icon: "⚙️",
+      name: "Machinery",
+      href: "/categories/machinery",
+    },
+    {
+      icon: "🌾",
+      name: "Agriculture",
+      href: "/categories/agriculture",
+    },
+    {
+      icon: "🛠️",
+      name: "Services",
+      href: "/categories/services",
+    },
+  ];
 
-const categoryData: Record<string, CategoryData> = {
-  vehicles: {
-    name: "Vehicles",
-    icon: "🚗",
-    description:
-      "Buy and sell cars, trucks, buses, motorcycles and other vehicles across Ghana.",
-    listings: [
-      {
-        title: "Toyota Corolla 2020",
-        description: "Clean and well-maintained Toyota Corolla.",
-        icon: "🚗",
-        price: "GH₵ 185,000",
-        location: "Kumasi",
-      },
-      {
-        title: "Toyota Land Cruiser",
-        description: "Premium SUV available for sale.",
-        icon: "🚙",
-        price: "GH₵ 650,000",
-        location: "Accra",
-      },
-      {
-        title: "Mercedes-Benz",
-        description: "Executive vehicle in excellent condition.",
-        icon: "🚘",
-        price: "GH₵ 480,000",
-        location: "East Legon",
-      },
-      {
-        title: "Commercial Truck",
-        description: "Heavy-duty truck for business operations.",
-        icon: "🚚",
-        price: "GH₵ 350,000",
-        location: "Tema",
-      },
-    ],
-  },
-
-  property: {
-    name: "Property",
-    icon: "🏠",
-    description:
-      "Find houses, apartments, land, commercial properties and real estate opportunities.",
-    listings: [
-      {
-        title: "Modern 3 Bedroom House",
-        description: "Beautiful modern home in a prime location.",
-        icon: "🏠",
-        price: "GH₵ 850,000",
-        location: "East Legon",
-      },
-      {
-        title: "4 Bedroom Luxury House",
-        description: "Spacious family home with modern facilities.",
-        icon: "🏡",
-        price: "GH₵ 1,250,000",
-        location: "Accra",
-      },
-      {
-        title: "Serviced Apartment",
-        description: "Fully serviced apartment available.",
-        icon: "🏢",
-        price: "GH₵ 450,000",
-        location: "Cantonments",
-      },
-      {
-        title: "Commercial Land",
-        description: "Prime land suitable for commercial development.",
-        icon: "🌍",
-        price: "GH₵ 2,000,000",
-        location: "Tema",
-      },
-    ],
-  },
-
-  electronics: {
-    name: "Electronics",
-    icon: "📱",
-    description:
-      "Shop phones, laptops, televisions, computers and other electronic products.",
-    listings: [
-      {
-        title: "iPhone 15 Pro Max",
-        description: "Premium smartphone with excellent condition.",
-        icon: "📱",
-        price: "GH₵ 14,500",
-        location: "Accra",
-      },
-      {
-        title: "HP Laptop Core i7",
-        description: "Powerful laptop for business and professional use.",
-        icon: "💻",
-        price: "GH₵ 8,500",
-        location: "Accra",
-      },
-      {
-        title: "Samsung Smart TV",
-        description: "Large-screen smart television.",
-        icon: "📺",
-        price: "GH₵ 9,500",
-        location: "Kumasi",
-      },
-      {
-        title: "MacBook Pro",
-        description: "Professional Apple laptop.",
-        icon: "💻",
-        price: "GH₵ 22,000",
-        location: "Tema",
-      },
-    ],
-  },
-
-  machinery: {
-    name: "Machinery",
-    icon: "⚙️",
-    description:
-      "Discover industrial machinery, printing equipment, construction equipment and tools.",
-    listings: [
-      {
-        title: "Industrial Printing Machine",
-        description: "Professional printing equipment for businesses.",
-        icon: "🏭",
-        price: "GH₵ 250,000",
-        location: "Accra",
-      },
-      {
-        title: "Construction Excavator",
-        description: "Heavy-duty excavator for construction projects.",
-        icon: "🚜",
-        price: "GH₵ 850,000",
-        location: "Tema",
-      },
-      {
-        title: "DTF Printing Machine",
-        description: "Commercial direct-to-film printing machine.",
-        icon: "🖨️",
-        price: "GH₵ 75,000",
-        location: "Accra",
-      },
-      {
-        title: "Industrial Generator",
-        description: "Large-capacity generator for industrial operations.",
-        icon: "⚡",
-        price: "GH₵ 180,000",
-        location: "Kumasi",
-      },
-    ],
-  },
-
-  agriculture: {
-    name: "Agriculture",
-    icon: "🌾",
-    description:
-      "Agricultural machinery, farming equipment, livestock and farming opportunities.",
-    listings: [
-      {
-        title: "Tractor",
-        description: "Agricultural tractor for large-scale farming.",
-        icon: "🚜",
-        price: "GH₵ 320,000",
-        location: "Kumasi",
-      },
-      {
-        title: "Irrigation Equipment",
-        description: "Modern irrigation system for farms.",
-        icon: "💧",
-        price: "GH₵ 45,000",
-        location: "Tamale",
-      },
-      {
-        title: "Maize Processing Machine",
-        description: "Commercial agricultural processing equipment.",
-        icon: "🌽",
-        price: "GH₵ 85,000",
-        location: "Sunyani",
-      },
-      {
-        title: "Poultry Equipment",
-        description: "Complete poultry farming equipment.",
-        icon: "🐔",
-        price: "GH₵ 35,000",
-        location: "Accra",
-      },
-    ],
-  },
-
-  services: {
-    name: "Services",
-    icon: "🛠️",
-    description:
-      "Find professional, business, technical, transport and other services across Ghana.",
-    listings: [
-      {
-        title: "Business Consulting",
-        description: "Professional business consulting services.",
-        icon: "💼",
-        price: "Contact Seller",
-        location: "Accra",
-      },
-      {
-        title: "Graphic Design Services",
-        description: "Professional graphic design and branding.",
-        icon: "🎨",
-        price: "From GH₵ 500",
-        location: "Accra",
-      },
-      {
-        title: "Building & Construction",
-        description: "Professional construction services.",
-        icon: "🏗️",
-        price: "Contact Seller",
-        location: "Kumasi",
-      },
-      {
-        title: "Delivery Services",
-        description: "Local and nationwide delivery services.",
-        icon: "🚚",
-        price: "Contact Seller",
-        location: "Tema",
-      },
-    ],
-  },
-};
-
-export function generateStaticParams() {
-  return Object.keys(categoryData).map((category) => ({
-    category,
-  }));
-}
-
-export default async function CategoryPage({
-  params,
-}: {
-  params: Promise<{ category: string }>;
-}) {
-  const { category } = await params;
-
-  const data = categoryData[category.toLowerCase()];
-
-  if (!data) {
-    notFound();
-  }
+  const listings = [
+    {
+      icon: "🏭",
+      title: "Industrial Machinery",
+      category: "Machinery & Equipment",
+      href: "/categories/machinery",
+    },
+    {
+      icon: "🚙",
+      title: "Vehicles & Auto",
+      category: "Vehicles",
+      href: "/categories/vehicles",
+    },
+    {
+      icon: "🏡",
+      title: "Property & Real Estate",
+      category: "Property",
+      href: "/categories/property",
+    },
+    {
+      icon: "🖨️",
+      title: "Printing Equipment",
+      category: "Business Equipment",
+      href: "/categories/machinery",
+    },
+    {
+      icon: "📱",
+      title: "Phones & Electronics",
+      category: "Electronics",
+      href: "/categories/electronics",
+    },
+    {
+      icon: "🌱",
+      title: "Agriculture Equipment",
+      category: "Agriculture",
+      href: "/categories/agriculture",
+    },
+  ];
 
   return (
     <main className="min-h-screen bg-slate-50">
-      <style jsx global>{`
-        * {
-          box-sizing: border-box;
-        }
 
-        body {
-          margin: 0;
-          font-family: Arial, Helvetica, sans-serif;
-        }
-
-        a {
-          text-decoration: none;
-        }
-      `}</style>
-
-      {/* HEADER */}
+      {/* =====================================================
+          HEADER
+      ===================================================== */}
       <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-          <Link href="/" className="flex items-center gap-3">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+
+          {/* LOGO */}
+          <Link
+            href="/"
+            className="flex items-center gap-3"
+            aria-label="BEST SALES GHANA Home"
+          >
             <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-700 text-2xl shadow-md">
               ⭐
             </div>
 
             <div>
-              <div className="text-lg font-black tracking-tight text-slate-900">
+              <div className="text-lg font-black tracking-tight text-slate-900 sm:text-xl">
                 BEST SALES GHANA
               </div>
 
-              <div className="text-xs text-slate-500">
+              <div className="text-xs font-medium text-slate-500">
                 Buy • Sell • Advertise • Connect
               </div>
             </div>
           </Link>
 
-          <nav className="hidden items-center gap-6 md:flex">
-            <Link
-              href="/"
-              className="font-semibold text-slate-700 hover:text-blue-700"
-            >
-              Home
-            </Link>
+          {/* DESKTOP NAVIGATION */}
+          <nav className="hidden items-center gap-5 md:flex">
 
             <Link
               href="/categories"
-              className="font-semibold text-blue-700"
+              className="font-semibold text-slate-700 transition hover:text-blue-700"
             >
               Categories
             </Link>
 
             <Link
               href="/listings"
-              className="font-semibold text-slate-700 hover:text-blue-700"
+              className="font-semibold text-slate-700 transition hover:text-blue-700"
             >
               Listings
             </Link>
 
             <Link
               href="/sell"
-              className="rounded-xl bg-blue-700 px-5 py-3 font-bold text-white shadow-md hover:bg-blue-800"
+              className="font-semibold text-slate-700 transition hover:text-blue-700"
+            >
+              Sell
+            </Link>
+
+            <Link
+              href="/about"
+              className="font-semibold text-slate-700 transition hover:text-blue-700"
+            >
+              About
+            </Link>
+
+            <Link
+              href="/login"
+              className="rounded-xl border border-blue-700 px-5 py-3 font-bold text-blue-700 transition hover:bg-blue-50"
+            >
+              Login
+            </Link>
+
+            <Link
+              href="/sell"
+              className="rounded-xl bg-blue-700 px-5 py-3 font-bold text-white shadow-lg transition hover:bg-blue-800"
             >
               Post an Ad
             </Link>
+
           </nav>
+
+          {/* MOBILE ACTIONS */}
+          <div className="flex items-center gap-2 md:hidden">
+
+            <Link
+              href="/login"
+              className="rounded-xl border border-blue-700 px-3 py-2 text-sm font-bold text-blue-700"
+            >
+              Login
+            </Link>
+
+            <Link
+              href="/sell"
+              className="rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-bold text-white shadow-lg"
+            >
+              Sell
+            </Link>
+
+          </div>
         </div>
       </header>
 
-      {/* CATEGORY HERO */}
-      <section className="bg-gradient-to-br from-blue-800 via-blue-700 to-cyan-400 text-white">
-        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
-          <Link
-            href="/categories"
-            className="inline-flex font-bold text-cyan-100 hover:text-white"
-          >
-            ← All Categories
-          </Link>
+      {/* =====================================================
+          HERO
+      ===================================================== */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-blue-700 via-blue-600 to-cyan-400">
 
-          <div className="mt-8 flex flex-col gap-6 sm:flex-row sm:items-center">
-            <div className="flex h-24 w-24 items-center justify-center rounded-3xl bg-white/15 text-6xl shadow-xl backdrop-blur">
-              {data.icon}
-            </div>
+        <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full bg-white/10" />
 
-            <div>
-              <p className="text-sm font-black uppercase tracking-[0.2em] text-cyan-100">
-                Marketplace Category
-              </p>
+        <div className="absolute -bottom-40 -left-32 h-96 w-96 rounded-full bg-white/10" />
 
-              <h1 className="mt-2 text-5xl font-black sm:text-6xl">
-                {data.name}
-              </h1>
+        <div className="relative mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8 lg:py-28">
 
-              <p className="mt-4 max-w-2xl text-lg leading-8 text-white/90">
-                {data.description}
-              </p>
-            </div>
+          <div className="max-w-4xl">
+
+            <p className="mb-5 text-sm font-black uppercase tracking-[0.2em] text-cyan-100">
+              Ghana&apos;s Marketplace
+            </p>
+
+            <h1 className="text-5xl font-black leading-none tracking-tight text-white sm:text-6xl lg:text-7xl">
+              Buy.
+              <br />
+              Sell.
+              <br />
+              <span className="text-cyan-100">
+                Connect.
+              </span>
+            </h1>
+
+            <p className="mt-6 max-w-3xl text-lg leading-8 text-white/90 sm:text-xl">
+              Discover products, vehicles, property, machinery, equipment,
+              services and business opportunities from sellers across Ghana.
+            </p>
+
+            {/* SEARCH */}
+            <form
+              action="/listings"
+              method="GET"
+              className="mt-8 rounded-2xl border border-white/30 bg-white/15 p-2 shadow-2xl backdrop-blur-xl"
+            >
+              <div className="grid gap-2 sm:grid-cols-[1fr_180px_auto]">
+
+                <div className="flex items-center rounded-xl bg-white px-4">
+
+                  <svg
+                    width="22"
+                    height="22"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    className="mr-3 shrink-0 text-slate-400"
+                    aria-hidden="true"
+                  >
+                    <circle cx="11" cy="11" r="7" />
+                    <path d="m20 20-4-4" />
+                  </svg>
+
+                  <input
+                    type="text"
+                    name="q"
+                    placeholder="What are you looking for?"
+                    className="w-full border-0 bg-transparent py-4 text-slate-900 outline-none"
+                  />
+
+                </div>
+
+                <select
+                  name="category"
+                  className="rounded-xl border-0 bg-white px-4 py-4 text-slate-800 outline-none"
+                  defaultValue=""
+                >
+                  <option value="" disabled>
+                    Category
+                  </option>
+
+                  <option value="vehicles">
+                    Vehicles
+                  </option>
+
+                  <option value="property">
+                    Property
+                  </option>
+
+                  <option value="electronics">
+                    Electronics
+                  </option>
+
+                  <option value="machinery">
+                    Machinery
+                  </option>
+
+                  <option value="agriculture">
+                    Agriculture
+                  </option>
+
+                  <option value="services">
+                    Services
+                  </option>
+                </select>
+
+                <button
+                  type="submit"
+                  className="rounded-xl bg-slate-950 px-7 py-4 font-bold text-white transition hover:-translate-y-0.5 hover:bg-slate-900"
+                >
+                  Search
+                </button>
+
+              </div>
+            </form>
+
           </div>
         </div>
       </section>
 
-      {/* CONTENT */}
+      {/* =====================================================
+          CATEGORIES
+      ===================================================== */}
       <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+
         <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+
           <div>
+
             <p className="text-sm font-black uppercase tracking-widest text-blue-700">
-              Browse
+              Explore
             </p>
 
-            <h2 className="mt-2 text-3xl font-black text-slate-900">
-              {data.name} Listings
+            <h2 className="mt-2 text-3xl font-black text-slate-900 sm:text-4xl">
+              Popular Categories
             </h2>
 
             <p className="mt-2 text-slate-500">
-              {data.listings.length} listings available
+              Find what you need from sellers across Ghana.
             </p>
+
           </div>
 
           <Link
-            href="/sell"
-            className="inline-flex rounded-xl bg-blue-700 px-6 py-3 font-black text-white shadow-lg hover:bg-blue-800"
+            href="/categories"
+            className="font-bold text-blue-700 transition hover:text-blue-900"
           >
-            + Post an Ad
+            View all categories →
           </Link>
+
         </div>
 
-        {/* SEARCH / FILTER BAR */}
-        <div className="mb-10 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="grid gap-3 md:grid-cols-[1fr_180px_160px]">
-            <input
-              type="search"
-              placeholder={`Search ${data.name.toLowerCase()}...`}
-              className="rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-600"
-            />
+        {/* CATEGORY CARDS */}
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
 
-            <select className="rounded-xl border border-slate-200 px-4 py-3 outline-none">
-              <option>All Ghana</option>
-              <option>Accra</option>
-              <option>Kumasi</option>
-              <option>Tema</option>
-              <option>East Legon</option>
-            </select>
-
-            <button
-              type="button"
-              className="rounded-xl bg-blue-700 px-6 py-3 font-bold text-white hover:bg-blue-800"
+          {categories.map((category) => (
+            <Link
+              key={category.name}
+              href={category.href}
+              className="group rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm transition hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl"
             >
-              Search
-            </button>
-          </div>
-        </div>
 
-        {/* LISTINGS */}
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {data.listings.map((item) => (
-            <article
-              key={item.title}
-              className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl"
-            >
-              <div className="flex h-48 items-center justify-center bg-gradient-to-br from-blue-50 to-slate-50 text-7xl">
-                {item.icon}
+              <div className="text-4xl">
+                {category.icon}
               </div>
 
-              <div className="p-5">
-                <div className="text-xs font-black uppercase tracking-wider text-blue-700">
-                  {data.name}
-                </div>
-
-                <h3 className="mt-2 text-lg font-black text-slate-900">
-                  {item.title}
-                </h3>
-
-                <p className="mt-2 text-sm leading-6 text-slate-500">
-                  {item.description}
-                </p>
-
-                <div className="mt-4 text-lg font-black text-blue-700">
-                  {item.price}
-                </div>
-
-                <div className="mt-2 text-sm text-slate-500">
-                  📍 {item.location}
-                </div>
-
-                <Link
-                  href="/login"
-                  className="mt-5 block rounded-xl border border-blue-700 px-4 py-3 text-center font-bold text-blue-700 hover:bg-blue-50"
-                >
-                  Contact Seller
-                </Link>
+              <div className="mt-4 font-bold text-slate-800 transition group-hover:text-blue-700">
+                {category.name}
               </div>
-            </article>
+
+              <div className="mt-2 text-xs font-semibold text-slate-400">
+                Explore →
+              </div>
+
+            </Link>
           ))}
+
         </div>
-
-        {/* SELLER CTA */}
-        <section className="mt-16 rounded-3xl bg-slate-950 p-8 text-white sm:p-12">
-          <p className="text-sm font-black uppercase tracking-widest text-cyan-400">
-            Sell on BEST SALES GHANA
-          </p>
-
-          <h2 className="mt-3 text-3xl font-black sm:text-4xl">
-            Have {data.name.toLowerCase()} to sell?
-          </h2>
-
-          <p className="mt-4 max-w-2xl text-white/70">
-            Create your listing and connect with buyers across Ghana.
-          </p>
-
-          <Link
-            href="/sell"
-            className="mt-7 inline-flex rounded-xl bg-blue-600 px-7 py-4 font-black text-white hover:bg-cyan-400 hover:text-slate-950"
-          >
-            Create a Listing →
-          </Link>
-        </section>
       </section>
 
-      {/* FOOTER */}
-      <footer className="bg-slate-950 py-10 text-white">
-        <div className="mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8">
-          <div className="text-xl font-black">BEST SALES GHANA</div>
+      {/* =====================================================
+          LATEST LISTINGS
+      ===================================================== */}
+      <section
+        id="latest-listings"
+        className="border-y border-slate-200 bg-slate-50"
+      >
 
-          <p className="mt-2 text-sm text-slate-400">
-            Buy • Sell • Advertise • Connect
-          </p>
+        <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
 
-          <p className="mt-6 text-sm text-slate-500">
+          <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+
+            <div>
+
+              <p className="text-sm font-black uppercase tracking-widest text-blue-700">
+                Marketplace
+              </p>
+
+              <h2 className="mt-2 text-3xl font-black text-slate-900 sm:text-4xl">
+                Latest Listings
+              </h2>
+
+              <p className="mt-2 text-slate-500">
+                Browse products and opportunities available on BEST SALES
+                GHANA.
+              </p>
+
+            </div>
+
+            <Link
+              href="/listings"
+              className="font-bold text-blue-700 transition hover:text-blue-900"
+            >
+              View all listings →
+            </Link>
+
+          </div>
+
+          {/* TOP SELLER AD */}
+          <div className="mb-8 overflow-hidden rounded-2xl bg-gradient-to-r from-blue-900 via-blue-700 to-cyan-500 p-7 text-white shadow-xl sm:p-10">
+
+            <p className="text-sm font-bold uppercase tracking-widest text-cyan-100">
+              Sell on BEST SALES GHANA
+            </p>
+
+            <h3 className="mt-2 text-2xl font-black sm:text-3xl">
+              Put your products in front of Ghanaian buyers.
+            </h3>
+
+            <p className="mt-3 max-w-2xl text-white/85">
+              Create your listing, advertise your business and connect directly
+              with potential customers.
+            </p>
+
+            <Link
+              href="/sell"
+              className="mt-6 inline-flex rounded-xl bg-white px-6 py-3 font-black text-blue-800 transition hover:-translate-y-0.5 hover:shadow-lg"
+            >
+              Post Your Ad
+            </Link>
+
+          </div>
+
+          {/* LISTING CARDS */}
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+
+            {listings.map((item) => (
+              <Link
+                key={item.title}
+                href={item.href}
+                className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl"
+              >
+
+                <div className="flex h-52 items-center justify-center bg-gradient-to-br from-blue-50 to-slate-50 text-7xl transition group-hover:from-cyan-50 group-hover:to-blue-50">
+                  {item.icon}
+                </div>
+
+                <div className="p-5">
+
+                  <p className="text-xs font-bold uppercase tracking-wider text-blue-700">
+                    {item.category}
+                  </p>
+
+                  <h3 className="mt-2 text-xl font-black text-slate-900">
+                    {item.title}
+                  </h3>
+
+                  <p className="mt-2 text-sm text-slate-500">
+                    Browse available listings and connect with sellers.
+                  </p>
+
+                  <div className="mt-5 font-bold text-blue-700">
+                    Explore →
+                  </div>
+
+                </div>
+
+              </Link>
+            ))}
+
+          </div>
+
+        </div>
+      </section>
+
+      {/* =====================================================
+          SELLER CTA
+      ===================================================== */}
+      <section className="border-b border-slate-200 bg-white">
+
+        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+
+          <div className="rounded-3xl bg-slate-950 p-8 text-white sm:p-12 lg:flex lg:items-center lg:justify-between lg:gap-10">
+
+            <div>
+
+              <p className="text-sm font-black uppercase tracking-widest text-cyan-400">
+                For Sellers &amp; Businesses
+              </p>
+
+              <h2 className="mt-3 text-3xl font-black sm:text-4xl">
+                Ready to sell on BEST SALES GHANA?
+              </h2>
+
+              <p className="mt-4 max-w-2xl text-white/70">
+                Post your products, promote your business and connect with
+                customers across Ghana.
+              </p>
+
+            </div>
+
+            <Link
+              href="/sell"
+              className="mt-7 inline-flex shrink-0 rounded-xl bg-blue-600 px-7 py-4 font-black text-white shadow-lg transition hover:-translate-y-1 hover:bg-cyan-400 hover:text-slate-950 lg:mt-0"
+            >
+              Create a Listing
+            </Link>
+
+          </div>
+
+        </div>
+      </section>
+
+      {/* =====================================================
+          FOOTER
+      ===================================================== */}
+      <footer className="bg-slate-950 text-white">
+
+        <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+
+          <div className="grid gap-10 md:grid-cols-4">
+
+            {/* COMPANY */}
+            <div className="md:col-span-2">
+
+              <div className="text-2xl font-black">
+                BEST SALES GHANA
+              </div>
+
+              <p className="mt-3 max-w-md text-sm leading-6 text-slate-400">
+                Ghana&apos;s marketplace for products, vehicles, property,
+                services, machinery, equipment and business opportunities.
+              </p>
+
+              <p className="mt-4 text-sm font-semibold text-cyan-400">
+                Buy • Sell • Advertise • Connect
+              </p>
+
+            </div>
+
+            {/* MARKETPLACE */}
+            <div>
+
+              <h3 className="font-bold">
+                Marketplace
+              </h3>
+
+              <div className="mt-4 space-y-3 text-sm text-slate-400">
+
+                <Link
+                  className="block hover:text-white"
+                  href="/categories"
+                >
+                  Categories
+                </Link>
+
+                <Link
+                  className="block hover:text-white"
+                  href="/listings"
+                >
+                  Listings
+                </Link>
+
+                <Link
+                  className="block hover:text-white"
+                  href="/sell"
+                >
+                  Sell
+                </Link>
+
+                <Link
+                  className="block hover:text-white"
+                  href="/login"
+                >
+                  Login
+                </Link>
+
+              </div>
+
+            </div>
+
+            {/* COMPANY / SUPPORT */}
+            <div>
+
+              <h3 className="font-bold">
+                Company
+              </h3>
+
+              <div className="mt-4 space-y-3 text-sm text-slate-400">
+
+                <Link
+                  className="block hover:text-white"
+                  href="/about"
+                >
+                  About Us
+                </Link>
+
+                <Link
+                  className="block hover:text-white"
+                  href="/contact"
+                >
+                  Contact
+                </Link>
+
+                <Link
+                  className="block hover:text-white"
+                  href="/help"
+                >
+                  Help Centre
+                </Link>
+
+                <Link
+                  className="block hover:text-white"
+                  href="/terms"
+                >
+                  Terms &amp; Conditions
+                </Link>
+
+                <Link
+                  className="block hover:text-white"
+                  href="/privacy"
+                >
+                  Privacy Policy
+                </Link>
+
+              </div>
+
+            </div>
+
+          </div>
+
+          {/* COPYRIGHT */}
+          <div className="mt-10 border-t border-white/10 pt-6 text-center text-sm text-slate-500">
             © 2026 All Prominent Ghana Limited. All rights reserved.
-          </p>
+          </div>
+
         </div>
       </footer>
+
     </main>
   );
 }
