@@ -1,93 +1,62 @@
 import Link from "next/link";
 
+const categories = [
+  { icon: "🚗", name: "Vehicles", href: "/categories/vehicles" },
+  { icon: "🏠", name: "Property", href: "/categories/property" },
+  { icon: "📱", name: "Electronics", href: "/categories/electronics" },
+  { icon: "⚙️", name: "Machinery", href: "/categories/machinery" },
+  { icon: "🌾", name: "Agriculture", href: "/categories/agriculture" },
+  { icon: "🛠️", name: "Services", href: "/categories/services" },
+];
+
+const listings = [
+  {
+    icon: "🏭",
+    title: "Industrial Machinery",
+    category: "Machinery & Equipment",
+    href: "/categories/machinery",
+  },
+  {
+    icon: "🚙",
+    title: "Vehicles & Auto",
+    category: "Vehicles",
+    href: "/categories/vehicles",
+  },
+  {
+    icon: "🏡",
+    title: "Property & Real Estate",
+    category: "Property",
+    href: "/categories/property",
+  },
+  {
+    icon: "🖨️",
+    title: "Printing Equipment",
+    category: "Business Equipment",
+    href: "/categories/machinery",
+  },
+  {
+    icon: "📱",
+    title: "Phones & Electronics",
+    category: "Electronics",
+    href: "/categories/electronics",
+  },
+  {
+    icon: "🌱",
+    title: "Agriculture Equipment",
+    category: "Agriculture",
+    href: "/categories/agriculture",
+  },
+];
+
 export default function HomePage() {
-  const categories = [
-    {
-      icon: "🚗",
-      name: "Vehicles",
-      href: "/categories/vehicles",
-    },
-    {
-      icon: "🏠",
-      name: "Property",
-      href: "/categories/property",
-    },
-    {
-      icon: "📱",
-      name: "Electronics",
-      href: "/categories/electronics",
-    },
-    {
-      icon: "⚙️",
-      name: "Machinery",
-      href: "/categories/machinery",
-    },
-    {
-      icon: "🌾",
-      name: "Agriculture",
-      href: "/categories/agriculture",
-    },
-    {
-      icon: "🛠️",
-      name: "Services",
-      href: "/categories/services",
-    },
-  ];
-
-  const listings = [
-    {
-      icon: "🏭",
-      title: "Industrial Machinery",
-      category: "Machinery & Equipment",
-      href: "/categories/machinery",
-    },
-    {
-      icon: "🚙",
-      title: "Vehicles & Auto",
-      category: "Vehicles",
-      href: "/categories/vehicles",
-    },
-    {
-      icon: "🏡",
-      title: "Property & Real Estate",
-      category: "Property",
-      href: "/categories/property",
-    },
-    {
-      icon: "🖨️",
-      title: "Printing Equipment",
-      category: "Business Equipment",
-      href: "/categories/machinery",
-    },
-    {
-      icon: "📱",
-      title: "Phones & Electronics",
-      category: "Electronics",
-      href: "/categories/electronics",
-    },
-    {
-      icon: "🌱",
-      title: "Agriculture Equipment",
-      category: "Agriculture",
-      href: "/categories/agriculture",
-    },
-  ];
-
   return (
     <main className="min-h-screen bg-slate-50">
 
-      {/* =====================================================
-          HEADER
-      ===================================================== */}
+      {/* HEADER */}
       <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
 
-          {/* LOGO */}
-          <Link
-            href="/"
-            className="flex items-center gap-3"
-            aria-label="BEST SALES GHANA Home"
-          >
+          <Link href="/" className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-700 text-2xl shadow-md">
               ⭐
             </div>
@@ -103,54 +72,52 @@ export default function HomePage() {
             </div>
           </Link>
 
-          {/* DESKTOP NAVIGATION */}
           <nav className="hidden items-center gap-5 md:flex">
 
             <Link
               href="/categories"
-              className="font-semibold text-slate-700 transition hover:text-blue-700"
+              className="font-semibold text-slate-700 hover:text-blue-700"
             >
               Categories
             </Link>
 
             <Link
               href="/listings"
-              className="font-semibold text-slate-700 transition hover:text-blue-700"
+              className="font-semibold text-slate-700 hover:text-blue-700"
             >
               Listings
             </Link>
 
             <Link
               href="/sell"
-              className="font-semibold text-slate-700 transition hover:text-blue-700"
+              className="font-semibold text-slate-700 hover:text-blue-700"
             >
               Sell
             </Link>
 
             <Link
               href="/about"
-              className="font-semibold text-slate-700 transition hover:text-blue-700"
+              className="font-semibold text-slate-700 hover:text-blue-700"
             >
               About
             </Link>
 
             <Link
               href="/login"
-              className="rounded-xl border border-blue-700 px-5 py-3 font-bold text-blue-700 transition hover:bg-blue-50"
+              className="rounded-xl border border-blue-700 px-5 py-3 font-bold text-blue-700 hover:bg-blue-50"
             >
               Login
             </Link>
 
             <Link
               href="/sell"
-              className="rounded-xl bg-blue-700 px-5 py-3 font-bold text-white shadow-lg transition hover:bg-blue-800"
+              className="rounded-xl bg-blue-700 px-5 py-3 font-bold text-white shadow-lg hover:bg-blue-800"
             >
               Post an Ad
             </Link>
 
           </nav>
 
-          {/* MOBILE ACTIONS */}
           <div className="flex items-center gap-2 md:hidden">
 
             <Link
@@ -162,18 +129,17 @@ export default function HomePage() {
 
             <Link
               href="/sell"
-              className="rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-bold text-white shadow-lg"
+              className="rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-bold text-white"
             >
               Sell
             </Link>
 
           </div>
+
         </div>
       </header>
 
-      {/* =====================================================
-          HERO
-      ===================================================== */}
+      {/* HERO */}
       <section className="relative overflow-hidden bg-gradient-to-br from-blue-700 via-blue-600 to-cyan-400">
 
         <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full bg-white/10" />
@@ -213,19 +179,9 @@ export default function HomePage() {
 
                 <div className="flex items-center rounded-xl bg-white px-4">
 
-                  <svg
-                    width="22"
-                    height="22"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    className="mr-3 shrink-0 text-slate-400"
-                    aria-hidden="true"
-                  >
-                    <circle cx="11" cy="11" r="7" />
-                    <path d="m20 20-4-4" />
-                  </svg>
+                  <span className="mr-3 text-xl text-slate-400">
+                    🔎
+                  </span>
 
                   <input
                     type="text"
@@ -238,41 +194,24 @@ export default function HomePage() {
 
                 <select
                   name="category"
-                  className="rounded-xl border-0 bg-white px-4 py-4 text-slate-800 outline-none"
                   defaultValue=""
+                  className="rounded-xl border-0 bg-white px-4 py-4 text-slate-800 outline-none"
                 >
                   <option value="" disabled>
                     Category
                   </option>
 
-                  <option value="vehicles">
-                    Vehicles
-                  </option>
-
-                  <option value="property">
-                    Property
-                  </option>
-
-                  <option value="electronics">
-                    Electronics
-                  </option>
-
-                  <option value="machinery">
-                    Machinery
-                  </option>
-
-                  <option value="agriculture">
-                    Agriculture
-                  </option>
-
-                  <option value="services">
-                    Services
-                  </option>
+                  <option value="vehicles">Vehicles</option>
+                  <option value="property">Property</option>
+                  <option value="electronics">Electronics</option>
+                  <option value="machinery">Machinery</option>
+                  <option value="agriculture">Agriculture</option>
+                  <option value="services">Services</option>
                 </select>
 
                 <button
                   type="submit"
-                  className="rounded-xl bg-slate-950 px-7 py-4 font-bold text-white transition hover:-translate-y-0.5 hover:bg-slate-900"
+                  className="rounded-xl bg-slate-950 px-7 py-4 font-bold text-white hover:bg-slate-900"
                 >
                   Search
                 </button>
@@ -284,39 +223,34 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* =====================================================
-          CATEGORIES
-      ===================================================== */}
+      {/* CATEGORIES */}
       <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
 
         <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
 
           <div>
-
             <p className="text-sm font-black uppercase tracking-widest text-blue-700">
               Explore
             </p>
 
-            <h2 className="mt-2 text-3xl font-black text-slate-900 sm:text-4xl">
+            <h2 className="mt-2 text-3xl font-black text-slate-900">
               Popular Categories
             </h2>
 
             <p className="mt-2 text-slate-500">
               Find what you need from sellers across Ghana.
             </p>
-
           </div>
 
           <Link
             href="/categories"
-            className="font-bold text-blue-700 transition hover:text-blue-900"
+            className="font-bold text-blue-700 hover:text-blue-900"
           >
             View all categories →
           </Link>
 
         </div>
 
-        {/* CATEGORY CARDS */}
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
 
           {categories.map((category) => (
@@ -325,64 +259,50 @@ export default function HomePage() {
               href={category.href}
               className="group rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm transition hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl"
             >
-
               <div className="text-4xl">
                 {category.icon}
               </div>
 
-              <div className="mt-4 font-bold text-slate-800 transition group-hover:text-blue-700">
+              <div className="mt-4 font-bold text-slate-800 group-hover:text-blue-700">
                 {category.name}
               </div>
-
-              <div className="mt-2 text-xs font-semibold text-slate-400">
-                Explore →
-              </div>
-
             </Link>
           ))}
 
         </div>
       </section>
 
-      {/* =====================================================
-          LATEST LISTINGS
-      ===================================================== */}
-      <section
-        id="latest-listings"
-        className="border-y border-slate-200 bg-slate-50"
-      >
+      {/* LATEST LISTINGS */}
+      <section className="border-y border-slate-200 bg-slate-50">
 
         <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
 
           <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
 
             <div>
-
               <p className="text-sm font-black uppercase tracking-widest text-blue-700">
                 Marketplace
               </p>
 
-              <h2 className="mt-2 text-3xl font-black text-slate-900 sm:text-4xl">
+              <h2 className="mt-2 text-3xl font-black text-slate-900">
                 Latest Listings
               </h2>
 
               <p className="mt-2 text-slate-500">
-                Browse products and opportunities available on BEST SALES
-                GHANA.
+                Browse products and opportunities available on BEST SALES GHANA.
               </p>
-
             </div>
 
             <Link
               href="/listings"
-              className="font-bold text-blue-700 transition hover:text-blue-900"
+              className="font-bold text-blue-700 hover:text-blue-900"
             >
               View all listings →
             </Link>
 
           </div>
 
-          {/* TOP SELLER AD */}
+          {/* SELLER AD */}
           <div className="mb-8 overflow-hidden rounded-2xl bg-gradient-to-r from-blue-900 via-blue-700 to-cyan-500 p-7 text-white shadow-xl sm:p-10">
 
             <p className="text-sm font-bold uppercase tracking-widest text-cyan-100">
@@ -400,7 +320,7 @@ export default function HomePage() {
 
             <Link
               href="/sell"
-              className="mt-6 inline-flex rounded-xl bg-white px-6 py-3 font-black text-blue-800 transition hover:-translate-y-0.5 hover:shadow-lg"
+              className="mt-6 inline-flex rounded-xl bg-white px-6 py-3 font-black text-blue-800 hover:shadow-lg"
             >
               Post Your Ad
             </Link>
@@ -417,7 +337,7 @@ export default function HomePage() {
                 className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl"
               >
 
-                <div className="flex h-52 items-center justify-center bg-gradient-to-br from-blue-50 to-slate-50 text-7xl transition group-hover:from-cyan-50 group-hover:to-blue-50">
+                <div className="flex h-52 items-center justify-center bg-gradient-to-br from-blue-50 to-slate-50 text-7xl">
                   {item.icon}
                 </div>
 
@@ -449,26 +369,91 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* =====================================================
-          SELLER CTA
-      ===================================================== */}
+      {/* DELIVERY */}
       <section className="border-b border-slate-200 bg-white">
 
         <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
 
-          <div className="rounded-3xl bg-slate-950 p-8 text-white sm:p-12 lg:flex lg:items-center lg:justify-between lg:gap-10">
+          <div className="rounded-3xl bg-slate-950 p-8 text-white sm:p-12">
+
+            <p className="text-sm font-black uppercase tracking-widest text-cyan-400">
+              BEST SALES GHANA DELIVERY
+            </p>
+
+            <h2 className="mt-3 text-3xl font-black sm:text-4xl">
+              Buy with delivery and tracking.
+            </h2>
+
+            <p className="mt-4 max-w-3xl text-white/70">
+              Buyers can choose BEST SALES GHANA delivery when the option is
+              available. Eligible orders will receive a tracking number and
+              delivery status updates.
+            </p>
+
+            <div className="mt-8 grid gap-4 md:grid-cols-3">
+
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                <div className="text-3xl">🚚</div>
+
+                <h3 className="mt-3 font-black">
+                  Company Delivery
+                </h3>
+
+                <p className="mt-2 text-sm text-white/60">
+                  Businesses can manage deliveries through the marketplace.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                <div className="text-3xl">📦</div>
+
+                <h3 className="mt-3 font-black">
+                  Optional Seller Delivery
+                </h3>
+
+                <p className="mt-2 text-sm text-white/60">
+                  Individual sellers can use their own delivery service or
+                  offer BEST SALES GHANA delivery.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                <div className="text-3xl">📍</div>
+
+                <h3 className="mt-3 font-black">
+                  Order Tracking
+                </h3>
+
+                <p className="mt-2 text-sm text-white/60">
+                  Buyers can track eligible orders using their tracking number.
+                </p>
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+      </section>
+
+      {/* SELLER CTA */}
+      <section className="bg-white">
+
+        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+
+          <div className="rounded-3xl bg-blue-700 p-8 text-white sm:p-12 lg:flex lg:items-center lg:justify-between">
 
             <div>
 
-              <p className="text-sm font-black uppercase tracking-widest text-cyan-400">
-                For Sellers &amp; Businesses
+              <p className="text-sm font-black uppercase tracking-widest text-cyan-100">
+                For Sellers & Businesses
               </p>
 
               <h2 className="mt-3 text-3xl font-black sm:text-4xl">
                 Ready to sell on BEST SALES GHANA?
               </h2>
 
-              <p className="mt-4 max-w-2xl text-white/70">
+              <p className="mt-4 max-w-2xl text-white/80">
                 Post your products, promote your business and connect with
                 customers across Ghana.
               </p>
@@ -477,7 +462,7 @@ export default function HomePage() {
 
             <Link
               href="/sell"
-              className="mt-7 inline-flex shrink-0 rounded-xl bg-blue-600 px-7 py-4 font-black text-white shadow-lg transition hover:-translate-y-1 hover:bg-cyan-400 hover:text-slate-950 lg:mt-0"
+              className="mt-7 inline-flex shrink-0 rounded-xl bg-white px-7 py-4 font-black text-blue-700 hover:bg-cyan-100 lg:mt-0"
             >
               Create a Listing
             </Link>
@@ -487,16 +472,13 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* =====================================================
-          FOOTER
-      ===================================================== */}
+      {/* FOOTER */}
       <footer className="bg-slate-950 text-white">
 
         <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
 
           <div className="grid gap-10 md:grid-cols-4">
 
-            {/* COMPANY */}
             <div className="md:col-span-2">
 
               <div className="text-2xl font-black">
@@ -514,7 +496,6 @@ export default function HomePage() {
 
             </div>
 
-            {/* MARKETPLACE */}
             <div>
 
               <h3 className="font-bold">
@@ -523,31 +504,19 @@ export default function HomePage() {
 
               <div className="mt-4 space-y-3 text-sm text-slate-400">
 
-                <Link
-                  className="block hover:text-white"
-                  href="/categories"
-                >
+                <Link href="/categories" className="block hover:text-white">
                   Categories
                 </Link>
 
-                <Link
-                  className="block hover:text-white"
-                  href="/listings"
-                >
+                <Link href="/listings" className="block hover:text-white">
                   Listings
                 </Link>
 
-                <Link
-                  className="block hover:text-white"
-                  href="/sell"
-                >
+                <Link href="/sell" className="block hover:text-white">
                   Sell
                 </Link>
 
-                <Link
-                  className="block hover:text-white"
-                  href="/login"
-                >
+                <Link href="/login" className="block hover:text-white">
                   Login
                 </Link>
 
@@ -555,7 +524,6 @@ export default function HomePage() {
 
             </div>
 
-            {/* COMPANY / SUPPORT */}
             <div>
 
               <h3 className="font-bold">
@@ -564,38 +532,23 @@ export default function HomePage() {
 
               <div className="mt-4 space-y-3 text-sm text-slate-400">
 
-                <Link
-                  className="block hover:text-white"
-                  href="/about"
-                >
+                <Link href="/about" className="block hover:text-white">
                   About Us
                 </Link>
 
-                <Link
-                  className="block hover:text-white"
-                  href="/contact"
-                >
+                <Link href="/contact" className="block hover:text-white">
                   Contact
                 </Link>
 
-                <Link
-                  className="block hover:text-white"
-                  href="/help"
-                >
+                <Link href="/help" className="block hover:text-white">
                   Help Centre
                 </Link>
 
-                <Link
-                  className="block hover:text-white"
-                  href="/terms"
-                >
-                  Terms &amp; Conditions
+                <Link href="/terms" className="block hover:text-white">
+                  Terms & Conditions
                 </Link>
 
-                <Link
-                  className="block hover:text-white"
-                  href="/privacy"
-                >
+                <Link href="/privacy" className="block hover:text-white">
                   Privacy Policy
                 </Link>
 
@@ -605,12 +558,12 @@ export default function HomePage() {
 
           </div>
 
-          {/* COPYRIGHT */}
           <div className="mt-10 border-t border-white/10 pt-6 text-center text-sm text-slate-500">
             © 2026 All Prominent Ghana Limited. All rights reserved.
           </div>
 
         </div>
+
       </footer>
 
     </main>
