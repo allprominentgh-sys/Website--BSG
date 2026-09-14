@@ -2,17 +2,32 @@
 
 import Link from "next/link";
 import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function AdminLoginPage() {
+  const router = useRouter();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [message, setMessage] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     setMessage("");
+
+    if (!email.trim()) {
+      setMessage("Please enter your admin email.");
+      return;
+    }
+
+    if (!password) {
+      setMessage("Please enter your password.");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -21,38 +36,47 @@ export default function AdminLoginPage() {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include",
         body: JSON.stringify({
-          email,
+          email: email.trim().toLowerCase(),
           password,
+          rememberMe,
         }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        setMessage(data.message || "Invalid admin login.");
+        setMessage(
+          data?.message || "Invalid admin email or password."
+        );
+        setLoading(false);
         return;
       }
 
-      window.location.href = "/admin";
-    } catch {
+      setMessage("Login successful. Opening admin dashboard...");
+
+      setTimeout(() => {
+        router.push("/admin");
+        router.refresh();
+      }, 500);
+    } catch (error) {
+      console.error(error);
+
       setMessage(
-        "Unable to connect to the admin login system. Please try again."
+        "Unable to connect to the login system. Please try again."
       );
-    } finally {
+
       setLoading(false);
     }
   }
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">
-
       {/* HEADER */}
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-
           <Link href="/" className="flex items-center gap-3">
-
             <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-700 text-2xl shadow-md">
               ⭐
             </div>
@@ -66,62 +90,47 @@ export default function AdminLoginPage() {
                 Administration Portal
               </div>
             </div>
-
           </Link>
 
           <Link
             href="/"
-            className="rounded-xl px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-100"
+            className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
           >
             ← Website
           </Link>
-
         </div>
       </header>
 
-      {/* LOGIN */}
-      <section className="flex min-h-[calc(100vh-90px)] items-center justify-center px-4 py-12">
-
+      {/* LOGIN AREA */}
+      <section className="flex min-h-[calc(100vh-150px)] items-center justify-center px-4 py-12">
         <div className="w-full max-w-md">
-
-          {/* LOGIN CARD */}
-          <div className="rounded-3xl border border-slate-200 bg-white p-7 shadow-xl sm:p-9">
-
-            {/* ICON */}
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-100 text-3xl">
+          {/* TITLE */}
+          <div className="mb-8 text-center">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-blue-700 text-4xl shadow-xl">
               🔐
             </div>
 
-            {/* TITLE */}
-            <div className="mt-6 text-center">
+            <p className="mt-7 text-sm font-black uppercase tracking-[0.25em] text-blue-700">
+              Administrator Access
+            </p>
 
-              <p className="text-xs font-black uppercase tracking-[0.2em] text-blue-700">
-                Secure Access
-              </p>
+            <h1 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">
+              Admin Sign In
+            </h1>
 
-              <h1 className="mt-2 text-3xl font-black">
-                Admin Login
-              </h1>
+            <p className="mt-3 text-slate-500">
+              Sign in to manage BEST SALES GHANA.
+            </p>
+          </div>
 
-              <p className="mt-2 text-sm leading-6 text-slate-500">
-                Sign in to manage Best Sales Ghana marketplace
-                administration.
-              </p>
-
-            </div>
-
-            {/* FORM */}
-            <form
-              onSubmit={handleSubmit}
-              className="mt-8 space-y-5"
-            >
-
+          {/* FORM CARD */}
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xl sm:p-8">
+            <form onSubmit={handleSubmit} className="space-y-6">
               {/* EMAIL */}
               <div>
-
                 <label
                   htmlFor="email"
-                  className="mb-2 block text-sm font-black"
+                  className="mb-2 block text-sm font-black text-slate-800"
                 >
                   Admin Email
                 </label>
@@ -131,107 +140,127 @@ export default function AdminLoginPage() {
                   type="email"
                   autoComplete="username"
                   value={email}
-                  onChange={(event) =>
-                    setEmail(event.target.value)
-                  }
+                  onChange={(event) => setEmail(event.target.value)}
                   placeholder="admin@bestsalesgh.com"
-                  required
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3.5 outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+                  disabled={loading}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-4 text-base outline-none transition placeholder:text-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 disabled:bg-slate-100"
                 />
-
               </div>
 
               {/* PASSWORD */}
               <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <label
+                    htmlFor="password"
+                    className="block text-sm font-black text-slate-800"
+                  >
+                    Password
+                  </label>
 
-                <label
-                  htmlFor="password"
-                  className="mb-2 block text-sm font-black"
-                >
-                  Password
-                </label>
+                  <Link
+                    href="/forgot-password"
+                    className="text-sm font-bold text-blue-700 hover:text-blue-800"
+                  >
+                    Forgot password?
+                  </Link>
+                </div>
 
                 <input
                   id="password"
                   type="password"
                   autoComplete="current-password"
                   value={password}
-                  onChange={(event) =>
-                    setPassword(event.target.value)
-                  }
-                  placeholder="Enter your admin password"
-                  required
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3.5 outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="Enter your password"
+                  disabled={loading}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-4 text-base outline-none transition placeholder:text-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 disabled:bg-slate-100"
                 />
-
               </div>
 
-              {/* ERROR / MESSAGE */}
+              {/* REMEMBER */}
+              <label className="flex cursor-pointer items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(event) =>
+                    setRememberMe(event.target.checked)
+                  }
+                  disabled={loading}
+                  className="h-5 w-5 rounded accent-blue-700"
+                />
+
+                <span className="text-sm font-semibold text-slate-600">
+                  Keep me signed in
+                </span>
+              </label>
+
+              {/* MESSAGE */}
               {message && (
-                <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">
+                <div
+                  className={`rounded-xl p-4 text-sm font-bold ${
+                    message.includes("successful")
+                      ? "border border-green-200 bg-green-50 text-green-800"
+                      : "border border-red-200 bg-red-50 text-red-700"
+                  }`}
+                >
                   {message}
                 </div>
               )}
 
-              {/* LOGIN BUTTON */}
+              {/* BUTTON */}
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full rounded-xl bg-blue-700 px-5 py-4 font-black text-white shadow-lg transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
+                className="w-full rounded-xl bg-blue-700 px-5 py-4 text-base font-black text-white shadow-lg transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {loading ? "Signing in..." : "Sign In to Admin"}
               </button>
-
             </form>
 
-            {/* SECURITY INFORMATION */}
-            <div className="mt-6 rounded-2xl border border-blue-200 bg-blue-50 p-4">
-
+            {/* SECURITY NOTICE */}
+            <div className="mt-6 rounded-2xl bg-slate-50 p-4">
               <div className="flex gap-3">
-
-                <div className="text-xl">
-                  🛡️
-                </div>
+                <div className="text-xl">🛡️</div>
 
                 <div>
-
-                  <h2 className="font-black text-blue-900">
-                    Administrator Access
-                  </h2>
-
-                  <p className="mt-1 text-xs leading-5 text-blue-800">
-                    This area is restricted to authorized Best Sales
-                    Ghana administrators.
+                  <p className="text-sm font-black text-slate-800">
+                    Administrator Area
                   </p>
 
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                    This area is for authorized BEST SALES GHANA
+                    administrators only.
+                  </p>
                 </div>
-
               </div>
-
             </div>
-
           </div>
 
-          {/* FOOTER */}
+          {/* BACK */}
           <div className="mt-6 text-center">
-
             <Link
               href="/"
-              className="text-sm font-bold text-blue-700 hover:underline"
+              className="text-sm font-bold text-slate-500 hover:text-blue-700"
             >
-              Return to Best Sales Ghana
+              Return to BEST SALES GHANA
             </Link>
-
-            <p className="mt-3 text-xs text-slate-400">
-              © {new Date().getFullYear()} All Prominent Ghana Limited
-            </p>
-
           </div>
-
         </div>
-
       </section>
 
+      {/* FOOTER */}
+      <footer className="border-t border-slate-200 bg-slate-950">
+        <div className="mx-auto max-w-7xl px-4 py-7 text-center sm:px-6 lg:px-8">
+          <p className="font-black text-white">
+            BEST SALES GHANA
+          </p>
+
+          <p className="mt-2 text-xs text-slate-500">
+            © {new Date().getFullYear()} All Prominent Ghana Limited.
+            All rights reserved.
+          </p>
+        </div>
+      </footer>
     </main>
   );
 }
