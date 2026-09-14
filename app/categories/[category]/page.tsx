@@ -1,8 +1,5 @@
-"use client";
-
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useState } from "react";
+import { notFound } from "next/navigation";
 
 type Listing = {
   title: string;
@@ -10,11 +7,6 @@ type Listing = {
   icon: string;
   price: string;
   location: string;
-  gps: string;
-  sellerType: "Company" | "Individual";
-  deliveryAvailable: boolean;
-  trackingNumber?: string;
-  subcategory: string;
 };
 
 type CategoryData = {
@@ -38,7 +30,8 @@ const categoryData: Record<string, CategoryData> = {
       "Buses",
       "Motorcycles",
       "Commercial Vehicles",
-      "Spare Parts",
+      "Heavy Equipment",
+      "Vehicle Parts",
       "Vehicle Accessories",
     ],
     listings: [
@@ -48,10 +41,6 @@ const categoryData: Record<string, CategoryData> = {
         icon: "🚗",
         price: "GH₵ 185,000",
         location: "Kumasi",
-        gps: "AK-1234-5678",
-        sellerType: "Individual",
-        deliveryAvailable: false,
-        subcategory: "Cars",
       },
       {
         title: "Toyota Land Cruiser",
@@ -59,11 +48,6 @@ const categoryData: Record<string, CategoryData> = {
         icon: "🚙",
         price: "GH₵ 650,000",
         location: "Accra",
-        gps: "GA-456-7890",
-        sellerType: "Company",
-        deliveryAvailable: true,
-        trackingNumber: "BSG-VH-000245",
-        subcategory: "SUVs",
       },
       {
         title: "Mercedes-Benz",
@@ -71,10 +55,6 @@ const categoryData: Record<string, CategoryData> = {
         icon: "🚘",
         price: "GH₵ 480,000",
         location: "East Legon",
-        gps: "GA-890-1234",
-        sellerType: "Individual",
-        deliveryAvailable: true,
-        subcategory: "Cars",
       },
       {
         title: "Commercial Truck",
@@ -82,11 +62,6 @@ const categoryData: Record<string, CategoryData> = {
         icon: "🚚",
         price: "GH₵ 350,000",
         location: "Tema",
-        gps: "GT-234-5678",
-        sellerType: "Company",
-        deliveryAvailable: true,
-        trackingNumber: "BSG-VH-000246",
-        subcategory: "Trucks",
       },
     ],
   },
@@ -102,9 +77,10 @@ const categoryData: Record<string, CategoryData> = {
       "Land",
       "Commercial Property",
       "Office Space",
-      "Warehouses",
       "Shops",
-      "Property for Rent",
+      "Warehouses",
+      "Hotels",
+      "Industrial Property",
     ],
     listings: [
       {
@@ -113,10 +89,6 @@ const categoryData: Record<string, CategoryData> = {
         icon: "🏠",
         price: "GH₵ 850,000",
         location: "East Legon",
-        gps: "GA-123-4567",
-        sellerType: "Company",
-        deliveryAvailable: false,
-        subcategory: "Houses",
       },
       {
         title: "4 Bedroom Luxury House",
@@ -124,10 +96,6 @@ const categoryData: Record<string, CategoryData> = {
         icon: "🏡",
         price: "GH₵ 1,250,000",
         location: "Accra",
-        gps: "GA-234-5678",
-        sellerType: "Individual",
-        deliveryAvailable: false,
-        subcategory: "Houses",
       },
       {
         title: "Serviced Apartment",
@@ -135,10 +103,6 @@ const categoryData: Record<string, CategoryData> = {
         icon: "🏢",
         price: "GH₵ 450,000",
         location: "Cantonments",
-        gps: "GA-345-6789",
-        sellerType: "Company",
-        deliveryAvailable: false,
-        subcategory: "Apartments",
       },
       {
         title: "Commercial Land",
@@ -146,10 +110,6 @@ const categoryData: Record<string, CategoryData> = {
         icon: "🌍",
         price: "GH₵ 2,000,000",
         location: "Tema",
-        gps: "GT-456-7890",
-        sellerType: "Company",
-        deliveryAvailable: false,
-        subcategory: "Land",
       },
     ],
   },
@@ -161,13 +121,15 @@ const categoryData: Record<string, CategoryData> = {
       "Shop phones, laptops, televisions, computers and other electronic products.",
     subcategories: [
       "Phones",
-      "Laptops",
       "Tablets",
+      "Laptops",
+      "Desktop Computers",
       "Televisions",
-      "Computers",
       "Cameras",
       "Audio Equipment",
-      "Accessories",
+      "Gaming",
+      "Computer Accessories",
+      "Phone Accessories",
     ],
     listings: [
       {
@@ -176,11 +138,6 @@ const categoryData: Record<string, CategoryData> = {
         icon: "📱",
         price: "GH₵ 14,500",
         location: "Accra",
-        gps: "GA-567-8901",
-        sellerType: "Company",
-        deliveryAvailable: true,
-        trackingNumber: "BSG-EL-000301",
-        subcategory: "Phones",
       },
       {
         title: "HP Laptop Core i7",
@@ -188,11 +145,6 @@ const categoryData: Record<string, CategoryData> = {
         icon: "💻",
         price: "GH₵ 8,500",
         location: "Accra",
-        gps: "GA-678-9012",
-        sellerType: "Company",
-        deliveryAvailable: true,
-        trackingNumber: "BSG-EL-000302",
-        subcategory: "Laptops",
       },
       {
         title: "Samsung Smart TV",
@@ -200,10 +152,6 @@ const categoryData: Record<string, CategoryData> = {
         icon: "📺",
         price: "GH₵ 9,500",
         location: "Kumasi",
-        gps: "AK-789-0123",
-        sellerType: "Individual",
-        deliveryAvailable: true,
-        subcategory: "Televisions",
       },
       {
         title: "MacBook Pro",
@@ -211,11 +159,6 @@ const categoryData: Record<string, CategoryData> = {
         icon: "💻",
         price: "GH₵ 22,000",
         location: "Tema",
-        gps: "GT-890-1234",
-        sellerType: "Company",
-        deliveryAvailable: true,
-        trackingNumber: "BSG-EL-000303",
-        subcategory: "Laptops",
       },
     ],
   },
@@ -226,13 +169,16 @@ const categoryData: Record<string, CategoryData> = {
     description:
       "Discover industrial machinery, printing equipment, construction equipment and tools.",
     subcategories: [
-      "Industrial Machines",
+      "Industrial Machinery",
       "Printing Equipment",
-      "DTF Machines",
+      "DTF Printing Machines",
+      "Eco-Solvent Printers",
       "Construction Equipment",
+      "Mining Equipment",
       "Generators",
       "Factory Equipment",
       "Packaging Machines",
+      "Machine Parts",
       "Tools",
     ],
     listings: [
@@ -242,11 +188,6 @@ const categoryData: Record<string, CategoryData> = {
         icon: "🏭",
         price: "GH₵ 250,000",
         location: "Accra",
-        gps: "GA-901-2345",
-        sellerType: "Company",
-        deliveryAvailable: true,
-        trackingNumber: "BSG-MC-000401",
-        subcategory: "Printing Equipment",
       },
       {
         title: "Construction Excavator",
@@ -254,11 +195,6 @@ const categoryData: Record<string, CategoryData> = {
         icon: "🚜",
         price: "GH₵ 850,000",
         location: "Tema",
-        gps: "GT-012-3456",
-        sellerType: "Company",
-        deliveryAvailable: true,
-        trackingNumber: "BSG-MC-000402",
-        subcategory: "Construction Equipment",
       },
       {
         title: "DTF Printing Machine",
@@ -266,10 +202,6 @@ const categoryData: Record<string, CategoryData> = {
         icon: "🖨️",
         price: "GH₵ 75,000",
         location: "Accra",
-        gps: "GA-123-4567",
-        sellerType: "Individual",
-        deliveryAvailable: true,
-        subcategory: "DTF Machines",
       },
       {
         title: "Industrial Generator",
@@ -277,11 +209,6 @@ const categoryData: Record<string, CategoryData> = {
         icon: "⚡",
         price: "GH₵ 180,000",
         location: "Kumasi",
-        gps: "AK-234-5678",
-        sellerType: "Company",
-        deliveryAvailable: true,
-        trackingNumber: "BSG-MC-000403",
-        subcategory: "Generators",
       },
     ],
   },
@@ -295,11 +222,13 @@ const categoryData: Record<string, CategoryData> = {
       "Tractors",
       "Farm Machinery",
       "Irrigation",
+      "Poultry Equipment",
       "Livestock",
-      "Poultry",
       "Seeds",
-      "Fertilizers",
-      "Farm Equipment",
+      "Fertilizer",
+      "Processing Equipment",
+      "Greenhouse Equipment",
+      "Farm Tools",
     ],
     listings: [
       {
@@ -308,11 +237,6 @@ const categoryData: Record<string, CategoryData> = {
         icon: "🚜",
         price: "GH₵ 320,000",
         location: "Kumasi",
-        gps: "AK-345-6789",
-        sellerType: "Company",
-        deliveryAvailable: true,
-        trackingNumber: "BSG-AG-000501",
-        subcategory: "Tractors",
       },
       {
         title: "Irrigation Equipment",
@@ -320,11 +244,6 @@ const categoryData: Record<string, CategoryData> = {
         icon: "💧",
         price: "GH₵ 45,000",
         location: "Tamale",
-        gps: "NT-456-7890",
-        sellerType: "Company",
-        deliveryAvailable: true,
-        trackingNumber: "BSG-AG-000502",
-        subcategory: "Irrigation",
       },
       {
         title: "Maize Processing Machine",
@@ -332,10 +251,6 @@ const categoryData: Record<string, CategoryData> = {
         icon: "🌽",
         price: "GH₵ 85,000",
         location: "Sunyani",
-        gps: "BA-567-8901",
-        sellerType: "Individual",
-        deliveryAvailable: true,
-        subcategory: "Farm Machinery",
       },
       {
         title: "Poultry Equipment",
@@ -343,10 +258,6 @@ const categoryData: Record<string, CategoryData> = {
         icon: "🐔",
         price: "GH₵ 35,000",
         location: "Accra",
-        gps: "GA-678-9012",
-        sellerType: "Individual",
-        deliveryAvailable: false,
-        subcategory: "Poultry",
       },
     ],
   },
@@ -360,11 +271,13 @@ const categoryData: Record<string, CategoryData> = {
       "Business Services",
       "Construction",
       "Graphic Design",
+      "IT Services",
       "Transport",
       "Delivery",
       "Repairs",
-      "IT Services",
+      "Cleaning",
       "Professional Services",
+      "Photography",
     ],
     listings: [
       {
@@ -373,10 +286,6 @@ const categoryData: Record<string, CategoryData> = {
         icon: "💼",
         price: "Contact Seller",
         location: "Accra",
-        gps: "GA-789-0123",
-        sellerType: "Company",
-        deliveryAvailable: false,
-        subcategory: "Business Services",
       },
       {
         title: "Graphic Design Services",
@@ -384,10 +293,6 @@ const categoryData: Record<string, CategoryData> = {
         icon: "🎨",
         price: "From GH₵ 500",
         location: "Accra",
-        gps: "GA-890-1234",
-        sellerType: "Individual",
-        deliveryAvailable: false,
-        subcategory: "Graphic Design",
       },
       {
         title: "Building & Construction",
@@ -395,10 +300,6 @@ const categoryData: Record<string, CategoryData> = {
         icon: "🏗️",
         price: "Contact Seller",
         location: "Kumasi",
-        gps: "AK-901-2345",
-        sellerType: "Company",
-        deliveryAvailable: false,
-        subcategory: "Construction",
       },
       {
         title: "Delivery Services",
@@ -406,111 +307,29 @@ const categoryData: Record<string, CategoryData> = {
         icon: "🚚",
         price: "Contact Seller",
         location: "Tema",
-        gps: "GT-012-3456",
-        sellerType: "Company",
-        deliveryAvailable: true,
-        trackingNumber: "BSG-SV-000601",
-        subcategory: "Delivery",
       },
     ],
   },
 };
 
-export default function CategoryPage() {
-  const params = useParams();
+export function generateStaticParams() {
+  return Object.keys(categoryData).map((category) => ({
+    category,
+  }));
+}
 
-  const categorySlug = String(params.category || "").toLowerCase();
+export default function CategoryPage({
+  params,
+}: {
+  params: { category: string };
+}) {
+  const category = params.category.toLowerCase();
 
-  const data = categoryData[categorySlug];
-
-  const [selectedSubcategory, setSelectedSubcategory] =
-    useState("All Subcategories");
-
-  const [search, setSearch] = useState("");
-
-  const [location, setLocation] = useState("All Ghana");
-
-  const [deliveryOnly, setDeliveryOnly] = useState(false);
-
-  const [gpsLocation, setGpsLocation] = useState("");
-
-  const [gpsLoading, setGpsLoading] = useState(false);
+  const data = categoryData[category];
 
   if (!data) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-50 px-6">
-        <div className="text-center">
-          <div className="text-6xl">🔎</div>
-
-          <h1 className="mt-5 text-3xl font-black text-slate-900">
-            Category not found
-          </h1>
-
-          <Link
-            href="/categories"
-            className="mt-6 inline-flex rounded-xl bg-blue-700 px-6 py-3 font-bold text-white"
-          >
-            Back to Categories
-          </Link>
-        </div>
-      </main>
-    );
+    notFound();
   }
-
-  const getCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      alert("GPS is not supported by this device/browser.");
-      return;
-    }
-
-    setGpsLoading(true);
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const latitude = position.coords.latitude.toFixed(6);
-        const longitude = position.coords.longitude.toFixed(6);
-
-        setGpsLocation(`GPS: ${latitude}, ${longitude}`);
-        setGpsLoading(false);
-      },
-      () => {
-        alert(
-          "We could not access your location. Please allow location permission and try again."
-        );
-
-        setGpsLoading(false);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
-      }
-    );
-  };
-
-  const filteredListings = data.listings.filter((item) => {
-    const matchesSearch =
-      item.title.toLowerCase().includes(search.toLowerCase()) ||
-      item.description.toLowerCase().includes(search.toLowerCase());
-
-    const matchesSubcategory =
-      selectedSubcategory === "All Subcategories" ||
-      item.subcategory === selectedSubcategory;
-
-    const matchesLocation =
-      location === "All Ghana" ||
-      item.location.toLowerCase() === location.toLowerCase();
-
-    const matchesDelivery =
-      !deliveryOnly || item.deliveryAvailable === true;
-
-    return (
-      matchesSearch &&
-      matchesSubcategory &&
-      matchesLocation &&
-      matchesDelivery
-    );
-  });
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -562,19 +381,10 @@ export default function CategoryPage() {
               Post an Ad
             </Link>
           </nav>
-
-          <div className="flex gap-2 md:hidden">
-            <Link
-              href="/login"
-              className="rounded-xl border border-blue-700 px-4 py-2 font-bold text-blue-700"
-            >
-              Login
-            </Link>
-          </div>
         </div>
       </header>
 
-      {/* HERO */}
+      {/* CATEGORY HERO */}
       <section className="bg-gradient-to-br from-blue-800 via-blue-700 to-cyan-400 text-white">
         <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
           <Link
@@ -585,7 +395,7 @@ export default function CategoryPage() {
           </Link>
 
           <div className="mt-8 flex flex-col gap-6 sm:flex-row sm:items-center">
-            <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-3xl bg-white/15 text-6xl shadow-xl backdrop-blur">
+            <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-3xl bg-white/15 text-6xl shadow-xl">
               {data.icon}
             </div>
 
@@ -611,7 +421,7 @@ export default function CategoryPage() {
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
           <div className="mb-5">
             <p className="text-sm font-black uppercase tracking-widest text-blue-700">
-              Browse by type
+              Explore
             </p>
 
             <h2 className="mt-1 text-2xl font-black text-slate-900">
@@ -619,29 +429,12 @@ export default function CategoryPage() {
             </h2>
           </div>
 
-          <div className="flex gap-3 overflow-x-auto pb-2">
-            <button
-              type="button"
-              onClick={() => setSelectedSubcategory("All Subcategories")}
-              className={`shrink-0 rounded-full px-5 py-3 font-bold transition ${
-                selectedSubcategory === "All Subcategories"
-                  ? "bg-blue-700 text-white shadow-md"
-                  : "border border-slate-200 bg-slate-50 text-slate-700 hover:border-blue-300"
-              }`}
-            >
-              All
-            </button>
-
+          <div className="flex flex-wrap gap-3">
             {data.subcategories.map((subcategory) => (
               <button
                 key={subcategory}
                 type="button"
-                onClick={() => setSelectedSubcategory(subcategory)}
-                className={`shrink-0 rounded-full px-5 py-3 font-bold transition ${
-                  selectedSubcategory === subcategory
-                    ? "bg-blue-700 text-white shadow-md"
-                    : "border border-slate-200 bg-slate-50 text-slate-700 hover:border-blue-300"
-                }`}
+                className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
               >
                 {subcategory}
               </button>
@@ -650,341 +443,225 @@ export default function CategoryPage() {
         </div>
       </section>
 
-      {/* SEARCH AND LOCATION */}
-      <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
-          <div className="mb-6">
-            <p className="text-sm font-black uppercase tracking-widest text-blue-700">
-              Search & Location
-            </p>
-
-            <h2 className="mt-1 text-2xl font-black text-slate-900">
-              Find listings near you
+      {/* MAIN CONTENT */}
+      <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+        {/* SEARCH + LOCATION */}
+        <div className="mb-10 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="mb-5">
+            <h2 className="text-xl font-black text-slate-900">
+              Find {data.name}
             </h2>
+
+            <p className="mt-1 text-sm text-slate-500">
+              Search by product, subcategory or location in Ghana.
+            </p>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr_1fr]">
-            {/* SEARCH */}
-            <div>
-              <label className="mb-2 block text-sm font-bold text-slate-700">
-                Search
-              </label>
+          <form
+            action="/listings"
+            method="GET"
+            className="grid gap-3 lg:grid-cols-[1fr_190px_190px_auto]"
+          >
+            <input
+              type="search"
+              name="q"
+              placeholder={`Search ${data.name.toLowerCase()}...`}
+              className="rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-600"
+            />
 
-              <input
-                type="search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder={`Search ${data.name.toLowerCase()}...`}
-                className="w-full rounded-xl border border-slate-200 px-4 py-4 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
-              />
-            </div>
+            <select
+              name="subcategory"
+              className="rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-blue-600"
+              defaultValue=""
+            >
+              <option value="">All Subcategories</option>
 
-            {/* LOCATION */}
-            <div>
-              <label className="mb-2 block text-sm font-bold text-slate-700">
-                Location in Ghana
-              </label>
+              {data.subcategories.map((subcategory) => (
+                <option key={subcategory} value={subcategory}>
+                  {subcategory}
+                </option>
+              ))}
+            </select>
 
-              <select
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-4 outline-none focus:border-blue-600"
-              >
-                <option>All Ghana</option>
-                <option>Accra</option>
-                <option>East Legon</option>
-                <option>Tema</option>
-                <option>Kumasi</option>
-                <option>Tamale</option>
-                <option>Sunyani</option>
-              </select>
-            </div>
+            <select
+              name="location"
+              className="rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-blue-600"
+              defaultValue=""
+            >
+              <option value="">All Ghana</option>
+              <option value="Greater Accra">Greater Accra</option>
+              <option value="Ashanti">Ashanti</option>
+              <option value="Western">Western</option>
+              <option value="Central">Central</option>
+              <option value="Eastern">Eastern</option>
+              <option value="Volta">Volta</option>
+              <option value="Northern">Northern</option>
+              <option value="Bono">Bono</option>
+              <option value="Bono East">Bono East</option>
+              <option value="Ahafo">Ahafo</option>
+              <option value="Upper East">Upper East</option>
+              <option value="Upper West">Upper West</option>
+              <option value="Oti">Oti</option>
+              <option value="Savannah">Savannah</option>
+              <option value="North East">North East</option>
+              <option value="Western North">Western North</option>
+            </select>
 
-            {/* SUBCATEGORY */}
-            <div>
-              <label className="mb-2 block text-sm font-bold text-slate-700">
-                Subcategory
-              </label>
+            <button
+              type="submit"
+              className="rounded-xl bg-blue-700 px-7 py-3 font-black text-white transition hover:bg-blue-800"
+            >
+              Search
+            </button>
+          </form>
 
-              <select
-                value={selectedSubcategory}
-                onChange={(e) => setSelectedSubcategory(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-4 outline-none focus:border-blue-600"
-              >
-                <option>All Subcategories</option>
-
-                {data.subcategories.map((subcategory) => (
-                  <option key={subcategory}>{subcategory}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* GPS */}
-          <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50 p-5">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          {/* GPS LOCATION */}
+          <div className="mt-4 rounded-xl bg-blue-50 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <div className="font-black text-slate-900">
-                  📍 GhanaPostGPS / Current GPS Location
-                </div>
-
-                <p className="mt-1 text-sm text-slate-600">
-                  Buyers and sellers can provide their GhanaPostGPS digital
-                  address and use their phone GPS for accurate location.
+                <p className="font-black text-slate-900">
+                  📍 Use my location
                 </p>
 
-                {gpsLocation && (
-                  <div className="mt-3 rounded-xl bg-white px-4 py-3 text-sm font-bold text-blue-700">
-                    {gpsLocation}
-                  </div>
-                )}
+                <p className="text-sm text-slate-500">
+                  Location will later connect to Ghana Post GPS / GPS-based
+                  delivery.
+                </p>
               </div>
 
               <button
                 type="button"
-                onClick={getCurrentLocation}
-                disabled={gpsLoading}
-                className="shrink-0 rounded-xl bg-blue-700 px-5 py-3 font-bold text-white shadow-md hover:bg-blue-800 disabled:opacity-60"
+                className="rounded-xl border border-blue-700 bg-white px-5 py-3 font-bold text-blue-700 hover:bg-blue-100"
               >
-                {gpsLoading ? "Getting Location..." : "📍 Use My GPS"}
+                Detect Location
               </button>
             </div>
-
-            <div className="mt-4">
-              <label className="mb-2 block text-sm font-bold text-slate-700">
-                GhanaPostGPS Digital Address
-              </label>
-
-              <input
-                type="text"
-                placeholder="Example: GA-123-4567"
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-blue-600"
-              />
-            </div>
-          </div>
-
-          {/* DELIVERY FILTER */}
-          <div className="mt-5 flex flex-col gap-4 rounded-2xl border border-slate-200 p-5 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="font-black text-slate-900">
-                🚚 BEST SALES GHANA Delivery
-              </div>
-
-              <p className="mt-1 text-sm text-slate-500">
-                Show sellers who allow delivery through our tracked delivery
-                system.
-              </p>
-            </div>
-
-            <label className="flex cursor-pointer items-center gap-3 font-bold text-slate-700">
-              <input
-                type="checkbox"
-                checked={deliveryOnly}
-                onChange={(e) => setDeliveryOnly(e.target.checked)}
-                className="h-5 w-5 accent-blue-700"
-              />
-
-              Delivery Available
-            </label>
           </div>
         </div>
 
-        {/* RESULTS */}
-        <div className="mt-12">
-          <div className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-            <div>
-              <p className="text-sm font-black uppercase tracking-widest text-blue-700">
-                Marketplace
-              </p>
-
-              <h2 className="mt-2 text-3xl font-black text-slate-900">
-                {selectedSubcategory === "All Subcategories"
-                  ? `${data.name} Listings`
-                  : selectedSubcategory}
-              </h2>
-
-              <p className="mt-2 text-slate-500">
-                {filteredListings.length} listings found
-              </p>
-            </div>
-
-            <Link
-              href="/sell"
-              className="inline-flex rounded-xl bg-blue-700 px-6 py-3 font-black text-white shadow-lg hover:bg-blue-800"
-            >
-              + Post an Ad
-            </Link>
-          </div>
-
-          {filteredListings.length === 0 ? (
-            <div className="rounded-3xl border border-slate-200 bg-white p-12 text-center">
-              <div className="text-6xl">🔎</div>
-
-              <h3 className="mt-5 text-2xl font-black text-slate-900">
-                No listings found
-              </h3>
-
-              <p className="mt-2 text-slate-500">
-                Try another search, location or subcategory.
-              </p>
-            </div>
-          ) : (
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-              {filteredListings.map((item) => (
-                <article
-                  key={item.title}
-                  className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl"
-                >
-                  {/* IMAGE PLACEHOLDER */}
-                  <div className="flex h-48 items-center justify-center bg-gradient-to-br from-blue-50 to-slate-50 text-7xl">
-                    {item.icon}
-                  </div>
-
-                  <div className="p-5">
-                    {/* SUBCATEGORY */}
-                    <div className="text-xs font-black uppercase tracking-wider text-blue-700">
-                      {item.subcategory}
-                    </div>
-
-                    <h3 className="mt-2 text-lg font-black text-slate-900">
-                      {item.title}
-                    </h3>
-
-                    <p className="mt-2 text-sm leading-6 text-slate-500">
-                      {item.description}
-                    </p>
-
-                    {/* PRICE */}
-                    <div className="mt-4 text-lg font-black text-blue-700">
-                      {item.price}
-                    </div>
-
-                    {/* LOCATION */}
-                    <div className="mt-2 text-sm text-slate-500">
-                      📍 {item.location}
-                    </div>
-
-                    {/* GPS */}
-                    <div className="mt-1 text-xs font-semibold text-slate-400">
-                      GhanaPostGPS: {item.gps}
-                    </div>
-
-                    {/* SELLER TYPE */}
-                    <div className="mt-4">
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
-                        {item.sellerType} Seller
-                      </span>
-                    </div>
-
-                    {/* DELIVERY */}
-                    {item.deliveryAvailable ? (
-                      <div className="mt-4 rounded-xl border border-green-200 bg-green-50 p-3">
-                        <div className="font-black text-green-700">
-                          🚚 Delivery Available
-                        </div>
-
-                        <p className="mt-1 text-xs text-green-700">
-                          Buyer can choose BEST SALES GHANA tracked delivery.
-                        </p>
-
-                        {item.trackingNumber && (
-                          <div className="mt-2 rounded-lg bg-white px-3 py-2 text-xs font-black text-slate-700">
-                            Tracking: {item.trackingNumber}
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                        <div className="font-bold text-slate-600">
-                          Seller Delivery
-                        </div>
-
-                        <p className="mt-1 text-xs text-slate-500">
-                          Platform delivery is not currently enabled for this
-                          listing.
-                        </p>
-                      </div>
-                    )}
-
-                    {/* CONTACT */}
-                    <Link
-                      href="/login"
-                      className="mt-5 block rounded-xl border border-blue-700 px-4 py-3 text-center font-bold text-blue-700 hover:bg-blue-50"
-                    >
-                      Contact Seller
-                    </Link>
-
-                    {/* VIEW */}
-                    <Link
-                      href={`/listings?category=${categorySlug}&subcategory=${encodeURIComponent(
-                        item.subcategory
-                      )}`}
-                      className="mt-2 block rounded-xl bg-blue-700 px-4 py-3 text-center font-bold text-white hover:bg-blue-800"
-                    >
-                      View Listing →
-                    </Link>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* DELIVERY EXPLANATION */}
-        <section className="mt-16 rounded-3xl bg-blue-950 p-8 text-white sm:p-12">
-          <div className="max-w-4xl">
-            <p className="text-sm font-black uppercase tracking-widest text-cyan-400">
-              BEST SALES GHANA Delivery
+        {/* RESULTS HEADER */}
+        <div className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+          <div>
+            <p className="text-sm font-black uppercase tracking-widest text-blue-700">
+              Marketplace
             </p>
 
-            <h2 className="mt-3 text-3xl font-black sm:text-4xl">
-              Choose how you want your item delivered.
+            <h2 className="mt-2 text-3xl font-black text-slate-900">
+              {data.name} Listings
             </h2>
 
-            <p className="mt-4 text-lg leading-8 text-white/70">
-              Buyers can choose BEST SALES GHANA tracked delivery when the
-              seller has enabled it. This gives the buyer a delivery tracking
-              number and allows the order to be followed from pickup to
-              delivery.
+            <p className="mt-2 text-slate-500">
+              {data.listings.length} sample listings available
             </p>
+          </div>
 
-            <div className="mt-8 grid gap-4 md:grid-cols-3">
-              <div className="rounded-2xl bg-white/10 p-5">
-                <div className="text-3xl">🏢</div>
+          <Link
+            href="/sell"
+            className="inline-flex rounded-xl bg-blue-700 px-6 py-3 font-black text-white shadow-lg hover:bg-blue-800"
+          >
+            + Post an Ad
+          </Link>
+        </div>
 
-                <h3 className="mt-3 font-black">
-                  Company Sellers
+        {/* LISTINGS */}
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          {data.listings.map((item) => (
+            <article
+              key={item.title}
+              className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl"
+            >
+              <div className="flex h-48 items-center justify-center bg-gradient-to-br from-blue-50 to-slate-50 text-7xl">
+                {item.icon}
+              </div>
+
+              <div className="p-5">
+                <div className="text-xs font-black uppercase tracking-wider text-blue-700">
+                  {data.name}
+                </div>
+
+                <h3 className="mt-2 text-lg font-black text-slate-900">
+                  {item.title}
                 </h3>
 
-                <p className="mt-2 text-sm text-white/60">
-                  Companies can operate with the BEST SALES GHANA delivery
-                  system for their orders.
+                <p className="mt-2 text-sm leading-6 text-slate-500">
+                  {item.description}
+                </p>
+
+                <div className="mt-4 text-lg font-black text-blue-700">
+                  {item.price}
+                </div>
+
+                <div className="mt-2 text-sm text-slate-500">
+                  📍 {item.location}
+                </div>
+
+                {/* DELIVERY */}
+                <div className="mt-4 rounded-xl bg-slate-50 p-3">
+                  <p className="text-xs font-black uppercase text-slate-500">
+                    Delivery
+                  </p>
+
+                  <p className="mt-1 text-sm font-semibold text-slate-700">
+                    🚚 Seller / Buyer arranged
+                  </p>
+
+                  <p className="mt-1 text-xs text-blue-700">
+                    Our tracked delivery can be selected at checkout.
+                  </p>
+                </div>
+
+                <Link
+                  href="/login"
+                  className="mt-5 block rounded-xl border border-blue-700 px-4 py-3 text-center font-bold text-blue-700 hover:bg-blue-50"
+                >
+                  Contact Seller
+                </Link>
+              </div>
+            </article>
+          ))}
+        </div>
+
+        {/* TRACKED DELIVERY */}
+        <section className="mt-14 rounded-3xl bg-blue-900 p-8 text-white sm:p-10">
+          <div className="grid gap-8 lg:grid-cols-2 lg:items-center">
+            <div>
+              <p className="text-sm font-black uppercase tracking-widest text-cyan-300">
+                BEST SALES GHANA DELIVERY
+              </p>
+
+              <h2 className="mt-3 text-3xl font-black sm:text-4xl">
+                Choose our tracked delivery when buying.
+              </h2>
+
+              <p className="mt-4 max-w-2xl leading-7 text-white/80">
+                Individual sellers can choose whether to use their own
+                delivery or allow the buyer to select BEST SALES GHANA
+                tracked delivery.
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl bg-white/10 p-5">
+                <div className="text-3xl">📍</div>
+                <p className="mt-3 font-black">Location</p>
+                <p className="mt-1 text-sm text-white/70">
+                  GPS location
                 </p>
               </div>
 
               <div className="rounded-2xl bg-white/10 p-5">
-                <div className="text-3xl">👤</div>
-
-                <h3 className="mt-3 font-black">
-                  Individual Sellers
-                </h3>
-
-                <p className="mt-2 text-sm text-white/60">
-                  Individual sellers can choose whether or not to offer BEST
-                  SALES GHANA delivery.
+                <div className="text-3xl">🔢</div>
+                <p className="mt-3 font-black">Tracking</p>
+                <p className="mt-1 text-sm text-white/70">
+                  Tracking number
                 </p>
               </div>
 
               <div className="rounded-2xl bg-white/10 p-5">
-                <div className="text-3xl">📦</div>
-
-                <h3 className="mt-3 font-black">
-                  Buyer Chooses
-                </h3>
-
-                <p className="mt-2 text-sm text-white/60">
-                  Where available, the client selects our tracked delivery at
-                  checkout.
+                <div className="text-3xl">🚚</div>
+                <p className="mt-3 font-black">Delivery</p>
+                <p className="mt-1 text-sm text-white/70">
+                  Track your item
                 </p>
               </div>
             </div>
@@ -992,7 +669,7 @@ export default function CategoryPage() {
         </section>
 
         {/* SELLER CTA */}
-        <section className="mt-16 rounded-3xl bg-slate-950 p-8 text-white sm:p-12">
+        <section className="mt-14 rounded-3xl bg-slate-950 p-8 text-white sm:p-12">
           <p className="text-sm font-black uppercase tracking-widest text-cyan-400">
             Sell on BEST SALES GHANA
           </p>
@@ -1002,9 +679,8 @@ export default function CategoryPage() {
           </h2>
 
           <p className="mt-4 max-w-2xl text-white/70">
-            Create your listing, select your subcategory, add your GhanaPostGPS
-            location and choose whether you want to offer BEST SALES GHANA
-            delivery.
+            Create your listing, choose your subcategory and location, and
+            connect with buyers across Ghana.
           </p>
 
           <Link
@@ -1019,9 +695,7 @@ export default function CategoryPage() {
       {/* FOOTER */}
       <footer className="bg-slate-950 py-10 text-white">
         <div className="mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8">
-          <div className="text-xl font-black">
-            BEST SALES GHANA
-          </div>
+          <div className="text-xl font-black">BEST SALES GHANA</div>
 
           <p className="mt-2 text-sm text-slate-400">
             Buy • Sell • Advertise • Connect
