@@ -1,754 +1,449 @@
-"use client";
-
-import { useMemo, useState } from "react";
-import Link from "next/link";
-
-type Listing = {
-  id: number;
-  title: string;
-  price: string;
-  location: string;
-  category: string;
-  seller: string;
-  image: string;
-  verified?: boolean;
-  featured?: boolean;
-};
-
-const listings: Listing[] = [
-  {
-    id: 1,
-    title: "iPhone 15 Pro Max",
-    price: "GH₵ 14,500",
-    location: "Accra",
-    category: "Phones & Tablets",
-    seller: "Prominent Store",
-    image: "📱",
-    verified: true,
-    featured: true,
-  },
-  {
-    id: 2,
-    title: "Toyota Corolla 2020",
-    price: "GH₵ 185,000",
-    location: "Kumasi",
-    category: "Cars & Vehicles",
-    seller: "Ghana Auto Hub",
-    image: "🚗",
-    verified: true,
-  },
-  {
-    id: 3,
-    title: "Modern 3 Bedroom House",
-    price: "GH₵ 850,000",
-    location: "East Legon",
-    category: "Property",
-    seller: "Prime Properties",
-    image: "🏠",
-    verified: true,
-    featured: true,
-  },
-  {
-    id: 4,
-    title: "HP Laptop Core i7",
-    price: "GH₵ 8,500",
-    location: "Accra",
-    category: "Electronics",
-    seller: "Tech World GH",
-    image: "💻",
-    verified: true,
-  },
-  {
-    id: 5,
-    title: "Men's Premium Shirt",
-    price: "GH₵ 350",
-    location: "Tema",
-    category: "Fashion",
-    seller: "Fashion House",
-    image: "👕",
-  },
-  {
-    id: 6,
-    title: "Professional Plumbing Service",
-    price: "From GH₵ 250",
-    location: "Accra",
-    category: "Jobs & Services",
-    seller: "Pro Services GH",
-    image: "🛠️",
-    verified: true,
-  },
-  {
-    id: 7,
-    title: "Samsung Galaxy S24 Ultra",
-    price: "GH₵ 13,800",
-    location: "Accra",
-    category: "Phones & Tablets",
-    seller: "Mobile Centre",
-    image: "📱",
-    verified: true,
-  },
-  {
-    id: 8,
-    title: "Commercial Shop Space",
-    price: "GH₵ 4,500 / month",
-    location: "Spintex",
-    category: "Property",
-    seller: "City Properties",
-    image: "🏢",
-    verified: true,
-  },
-];
-
-const categories = [
-  "All Categories",
-  "Phones & Tablets",
-  "Cars & Vehicles",
-  "Property",
-  "Electronics",
-  "Fashion",
-  "Jobs & Services",
-  "Industrial Machinery",
-  "Printing Equipment",
-  "Construction Equipment",
-  "Agriculture",
-  "Home & Garden",
-];
-
-const locations = [
-  "All Ghana",
-  "Accra",
-  "Kumasi",
-  "Tema",
-  "Takoradi",
-  "Cape Coast",
-  "Tamale",
-  "East Legon",
-  "Spintex",
-];
-
-export default function MarketplacePage() {
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("All Categories");
-  const [location, setLocation] = useState("All Ghana");
-  const [sort, setSort] = useState("Featured");
-
-  const filteredListings = useMemo(() => {
-    const query = search.toLowerCase().trim();
-
-    let result = listings.filter((item) => {
-      const matchesSearch =
-        !query ||
-        item.title.toLowerCase().includes(query) ||
-        item.category.toLowerCase().includes(query) ||
-        item.location.toLowerCase().includes(query) ||
-        item.seller.toLowerCase().includes(query);
-
-      const matchesCategory =
-        category === "All Categories" || item.category === category;
-
-      const matchesLocation =
-        location === "All Ghana" || item.location === location;
-
-      return matchesSearch && matchesCategory && matchesLocation;
-    });
-
-    if (sort === "Featured") {
-      result = [...result].sort(
-        (a, b) => Number(b.featured) - Number(a.featured)
-      );
-    }
-
-    if (sort === "Newest") {
-      result = [...result].sort((a, b) => b.id - a.id);
-    }
-
-    return result;
-  }, [search, category, location, sort]);
-
-  const clearFilters = () => {
-    setSearch("");
-    setCategory("All Categories");
-    setLocation("All Ghana");
-  };
-
+export default function HomePage() {
   return (
-    <main className="marketplace-page min-h-screen bg-slate-50 text-slate-900">
+    <main className="marketplace-page min-h-screen bg-slate-50">
 
       {/* =====================================================
           HEADER
-      ====================================================== */}
+      ===================================================== */}
+      <header className="site-header sticky top-0 z-50 border-b bg-white/95 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
 
-      <header className="site-header sticky top-0 z-50 border-b-2 border-cyan-400 bg-white/95 backdrop-blur">
+          {/* LOGO / BRAND */}
+          <a
+            href="/"
+            className="flex items-center gap-3"
+            aria-label="BEST SALES GHANA Home"
+          >
+            <div className="logo-mark">
+              <div className="logo-ring">
+                <div className="logo-person">
+                  <span className="logo-head" />
+                  <span className="logo-arm logo-arm-left" />
+                  <span className="logo-arm logo-arm-right" />
+                  <span className="logo-body" />
+                </div>
+              </div>
+            </div>
 
-        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 sm:px-6 lg:px-8">
-
-          <div className="flex items-center justify-between gap-4">
-
-            {/* ANIMATED LOGO */}
-
-            <Link href="/" className="group flex min-w-0 items-center gap-3">
-
-              <div className="animated-logo relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-blue-700 shadow-lg">
-
-                <div className="logo-ring absolute inset-1 rounded-xl border-2 border-cyan-300/70" />
-
-                <span className="relative z-10 text-xl font-black text-white">
-                  BS
-                </span>
-
+            <div>
+              <div className="text-lg font-black tracking-tight text-slate-900 sm:text-xl">
+                BEST SALES GHANA
               </div>
 
-              <div className="min-w-0">
-
-                <div className="logo-brand text-xl font-black tracking-tight text-blue-700 sm:text-2xl">
-                  BEST SALES GHANA
-                </div>
-
-                <div className="text-xs font-medium text-slate-500 sm:text-sm">
-                  Buy • Sell • Advertise • Connect
-                </div>
-
+              <div className="text-xs font-medium text-slate-500">
+                Buy • Sell • Advertise • Connect
               </div>
+            </div>
+          </a>
 
-            </Link>
-
-            <Link
-              href="/post-ad"
-              className="btn-primary hidden rounded-xl bg-blue-700 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-cyan-400 hover:text-slate-950 sm:block"
+          {/* NAVIGATION */}
+          <nav className="hidden items-center gap-6 md:flex">
+            <a
+              href="#categories"
+              className="font-semibold text-slate-700 transition hover:text-blue-700"
             >
-              + Sell an Item
-            </Link>
+              Categories
+            </a>
 
-          </div>
+            <a
+              href="#latest-listings"
+              className="font-semibold text-slate-700 transition hover:text-blue-700"
+            >
+              Listings
+            </a>
 
-          <nav className="nav-links flex items-center gap-5 overflow-x-auto whitespace-nowrap pb-1 text-sm font-semibold text-slate-600">
+            <a
+              href="#sell"
+              className="font-semibold text-slate-700 transition hover:text-blue-700"
+            >
+              Sell
+            </a>
 
-            <Link href="/" className="text-blue-700">
-              Home
-            </Link>
+            <a
+              href="#about"
+              className="font-semibold text-slate-700 transition hover:text-blue-700"
+            >
+              About
+            </a>
 
-            <Link href="/listings" className="hover:text-blue-700">
-              Marketplace
-            </Link>
-
-            <Link href="/post-ad" className="hover:text-blue-700">
-              Sell an Item
-            </Link>
-
-            <Link href="/account" className="hover:text-blue-700">
-              Sign In
-            </Link>
-
+            <a
+              href="#sell"
+              className="btn-primary rounded-xl px-5 py-3 font-bold text-white"
+            >
+              Post an Ad
+            </a>
           </nav>
 
+          {/* MOBILE BUTTON */}
+          <a
+            href="#sell"
+            className="rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-bold text-white shadow-lg md:hidden"
+          >
+            Sell
+          </a>
         </div>
-
       </header>
 
       {/* =====================================================
           HERO
-      ====================================================== */}
+      ===================================================== */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-blue-700 via-blue-600 to-cyan-400">
+        <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full bg-white/10" />
+        <div className="absolute -bottom-40 -left-32 h-96 w-96 rounded-full bg-white/10" />
 
-      <section className="hero relative overflow-hidden">
-
-        <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full bg-cyan-300/20 blur-3xl" />
-
-        <div className="absolute -bottom-40 -left-32 h-96 w-96 rounded-full bg-blue-900/30 blur-3xl" />
-
-        <div className="relative z-10 mx-auto max-w-7xl px-4 py-14 sm:px-6 sm:py-20 lg:px-8 lg:py-24">
+        <div className="relative mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8 lg:py-28">
 
           <div className="max-w-4xl">
 
-            <p className="mb-4 text-sm font-bold uppercase tracking-[0.2em] text-cyan-100">
-              BEST SALES GHANA MARKETPLACE
+            <p className="mb-5 text-sm font-black uppercase tracking-[0.2em] text-cyan-100">
+              Ghana's Marketplace
             </p>
 
-            <h1 className="text-4xl font-black leading-[1.05] tracking-tight text-white sm:text-5xl lg:text-7xl">
-
-              Find what you need.
-
+            <h1 className="text-5xl font-black leading-none tracking-tight text-white sm:text-6xl lg:text-7xl">
+              Buy.
               <br />
-
-              <span className="text-cyan-200">
-                Sell what you have.
+              Sell.
+              <br />
+              <span className="text-cyan-100">
+                Connect.
               </span>
-
             </h1>
 
-            <p className="mt-6 max-w-3xl text-base leading-7 text-white/90 sm:text-lg">
-
-              Discover products, vehicles, property, services, machinery,
-              equipment and business opportunities from sellers across Ghana.
-
+            <p className="mt-6 max-w-3xl text-lg leading-8 text-white/90 sm:text-xl">
+              Discover products, vehicles, property, machinery, equipment,
+              services and business opportunities from sellers across Ghana.
             </p>
 
-          </div>
+            {/* SEARCH */}
+            <div className="mt-8 rounded-2xl border border-white/30 bg-white/15 p-2 shadow-2xl backdrop-blur-xl">
+              <form className="grid gap-2 sm:grid-cols-[1fr_180px_auto]">
 
-          {/* SEARCH */}
+                <div className="flex items-center rounded-xl bg-white px-4">
+                  <svg
+                    width="22"
+                    height="22"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    className="mr-3 text-slate-400"
+                  >
+                    <circle cx="11" cy="11" r="7" />
+                    <path d="m20 20-4-4" />
+                  </svg>
 
-          <div className="hero-search-bar mt-9 rounded-2xl border border-white/30 bg-white/15 p-3 shadow-2xl backdrop-blur-xl">
+                  <input
+                    type="text"
+                    placeholder="What are you looking for?"
+                    className="w-full border-0 bg-transparent py-4 text-slate-900 outline-none"
+                  />
+                </div>
 
-            <div className="flex flex-col gap-3 lg:flex-row">
+                <select
+                  className="rounded-xl border-0 bg-white px-4 py-4 text-slate-800 outline-none"
+                  defaultValue=""
+                >
+                  <option value="" disabled>
+                    Category
+                  </option>
+                  <option>Vehicles</option>
+                  <option>Property</option>
+                  <option>Electronics</option>
+                  <option>Machinery</option>
+                  <option>Agriculture</option>
+                  <option>Services</option>
+                </select>
 
-              <div className="input-group relative flex-1">
+                <button
+                  type="submit"
+                  className="rounded-xl bg-slate-950 px-7 py-4 font-bold text-white transition hover:-translate-y-0.5 hover:bg-slate-900"
+                >
+                  Search
+                </button>
 
-                <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-2xl">
-                  🔍
-                </span>
-
-                <input
-                  type="search"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="What are you looking for?"
-                  className="h-14 w-full rounded-xl border border-transparent bg-white pl-12 pr-4 text-base text-slate-900 outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-100"
-                />
-
-              </div>
-
-              <select
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                className="h-14 rounded-xl border border-transparent bg-white px-4 text-base text-slate-900 outline-none focus:border-cyan-400 lg:w-52"
-              >
-                {locations.map((item) => (
-                  <option key={item}>{item}</option>
-                ))}
-              </select>
-
-              <button
-                type="button"
-                onClick={() => {
-                  document
-                    .getElementById("latest-listings")
-                    ?.scrollIntoView({ behavior: "smooth" });
-                }}
-                className="h-14 rounded-xl bg-slate-950 px-8 text-base font-bold text-white transition hover:bg-cyan-400 hover:text-slate-950"
-              >
-                Search
-              </button>
-
+              </form>
             </div>
 
           </div>
-
         </div>
-
       </section>
 
       {/* =====================================================
-          MAIN CONTENT
-      ====================================================== */}
-
+          CATEGORIES
+      ===================================================== */}
       <section
-        id="latest-listings"
-        className="main-content mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8"
+        id="categories"
+        className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8"
       >
-
-        <div className="grid gap-8 lg:grid-cols-[260px_1fr]">
-
-          {/* FILTER SIDEBAR */}
-
-          <aside className="filter-section h-fit rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-
-            <div className="mb-5 flex items-center justify-between">
-
-              <h2 className="text-xl font-extrabold">
-                Filters
-              </h2>
-
-              {(search ||
-                category !== "All Categories" ||
-                location !== "All Ghana") && (
-
-                <button
-                  type="button"
-                  onClick={clearFilters}
-                  className="font-bold text-blue-700 hover:underline"
-                >
-                  Clear
-                </button>
-
-              )}
-
-            </div>
-
-            <div className="space-y-5">
-
-              <label className="filter-group block">
-
-                <span className="mb-2 block text-sm font-bold text-slate-700">
-                  Search
-                </span>
-
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search marketplace"
-                  className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
-                />
-
-              </label>
-
-              <label className="filter-group block">
-
-                <span className="mb-2 block text-sm font-bold text-slate-700">
-                  Category
-                </span>
-
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 outline-none focus:border-blue-600"
-                >
-                  {categories.map((item) => (
-                    <option key={item}>{item}</option>
-                  ))}
-                </select>
-
-              </label>
-
-              <label className="filter-group block">
-
-                <span className="mb-2 block text-sm font-bold text-slate-700">
-                  Location
-                </span>
-
-                <select
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 outline-none focus:border-blue-600"
-                >
-                  {locations.map((item) => (
-                    <option key={item}>{item}</option>
-                  ))}
-                </select>
-
-              </label>
-
-              <Link
-                href="/post-ad"
-                className="btn-primary flex h-12 items-center justify-center rounded-xl bg-blue-700 px-4 font-bold text-white transition hover:bg-cyan-400 hover:text-slate-950"
-              >
-                + Sell an Item
-              </Link>
-
-            </div>
-
-          </aside>
-
-          {/* RESULTS */}
-
-          <div className="min-w-0">
-
-            <div className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-
-              <div>
-
-                <p className="mb-1 text-sm font-bold uppercase tracking-wider text-blue-700">
-                  MARKETPLACE
-                </p>
-
-                <h2 className="text-3xl font-black tracking-tight sm:text-4xl">
-                  {search
-                    ? `Results for "${search}"`
-                    : "Latest Listings"}
-                </h2>
-
-                <p className="mt-2 text-slate-500">
-                  {filteredListings.length} listings available
-                </p>
-
-              </div>
-
-              <select
-                value={sort}
-                onChange={(e) => setSort(e.target.value)}
-                className="h-11 rounded-xl border border-slate-200 bg-white px-4 font-semibold outline-none"
-              >
-                <option>Featured</option>
-                <option>Newest</option>
-              </select>
-
-            </div>
-
-            {/* TOP ADS */}
-
-            {!search && category === "All Categories" && (
-
-              <div className="top-ads mb-8 overflow-hidden rounded-2xl p-6 text-white shadow-lg sm:p-8">
-
-                <div className="flex flex-col justify-between gap-6 md:flex-row md:items-center">
-
-                  <div>
-
-                    <div className="mb-3 text-sm font-bold uppercase tracking-wider text-cyan-100">
-                      ⭐ TOP ADS
-                    </div>
-
-                    <h3 className="text-2xl font-black sm:text-3xl">
-                      Give your business more visibility
-                    </h3>
-
-                    <p className="mt-2 max-w-2xl text-blue-100">
-                      Promote your products and services to more customers
-                      across Ghana.
-                    </p>
-
-                  </div>
-
-                  <Link
-                    href="/post-ad"
-                    className="inline-flex w-fit rounded-xl bg-white px-6 py-3 font-bold text-blue-700 transition hover:bg-cyan-300 hover:text-slate-950"
-                  >
-                    Advertise Now →
-                  </Link>
-
-                </div>
-
-              </div>
-
-            )}
-
-            {/* LISTINGS */}
-
-            {filteredListings.length > 0 ? (
-
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-
-                {filteredListings.map((item) => (
-
-                  <Link
-                    href={`/listings/${item.id}`}
-                    key={item.id}
-                    className="card group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
-                  >
-
-                    <div className="relative flex h-48 items-center justify-center bg-slate-100">
-
-                      {item.featured && (
-
-                        <span className="absolute left-3 top-3 rounded-full bg-blue-700 px-3 py-1 text-xs font-bold text-white shadow">
-                          TOP AD
-                        </span>
-
-                      )}
-
-                      <span className="text-7xl transition duration-300 group-hover:scale-110">
-                        {item.image}
-                      </span>
-
-                    </div>
-
-                    <div className="p-5">
-
-                      <p className="card-highlight mb-2 text-xs font-bold uppercase tracking-wide text-blue-700">
-                        {item.category}
-                      </p>
-
-                      <h3 className="card-title line-clamp-2 min-h-[3.5rem] text-lg font-extrabold text-slate-900">
-                        {item.title}
-                      </h3>
-
-                      <div className="mt-3 text-xl font-black text-slate-900">
-                        {item.price}
-                      </div>
-
-                      <p className="mt-2 text-sm text-slate-500">
-                        📍 {item.location}
-                      </p>
-
-                      <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-4">
-
-                        <span className="text-sm font-semibold text-slate-600">
-                          {item.seller}
-                        </span>
-
-                        {item.verified && (
-
-                          <span className="rounded-full bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700">
-                            ✓ Verified
-                          </span>
-
-                        )}
-
-                      </div>
-
-                    </div>
-
-                  </Link>
-
-                ))}
-
-              </div>
-
-            ) : (
-
-              <div className="rounded-2xl border border-slate-200 bg-white px-6 py-16 text-center">
-
-                <div className="text-5xl">
-                  🔎
-                </div>
-
-                <h3 className="mt-5 text-2xl font-black">
-                  No listings found
-                </h3>
-
-                <p className="mx-auto mt-2 max-w-md text-slate-500">
-                  Try another search, category or location.
-                </p>
-
-                <button
-                  type="button"
-                  onClick={clearFilters}
-                  className="mt-6 rounded-xl bg-blue-700 px-6 py-3 font-bold text-white transition hover:bg-cyan-400 hover:text-slate-950"
-                >
-                  View all listings
-                </button>
-
-              </div>
-
-            )}
-
-          </div>
-
+        <div className="mb-8">
+          <p className="text-sm font-black uppercase tracking-widest text-blue-700">
+            Explore
+          </p>
+
+          <h2 className="mt-2 text-3xl font-black text-slate-900">
+            Popular Categories
+          </h2>
+
+          <p className="mt-2 text-slate-500">
+            Find what you need from sellers across Ghana.
+          </p>
         </div>
 
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+
+          {[
+            ["🚗", "Vehicles"],
+            ["🏠", "Property"],
+            ["📱", "Electronics"],
+            ["⚙️", "Machinery"],
+            ["🌾", "Agriculture"],
+            ["🛠️", "Services"],
+          ].map(([icon, name]) => (
+            <a
+              key={name}
+              href="#latest-listings"
+              className="group rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm transition hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl"
+            >
+              <div className="text-4xl">{icon}</div>
+
+              <div className="mt-4 font-bold text-slate-800 transition group-hover:text-blue-700">
+                {name}
+              </div>
+            </a>
+          ))}
+
+        </div>
+      </section>
+
+      {/* =====================================================
+          LATEST LISTINGS
+      ===================================================== */}
+      <section
+        id="latest-listings"
+        className="border-y border-slate-200 bg-slate-50"
+      >
+        <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+
+          <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+            <div>
+              <p className="text-sm font-black uppercase tracking-widest text-blue-700">
+                Marketplace
+              </p>
+
+              <h2 className="mt-2 text-3xl font-black text-slate-900">
+                Latest Listings
+              </h2>
+
+              <p className="mt-2 text-slate-500">
+                Browse products and opportunities available on BEST SALES GHANA.
+              </p>
+            </div>
+
+            <a
+              href="#categories"
+              className="font-bold text-blue-700 hover:text-blue-900"
+            >
+              View all categories →
+            </a>
+          </div>
+
+          {/* TOP AD */}
+          <div className="mb-8 overflow-hidden rounded-2xl bg-gradient-to-r from-blue-900 via-blue-700 to-cyan-500 p-7 text-white shadow-xl sm:p-10">
+            <p className="text-sm font-bold uppercase tracking-widest text-cyan-100">
+              Sell on BEST SALES GHANA
+            </p>
+
+            <h3 className="mt-2 text-2xl font-black sm:text-3xl">
+              Put your products in front of Ghanaian buyers.
+            </h3>
+
+            <p className="mt-3 max-w-2xl text-white/85">
+              Create your listing, advertise your business and connect directly
+              with potential customers.
+            </p>
+
+            <a
+              href="#sell"
+              className="mt-6 inline-flex rounded-xl bg-white px-6 py-3 font-black text-blue-800 transition hover:-translate-y-0.5 hover:shadow-lg"
+            >
+              Post Your Ad
+            </a>
+          </div>
+
+          {/* LISTING CARDS */}
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+
+            {[
+              {
+                icon: "🏭",
+                title: "Industrial Machinery",
+                category: "Machinery & Equipment",
+              },
+              {
+                icon: "🚙",
+                title: "Vehicles & Auto",
+                category: "Vehicles",
+              },
+              {
+                icon: "🏡",
+                title: "Property & Real Estate",
+                category: "Property",
+              },
+              {
+                icon: "🖨️",
+                title: "Printing Equipment",
+                category: "Business Equipment",
+              },
+              {
+                icon: "📱",
+                title: "Phones & Electronics",
+                category: "Electronics",
+              },
+              {
+                icon: "🌱",
+                title: "Agriculture Equipment",
+                category: "Agriculture",
+              },
+            ].map((item) => (
+              <a
+                key={item.title}
+                href="#"
+                className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl"
+              >
+                <div className="flex h-52 items-center justify-center bg-gradient-to-br from-blue-50 to-slate-50 text-7xl transition group-hover:from-cyan-50 group-hover:to-blue-50">
+                  {item.icon}
+                </div>
+
+                <div className="p-5">
+                  <p className="text-xs font-bold uppercase tracking-wider text-blue-700">
+                    {item.category}
+                  </p>
+
+                  <h3 className="mt-2 text-xl font-black text-slate-900">
+                    {item.title}
+                  </h3>
+
+                  <p className="mt-2 text-sm text-slate-500">
+                    Browse available listings and connect with sellers.
+                  </p>
+
+                  <div className="mt-5 font-bold text-blue-700">
+                    Explore →
+                  </div>
+                </div>
+              </a>
+            ))}
+
+          </div>
+        </div>
       </section>
 
       {/* =====================================================
           SELLER CTA
-      ====================================================== */}
+      ===================================================== */}
+      <section
+        id="sell"
+        className="border-b border-slate-200 bg-white"
+      >
+        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
 
-      <section className="border-y border-slate-200 bg-white">
+          <div className="rounded-3xl bg-slate-950 p-8 text-white sm:p-12 lg:flex lg:items-center lg:justify-between lg:gap-10">
 
-        <div className="mx-auto max-w-7xl px-4 py-14 text-center sm:px-6 lg:px-8">
+            <div>
+              <p className="text-sm font-black uppercase tracking-widest text-cyan-400">
+                For Sellers & Businesses
+              </p>
 
-          <p className="text-sm font-bold uppercase tracking-[0.18em] text-blue-700">
-            SELL ON BEST SALES GHANA
-          </p>
+              <h2 className="mt-3 text-3xl font-black sm:text-4xl">
+                Ready to sell on BEST SALES GHANA?
+              </h2>
 
-          <h2 className="mt-3 text-3xl font-black sm:text-4xl">
-            Have something to sell?
-          </h2>
+              <p className="mt-4 max-w-2xl text-white/70">
+                Post your products, promote your business and connect with
+                customers across Ghana.
+              </p>
+            </div>
 
-          <p className="mx-auto mt-4 max-w-2xl text-slate-600">
-            List your product, vehicle, property, service, machinery or
-            business opportunity and reach customers across Ghana.
-          </p>
+            <a
+              href="#"
+              className="mt-7 inline-flex shrink-0 rounded-xl bg-blue-600 px-7 py-4 font-black text-white shadow-lg transition hover:-translate-y-1 hover:bg-cyan-400 hover:text-slate-950 lg:mt-0"
+            >
+              Create a Listing
+            </a>
 
-          <Link
-            href="/post-ad"
-            className="btn-primary mt-7 inline-flex rounded-xl bg-blue-700 px-7 py-4 font-bold text-white shadow-sm transition hover:bg-cyan-400 hover:text-slate-950"
-          >
-            + Post an Ad
-          </Link>
-
+          </div>
         </div>
-
       </section>
 
       {/* =====================================================
           FOOTER
-      ====================================================== */}
+      ===================================================== */}
+      <footer
+        id="about"
+        className="bg-slate-950 text-white"
+      >
+        <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
 
-      <footer className="bg-slate-950 text-white">
+          <div className="grid gap-10 md:grid-cols-4">
 
-        <div className="mx-auto grid max-w-7xl gap-8 px-4 py-12 sm:px-6 md:grid-cols-3 lg:px-8">
-
-          <div>
-
-            <div className="flex items-center gap-3">
-
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-700 font-black text-white">
-                BS
-              </div>
-
-              <div className="text-xl font-black">
+            <div className="md:col-span-2">
+              <div className="text-2xl font-black">
                 BEST SALES GHANA
               </div>
 
+              <p className="mt-3 max-w-md text-sm leading-6 text-slate-400">
+                Ghana's marketplace for products, vehicles, property, services,
+                machinery, equipment and business opportunities.
+              </p>
             </div>
 
-            <p className="mt-2 text-sm text-slate-400">
-              Buy • Sell • Advertise • Connect
-            </p>
+            <div>
+              <h3 className="font-bold">
+                Marketplace
+              </h3>
 
-            <p className="mt-5 text-sm text-slate-400">
-              A marketplace operated by
-              <br />
-              <strong className="text-white">
-                ALL PROMINENT GHANA LIMITED
-              </strong>
-            </p>
+              <div className="mt-4 space-y-3 text-sm text-slate-400">
+                <a className="block hover:text-white" href="#categories">
+                  Categories
+                </a>
 
-          </div>
+                <a className="block hover:text-white" href="#latest-listings">
+                  Listings
+                </a>
 
-          <div>
-
-            <h3 className="font-bold">
-              Marketplace
-            </h3>
-
-            <div className="mt-4 flex flex-col gap-3 text-sm text-slate-400">
-
-              <Link href="/listings" className="hover:text-cyan-300">
-                Browse Listings
-              </Link>
-
-              <Link href="/post-ad" className="hover:text-cyan-300">
-                Sell an Item
-              </Link>
-
-              <Link href="/account" className="hover:text-cyan-300">
-                My Account
-              </Link>
-
+                <a className="block hover:text-white" href="#sell">
+                  Sell
+                </a>
+              </div>
             </div>
 
-          </div>
+            <div>
+              <h3 className="font-bold">
+                Connect
+              </h3>
 
-          <div>
+              <div className="mt-4 space-y-3 text-sm text-slate-400">
+                <a className="block hover:text-white" href="#">
+                  Contact
+                </a>
 
-            <h3 className="font-bold">
-              Company
-            </h3>
+                <a className="block hover:text-white" href="#">
+                  Help Centre
+                </a>
 
-            <div className="mt-4 flex flex-col gap-3 text-sm text-slate-400">
-
-              <Link href="/" className="hover:text-cyan-300">
-                Home
-              </Link>
-
-              <Link href="/account" className="hover:text-cyan-300">
-                Sign In
-              </Link>
-
-              <Link href="/post-ad" className="hover:text-cyan-300">
-                Advertise
-              </Link>
-
+                <a className="block hover:text-white" href="#">
+                  Terms & Privacy
+                </a>
+              </div>
             </div>
 
           </div>
 
-        </div>
-
-        <div className="border-t border-slate-800">
-
-          <div className="mx-auto max-w-7xl px-4 py-5 text-center text-xs text-slate-500 sm:px-6 lg:px-8">
-
+          <div className="mt-10 border-t border-white/10 pt-6 text-sm text-slate-500">
             © {new Date().getFullYear()} BEST SALES GHANA. All rights reserved.
-
-            <br />
-
-            ALL PROMINENT GHANA LIMITED
-
           </div>
 
         </div>
-
       </footer>
 
     </main>
