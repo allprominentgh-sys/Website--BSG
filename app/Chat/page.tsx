@@ -3,70 +3,62 @@
 import Link from "next/link";
 import { useState } from "react";
 
-type Conversation = {
+type Message = {
   id: number;
-  name: string;
-  type: "Seller" | "Business" | "Support";
-  listing: string;
-  lastMessage: string;
+  sender: "buyer" | "seller";
+  text: string;
   time: string;
-  unread: number;
-  online: boolean;
 };
 
-const conversations: Conversation[] = [
+const initialMessages: Message[] = [
   {
     id: 1,
-    name: "Industrial Equipment Ghana",
-    type: "Business",
-    listing: "Industrial Printing Machine",
-    lastMessage: "Yes, the machine is still available.",
-    time: "10:42 AM",
-    unread: 2,
-    online: true,
+    sender: "seller",
+    text: "Hello, yes the item is still available.",
+    time: "10:21 AM",
   },
   {
     id: 2,
-    name: "Kwame Mensah",
-    type: "Seller",
-    listing: "Toyota Hilux 2022",
-    lastMessage: "You can come and inspect it.",
-    time: "Yesterday",
-    unread: 0,
-    online: false,
+    sender: "buyer",
+    text: "Great. Is the price negotiable?",
+    time: "10:23 AM",
   },
   {
     id: 3,
-    name: "BEST SALES GHANA Support",
-    type: "Support",
-    listing: "Payment Support",
-    lastMessage: "Your request has been received.",
-    time: "Monday",
-    unread: 0,
-    online: true,
+    sender: "seller",
+    text: "We can discuss the price.",
+    time: "10:24 AM",
   },
 ];
 
 export default function ChatPage() {
-  const [selectedId, setSelectedId] = useState(1);
-  const [message, setMessage] = useState("");
+  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const [newMessage, setNewMessage] = useState("");
 
-  const selectedConversation =
-    conversations.find((conversation) => conversation.id === selectedId) ??
-    conversations[0];
+  function sendMessage() {
+    const text = newMessage.trim();
 
-  const sendMessage = () => {
-    if (!message.trim()) return;
+    if (!text) return;
 
-    alert("Chat message interface ready. Real-time messaging will be connected in the next step.");
-    setMessage("");
-  };
+    const message: Message = {
+      id: Date.now(),
+      sender: "buyer",
+      text,
+      time: new Date().toLocaleTimeString([], {
+        hour: "numeric",
+        minute: "2-digit",
+      }),
+    };
+
+    setMessages((current) => [...current, message]);
+    setNewMessage("");
+  }
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-800">
 
       {/* HEADER */}
-      <header className="border-b bg-white">
+      <header className="sticky top-0 z-50 border-b bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
 
           <Link href="/" className="block">
@@ -74,357 +66,286 @@ export default function ChatPage() {
               BEST SALES GHANA
             </div>
 
-            <div className="text-xs font-medium text-slate-500 sm:text-sm">
+            <div className="text-xs font-medium text-slate-500">
               Buy • Sell • Advertise • Connect
             </div>
           </Link>
 
-          <div className="flex items-center gap-2 sm:gap-4">
-
+          <div className="flex items-center gap-2">
             <Link
-              href="/"
-              className="rounded-xl px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100"
+              href="/dashboard"
+              className="rounded-xl px-4 py-2.5 font-bold text-slate-700 hover:bg-slate-100"
             >
-              Marketplace
+              Dashboard
             </Link>
 
             <Link
-              href="/login"
-              className="rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-800"
+              href="/account"
+              className="rounded-xl bg-blue-700 px-4 py-2.5 font-bold text-white hover:bg-blue-800"
             >
               Account
             </Link>
-
           </div>
 
         </div>
       </header>
 
       {/* CHAT AREA */}
-      <section className="mx-auto max-w-7xl px-0 py-0 sm:px-6 sm:py-8 lg:px-8">
+      <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
 
-        <div className="overflow-hidden border-x border-slate-200 bg-white shadow-sm sm:rounded-3xl sm:border">
+        <div className="grid min-h-[700px] overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm lg:grid-cols-[320px_1fr]">
 
-          <div className="grid min-h-[calc(100vh-105px)] md:grid-cols-[340px_1fr] lg:grid-cols-[380px_1fr]">
+          {/* CHAT LIST */}
+          <aside className="hidden border-r border-slate-200 lg:block">
 
-            {/* CONVERSATIONS */}
-            <aside className="border-r border-slate-200 bg-white">
+            <div className="border-b border-slate-200 p-5">
+              <h1 className="text-2xl font-black text-slate-900">
+                Messages
+              </h1>
 
-              <div className="border-b border-slate-200 p-5">
+              <p className="mt-1 text-sm text-slate-500">
+                Your marketplace conversations
+              </p>
+            </div>
 
-                <div className="flex items-center justify-between">
+            {/* SEARCH */}
+            <div className="p-4">
+              <input
+                type="search"
+                placeholder="Search conversations..."
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
 
-                  <div>
-                    <h1 className="text-2xl font-black text-slate-900">
-                      Messages
-                    </h1>
+            {/* CONVERSATION */}
+            <button
+              type="button"
+              className="w-full border-l-4 border-blue-700 bg-blue-50 px-5 py-4 text-left"
+            >
+              <div className="flex items-start justify-between gap-3">
 
-                    <p className="mt-1 text-sm text-slate-500">
-                      Your marketplace conversations
+                <div className="flex min-w-0 items-center gap-3">
+
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-700 font-black text-white">
+                    KO
+                  </div>
+
+                  <div className="min-w-0">
+                    <p className="truncate font-black text-slate-900">
+                      Kofi Official Motors
+                    </p>
+
+                    <p className="mt-1 truncate text-sm text-slate-500">
+                      Great, we can discuss the price.
                     </p>
                   </div>
 
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-xl">
-                    💬
+                </div>
+
+                <span className="shrink-0 text-xs text-slate-400">
+                  10:24
+                </span>
+
+              </div>
+            </button>
+
+          </aside>
+
+          {/* CHAT WINDOW */}
+          <section className="flex min-w-0 flex-col">
+
+            {/* CHAT HEADER */}
+            <div className="border-b border-slate-200 bg-white p-4 sm:p-5">
+
+              <div className="flex items-center justify-between gap-4">
+
+                <div className="flex min-w-0 items-center gap-3">
+
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-700 font-black text-white">
+                    KO
+                  </div>
+
+                  <div className="min-w-0">
+                    <h2 className="truncate font-black text-slate-900">
+                      Kofi Official Motors
+                    </h2>
+
+                    <div className="mt-1 flex items-center gap-2 text-xs">
+                      <span className="h-2 w-2 rounded-full bg-green-500" />
+                      <span className="text-slate-500">
+                        Active now
+                      </span>
+                    </div>
                   </div>
 
                 </div>
 
-                {/* SEARCH */}
-                <div className="mt-5">
+                <div className="flex items-center gap-2">
 
-                  <input
-                    type="search"
-                    placeholder="Search conversations..."
-                    className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
-                  />
+                  <button
+                    type="button"
+                    className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50"
+                  >
+                    Report
+                  </button>
+
+                  <button
+                    type="button"
+                    className="rounded-xl border border-red-200 px-3 py-2 text-sm font-bold text-red-600 hover:bg-red-50"
+                  >
+                    Block
+                  </button>
 
                 </div>
 
               </div>
 
-              {/* CONVERSATION LIST */}
-              <div>
-
-                {conversations.map((conversation) => (
-
-                  <button
-                    key={conversation.id}
-                    type="button"
-                    onClick={() => setSelectedId(conversation.id)}
-                    className={`w-full border-b border-slate-100 p-4 text-left transition hover:bg-slate-50 ${
-                      selectedId === conversation.id
-                        ? "bg-blue-50"
-                        : "bg-white"
-                    }`}
-                  >
-
-                    <div className="flex gap-3">
-
-                      {/* AVATAR */}
-                      <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-700 font-black text-white">
-
-                        {conversation.name.charAt(0)}
-
-                        {conversation.online && (
-                          <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white bg-green-500" />
-                        )}
-
-                      </div>
-
-                      {/* INFO */}
-                      <div className="min-w-0 flex-1">
-
-                        <div className="flex items-start justify-between gap-2">
-
-                          <div className="truncate font-black text-slate-900">
-                            {conversation.name}
-                          </div>
-
-                          <span className="shrink-0 text-xs text-slate-400">
-                            {conversation.time}
-                          </span>
-
-                        </div>
-
-                        <div className="mt-1 text-xs font-bold text-blue-700">
-                          {conversation.type}
-                        </div>
-
-                        <div className="mt-1 truncate text-sm text-slate-500">
-                          {conversation.lastMessage}
-                        </div>
-
-                        <div className="mt-2 flex items-center justify-between">
-
-                          <span className="truncate text-xs text-slate-400">
-                            {conversation.listing}
-                          </span>
-
-                          {conversation.unread > 0 && (
-                            <span className="ml-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-700 px-1.5 text-[10px] font-black text-white">
-                              {conversation.unread}
-                            </span>
-                          )}
-
-                        </div>
-
-                      </div>
-
-                    </div>
-
-                  </button>
-
-                ))}
-
-              </div>
-
-            </aside>
-
-            {/* CHAT WINDOW */}
-            <section className="flex min-h-[calc(100vh-105px)] flex-col bg-slate-50">
-
-              {/* CHAT HEADER */}
-              <div className="border-b border-slate-200 bg-white px-5 py-4">
+              {/* LISTING REFERENCE */}
+              <div className="mt-4 rounded-2xl border border-blue-100 bg-blue-50 p-4">
 
                 <div className="flex items-center justify-between gap-4">
 
-                  <div className="flex min-w-0 items-center gap-3">
-
-                    <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-700 font-black text-white">
-
-                      {selectedConversation.name.charAt(0)}
-
-                      {selectedConversation.online && (
-                        <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white bg-green-500" />
-                      )}
-
-                    </div>
-
-                    <div className="min-w-0">
-
-                      <h2 className="truncate font-black text-slate-900">
-                        {selectedConversation.name}
-                      </h2>
-
-                      <p className="text-xs text-slate-500">
-                        {selectedConversation.online
-                          ? "Online now"
-                          : "Offline"}
-                      </p>
-
-                    </div>
-
-                  </div>
-
-                  <button
-                    type="button"
-                    className="rounded-xl px-3 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100"
-                  >
-                    ⋮
-                  </button>
-
-                </div>
-
-                {/* LISTING ATTACHMENT */}
-                <div className="mt-4 flex items-center gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-3">
-
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white text-xl">
-                    📦
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-
-                    <p className="text-xs font-bold uppercase tracking-wide text-blue-700">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-wider text-blue-700">
                       Listing
                     </p>
 
-                    <p className="truncate font-black text-slate-900">
-                      {selectedConversation.listing}
+                    <p className="mt-1 font-black text-slate-900">
+                      Toyota Hilux 2022
                     </p>
 
+                    <p className="mt-1 text-sm text-slate-500">
+                      GH₵ 450,000
+                    </p>
                   </div>
 
-                  <button
-                    type="button"
-                    className="rounded-lg bg-white px-3 py-2 text-xs font-black text-blue-700 hover:bg-blue-100"
+                  <Link
+                    href="/listings"
+                    className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800"
                   >
-                    View
-                  </button>
+                    View Listing
+                  </Link>
 
                 </div>
 
               </div>
 
-              {/* MESSAGES */}
-              <div className="flex-1 space-y-5 overflow-y-auto p-5">
+            </div>
 
-                {/* DATE */}
-                <div className="flex justify-center">
-                  <span className="rounded-full bg-white px-4 py-1.5 text-xs font-bold text-slate-400 shadow-sm">
-                    Today
-                  </span>
-                </div>
+            {/* MESSAGES */}
+            <div className="flex-1 space-y-4 overflow-y-auto bg-slate-50 p-4 sm:p-6">
 
-                {/* SELLER MESSAGE */}
-                <div className="flex justify-start">
+              <div className="text-center">
+                <span className="rounded-full bg-white px-4 py-2 text-xs font-bold text-slate-400 shadow-sm">
+                  Today
+                </span>
+              </div>
 
-                  <div className="max-w-[80%] sm:max-w-[65%]">
+              {messages.map((message) => (
 
-                    <div className="rounded-2xl rounded-tl-md bg-white px-4 py-3 shadow-sm">
+                <div
+                  key={message.id}
+                  className={`flex ${
+                    message.sender === "buyer"
+                      ? "justify-end"
+                      : "justify-start"
+                  }`}
+                >
 
-                      <p className="text-sm leading-6 text-slate-700">
-                        Hello. Thank you for your interest in this listing.
-                      </p>
+                  <div
+                    className={`max-w-[80%] rounded-2xl px-4 py-3 shadow-sm ${
+                      message.sender === "buyer"
+                        ? "rounded-br-md bg-blue-700 text-white"
+                        : "rounded-bl-md bg-white text-slate-800"
+                    }`}
+                  >
 
-                    </div>
-
-                    <p className="mt-1 px-1 text-[11px] text-slate-400">
-                      10:38 AM
+                    <p className="text-sm leading-6">
+                      {message.text}
                     </p>
 
-                  </div>
-
-                </div>
-
-                {/* BUYER MESSAGE */}
-                <div className="flex justify-end">
-
-                  <div className="max-w-[80%] sm:max-w-[65%]">
-
-                    <div className="rounded-2xl rounded-tr-md bg-blue-700 px-4 py-3 text-white shadow-sm">
-
-                      <p className="text-sm leading-6">
-                        Is the machine still available?
-                      </p>
-
-                    </div>
-
-                    <div className="mt-1 flex justify-end gap-1 px-1 text-[11px] text-slate-400">
-                      <span>10:40 AM</span>
-                      <span className="font-black text-blue-600">
-                        ✓✓
-                      </span>
-                    </div>
-
-                  </div>
-
-                </div>
-
-                {/* SELLER MESSAGE */}
-                <div className="flex justify-start">
-
-                  <div className="max-w-[80%] sm:max-w-[65%]">
-
-                    <div className="rounded-2xl rounded-tl-md bg-white px-4 py-3 shadow-sm">
-
-                      <p className="text-sm leading-6 text-slate-700">
-                        Yes, the machine is still available.
-                      </p>
-
-                    </div>
-
-                    <p className="mt-1 px-1 text-[11px] text-slate-400">
-                      10:42 AM
+                    <p
+                      className={`mt-1 text-right text-[10px] ${
+                        message.sender === "buyer"
+                          ? "text-blue-100"
+                          : "text-slate-400"
+                      }`}
+                    >
+                      {message.time}
                     </p>
 
                   </div>
 
                 </div>
 
-              </div>
+              ))}
 
-              {/* SAFETY NOTICE */}
-              <div className="border-t border-slate-200 bg-amber-50 px-5 py-3">
+            </div>
 
-                <p className="text-center text-xs leading-5 text-amber-800">
-                  <strong>Safety:</strong> Keep conversations and payments
-                  within BEST SALES GHANA whenever possible. Report suspicious
-                  activity to Marketplace Support.
-                </p>
+            {/* MESSAGE COMPOSER */}
+            <div className="border-t border-slate-200 bg-white p-4">
 
-              </div>
+              <div className="flex items-end gap-2">
 
-              {/* MESSAGE INPUT */}
-              <div className="border-t border-slate-200 bg-white p-4">
+                <button
+                  type="button"
+                  title="Attach file"
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-slate-300 text-xl hover:bg-slate-50"
+                >
+                  📎
+                </button>
 
-                <div className="flex items-end gap-2">
+                <textarea
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      sendMessage();
+                    }
+                  }}
+                  rows={1}
+                  placeholder="Write a message..."
+                  className="min-h-12 flex-1 resize-none rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                />
 
-                  <button
-                    type="button"
-                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-xl hover:bg-slate-200"
-                    title="Attach file"
-                  >
-                    📎
-                  </button>
-
-                  <textarea
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    placeholder="Write a message..."
-                    rows={1}
-                    className="max-h-32 min-h-12 flex-1 resize-none rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
-                  />
-
-                  <button
-                    type="button"
-                    onClick={sendMessage}
-                    className="flex h-12 shrink-0 items-center justify-center rounded-xl bg-blue-700 px-5 font-black text-white shadow-md hover:bg-blue-800"
-                  >
-                    Send
-                  </button>
-
-                </div>
+                <button
+                  type="button"
+                  onClick={sendMessage}
+                  className="h-12 rounded-xl bg-blue-700 px-5 font-black text-white shadow-sm hover:bg-blue-800"
+                >
+                  Send
+                </button>
 
               </div>
 
-            </section>
+              <p className="mt-2 text-center text-xs text-slate-400">
+                Never share passwords, PINs or sensitive financial information
+                in chat.
+              </p>
 
-          </div>
+            </div>
+
+          </section>
 
         </div>
 
       </section>
+
+      {/* FOOTER */}
+      <footer className="bg-slate-950 px-4 py-8 text-center text-sm text-slate-500">
+        <p className="font-black text-white">
+          BEST SALES GHANA
+        </p>
+
+        <p className="mt-2">
+          Buy • Sell • Advertise • Connect
+        </p>
+
+        <p className="mt-4">
+          © 2026 All Prominent Ghana Limited. All rights reserved.
+        </p>
+      </footer>
 
     </main>
   );
