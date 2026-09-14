@@ -1,521 +1,473 @@
-"use client";
-
-import { useState } from "react";
+import Link from "next/link";
 
 export default function SellPage() {
-  const [accountType, setAccountType] = useState("");
-  const [agreed, setAgreed] = useState(false);
-
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900">
+    <main className="min-h-screen bg-slate-50 text-slate-800">
 
-      {/* =====================================================
-          HEADER
-      ===================================================== */}
-      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+      {/* HEADER */}
+      <header className="sticky top-0 z-50 border-b bg-white/95 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-5 sm:px-6 lg:px-8">
 
-          <a href="/" className="flex flex-col">
-            <span className="text-xl font-black tracking-tight text-slate-900">
+          <Link href="/" className="block">
+            <div className="text-xl font-black tracking-tight text-slate-900 sm:text-2xl">
               BEST SALES GHANA
-            </span>
+            </div>
 
-            <span className="text-xs font-medium text-slate-500">
+            <div className="text-sm font-medium text-slate-500">
               Buy • Sell • Advertise • Connect
-            </span>
-          </a>
+            </div>
+          </Link>
 
-          <a
-            href="/login"
-            className="rounded-xl border border-slate-300 px-5 py-3 font-bold text-slate-700 transition hover:border-blue-600 hover:text-blue-700"
-          >
-            Sign In
-          </a>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/login"
+              className="hidden rounded-xl px-4 py-3 font-bold text-slate-700 hover:bg-slate-100 sm:block"
+            >
+              Sign In
+            </Link>
+
+            <Link
+              href="/register"
+              className="rounded-xl bg-blue-700 px-5 py-3 font-bold text-white shadow-md transition hover:bg-blue-800"
+            >
+              Create Account
+            </Link>
+          </div>
 
         </div>
       </header>
 
-      {/* =====================================================
-          HERO
-      ===================================================== */}
-      <section className="bg-gradient-to-br from-blue-700 via-blue-600 to-cyan-400">
-        <div className="mx-auto max-w-7xl px-4 py-14 text-white sm:px-6 lg:px-8">
+      {/* HERO */}
+      <section className="bg-gradient-to-br from-blue-700 via-blue-600 to-cyan-500 px-4 py-16 text-white sm:px-6 lg:px-8">
 
-          <p className="text-sm font-black uppercase tracking-[0.2em] text-cyan-100">
+        <div className="mx-auto max-w-5xl text-center">
+
+          <p className="text-sm font-black uppercase tracking-[0.25em] text-cyan-100">
             Sell on BEST SALES GHANA
           </p>
 
-          <h1 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl lg:text-6xl">
-            Turn your products into opportunities.
+          <h1 className="mt-4 text-4xl font-black sm:text-5xl lg:text-6xl">
+            Turn your products into sales.
           </h1>
 
-          <p className="mt-5 max-w-3xl text-lg leading-8 text-white/90">
-            Create listings, advertise your business and connect with buyers
-            across Ghana.
+          <p className="mx-auto mt-5 max-w-3xl text-lg leading-8 text-white/90">
+            List your products, vehicles, property, machinery, equipment,
+            services and business opportunities and connect with buyers across
+            Ghana.
           </p>
 
         </div>
+
       </section>
 
-      {/* =====================================================
-          MAIN CONTENT
-      ===================================================== */}
-      <section className="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
+      {/* SELLING OPTIONS */}
+      <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
 
-        {/* ===================================================
-            ACCOUNT TYPE
-        =================================================== */}
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-10">
-
-          <div className="mb-8">
-            <p className="text-sm font-black uppercase tracking-widest text-blue-700">
-              Step 1
-            </p>
-
-            <h2 className="mt-2 text-3xl font-black">
-              Choose your seller type
-            </h2>
-
-            <p className="mt-2 text-slate-500">
-              Your account type determines how payments and verification are
-              handled on the marketplace.
-            </p>
-          </div>
-
-          <div className="grid gap-5 md:grid-cols-2">
-
-            {/* INDIVIDUAL */}
-            <button
-              type="button"
-              onClick={() => setAccountType("individual")}
-              className={`rounded-2xl border-2 p-6 text-left transition ${
-                accountType === "individual"
-                  ? "border-blue-600 bg-blue-50 shadow-lg"
-                  : "border-slate-200 bg-white hover:border-blue-300"
-              }`}
-            >
-              <div className="text-4xl">👤</div>
-
-              <h3 className="mt-4 text-xl font-black">
-                Individual Seller
-              </h3>
-
-              <p className="mt-2 text-sm leading-6 text-slate-500">
-                For people selling products or services in their personal
-                capacity.
-              </p>
-
-              <ul className="mt-5 space-y-2 text-sm text-slate-700">
-                <li>✓ National ID verification</li>
-                <li>✓ Face verification may be required</li>
-                <li>✓ Listings can be published</li>
-                <li>✓ Payments subject to internal holding</li>
-              </ul>
-            </button>
-
-            {/* BUSINESS */}
-            <button
-              type="button"
-              onClick={() => setAccountType("business")}
-              className={`rounded-2xl border-2 p-6 text-left transition ${
-                accountType === "business"
-                  ? "border-blue-600 bg-blue-50 shadow-lg"
-                  : "border-slate-200 bg-white hover:border-blue-300"
-              }`}
-            >
-              <div className="text-4xl">🏢</div>
-
-              <h3 className="mt-4 text-xl font-black">
-                Registered Business / Company
-              </h3>
-
-              <p className="mt-2 text-sm leading-6 text-slate-500">
-                For registered businesses and companies selling products or
-                services through the marketplace.
-              </p>
-
-              <ul className="mt-5 space-y-2 text-sm text-slate-700">
-                <li>✓ Business registration verification</li>
-                <li>✓ Tax identification details</li>
-                <li>✓ Authorized representative verification</li>
-                <li className="font-bold text-blue-700">
-                  ✓ Eligible for direct platform payments
-                </li>
-              </ul>
-            </button>
-
-          </div>
-
-          {/* =================================================
-              BUSINESS PAYMENT NOTICE
-          ================================================= */}
-          {accountType === "business" && (
-            <div className="mt-6 rounded-2xl border border-blue-200 bg-blue-50 p-5">
-
-              <div className="flex gap-3">
-                <div className="text-xl">💳</div>
-
-                <div>
-                  <h3 className="font-black text-blue-900">
-                    Business platform payments
-                  </h3>
-
-                  <p className="mt-1 text-sm leading-6 text-blue-800">
-                    Verified registered businesses may receive payments from
-                    clients through the platform. Payments are processed for
-                    five (5) business days before settlement, subject to
-                    verification and dispute procedures.
-                  </p>
-
-                  <p className="mt-2 text-sm font-bold text-blue-900">
-                    Platform processing fee: 2.15% of the transaction amount.
-                  </p>
-                </div>
-              </div>
-
-            </div>
-          )}
-
-          {accountType === "individual" && (
-            <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5">
-
-              <div className="flex gap-3">
-                <div className="text-xl">🛡️</div>
-
-                <div>
-                  <h3 className="font-black text-amber-900">
-                    Individual seller payment protection
-                  </h3>
-
-                  <p className="mt-1 text-sm leading-6 text-amber-800">
-                    Individual sellers do not receive direct platform payouts
-                    to a bank account. Transactions may be held internally and
-                    manually verified to protect buyers and sellers.
-                  </p>
-                </div>
-              </div>
-
-            </div>
-          )}
-
-        </div>
-
-        {/* ===================================================
-            LISTING DETAILS
-        =================================================== */}
-        <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-10">
-
-          <div className="mb-8">
-            <p className="text-sm font-black uppercase tracking-widest text-blue-700">
-              Step 2
-            </p>
-
-            <h2 className="mt-2 text-3xl font-black">
-              Create your listing
-            </h2>
-
-            <p className="mt-2 text-slate-500">
-              Give buyers accurate information about what you are selling.
-            </p>
-          </div>
-
-          <div className="space-y-6">
-
-            {/* TITLE */}
-            <div>
-              <label className="mb-2 block font-bold">
-                Listing Title
-              </label>
-
-              <input
-                type="text"
-                placeholder="e.g. 2024 Toyota Land Cruiser"
-                className="w-full rounded-xl border border-slate-300 px-4 py-4 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
-              />
-            </div>
-
-            {/* CATEGORY */}
-            <div>
-              <label className="mb-2 block font-bold">
-                Category
-              </label>
-
-              <select
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-4 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
-                defaultValue=""
-              >
-                <option value="" disabled>
-                  Select a category
-                </option>
-
-                <option>Vehicles</option>
-                <option>Property</option>
-                <option>Electronics</option>
-                <option>Machinery & Equipment</option>
-                <option>Printing Equipment</option>
-                <option>Agriculture</option>
-                <option>Phones & Tablets</option>
-                <option>Fashion</option>
-                <option>Home & Garden</option>
-                <option>Jobs & Services</option>
-                <option>Industrial Equipment</option>
-                <option>Construction Equipment</option>
-                <option>Other</option>
-              </select>
-            </div>
-
-            {/* PRICE */}
-            <div className="grid gap-5 sm:grid-cols-2">
-
-              <div>
-                <label className="mb-2 block font-bold">
-                  Price
-                </label>
-
-                <div className="flex overflow-hidden rounded-xl border border-slate-300">
-                  <div className="flex items-center bg-slate-100 px-4 font-bold">
-                    GHS
-                  </div>
-
-                  <input
-                    type="number"
-                    placeholder="0.00"
-                    className="w-full px-4 py-4 outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-2 block font-bold">
-                  Location
-                </label>
-
-                <input
-                  type="text"
-                  placeholder="e.g. Accra, Ghana"
-                  className="w-full rounded-xl border border-slate-300 px-4 py-4 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
-                />
-              </div>
-
-            </div>
-
-            {/* DESCRIPTION */}
-            <div>
-              <label className="mb-2 block font-bold">
-                Description
-              </label>
-
-              <textarea
-                rows={7}
-                placeholder="Describe the product or service accurately. Include condition, specifications, defects and other important information."
-                className="w-full resize-none rounded-xl border border-slate-300 px-4 py-4 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
-              />
-            </div>
-
-            {/* PHOTOS */}
-            <div>
-              <label className="mb-2 block font-bold">
-                Product Photos
-              </label>
-
-              <div className="rounded-2xl border-2 border-dashed border-slate-300 p-8 text-center transition hover:border-blue-500">
-
-                <div className="text-4xl">📷</div>
-
-                <p className="mt-3 font-bold">
-                  Upload clear photos
-                </p>
-
-                <p className="mt-1 text-sm text-slate-500">
-                  Use original photographs that accurately represent your
-                  product.
-                </p>
-
-                <input
-                  type="file"
-                  multiple
-                  accept="image/*"
-                  className="mx-auto mt-5 block max-w-full text-sm"
-                />
-
-              </div>
-            </div>
-
-          </div>
-
-        </div>
-
-        {/* ===================================================
-            ADVERTISING
-        =================================================== */}
-        <div className="mt-8 rounded-3xl bg-slate-950 p-6 text-white shadow-sm sm:p-10">
-
-          <p className="text-sm font-black uppercase tracking-widest text-cyan-400">
-            Optional
-          </p>
-
-          <h2 className="mt-2 text-3xl font-black">
-            Promote your listing
-          </h2>
-
-          <p className="mt-3 max-w-2xl text-white/70">
-            Increase visibility by selecting an advertising package after
-            creating your listing.
-          </p>
-
-          <div className="mt-6 grid gap-4 sm:grid-cols-3">
-
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-              <div className="font-black">Standard</div>
-              <p className="mt-2 text-sm text-white/60">
-                Normal marketplace visibility.
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-blue-500/50 bg-blue-600/20 p-5">
-              <div className="font-black">Featured</div>
-              <p className="mt-2 text-sm text-white/60">
-                Increased listing visibility.
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-cyan-400/50 bg-cyan-400/10 p-5">
-              <div className="font-black">Top Ad</div>
-              <p className="mt-2 text-sm text-white/60">
-                Premium marketplace placement.
-              </p>
-            </div>
-
-          </div>
-
-          <p className="mt-5 text-xs text-white/50">
-            Advertising package fees are non-refundable once activated.
-            Advertising does not guarantee sales or conversion.
-          </p>
-
-        </div>
-
-        {/* ===================================================
-            TERMS AGREEMENT
-        =================================================== */}
-        <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-10">
+        <div className="text-center">
 
           <p className="text-sm font-black uppercase tracking-widest text-blue-700">
-            Step 3
+            Choose your seller type
           </p>
 
-          <h2 className="mt-2 text-3xl font-black">
-            Marketplace Terms
+          <h2 className="mt-2 text-3xl font-black text-slate-900 sm:text-4xl">
+            How do you want to sell?
           </h2>
 
-          <div className="mt-6 rounded-2xl bg-slate-50 p-5 text-sm leading-7 text-slate-600">
-
-            <p>
-              By publishing a listing, you confirm that the information,
-              pricing, photographs and representations provided are accurate.
-            </p>
-
-            <p className="mt-3">
-              You agree not to list prohibited, counterfeit, stolen, illegal
-              or otherwise restricted products or services.
-            </p>
-
-            <p className="mt-3">
-              You agree to comply with BEST SALES GHANA's payment, refund,
-              dispute resolution, verification, privacy and anti-fraud
-              policies.
-            </p>
-
-            <a
-              href="/terms"
-              className="mt-4 inline-block font-bold text-blue-700 hover:text-blue-900"
-            >
-              Read the complete Marketplace Terms & Conditions →
-            </a>
-
-          </div>
-
-          <label className="mt-6 flex cursor-pointer items-start gap-3">
-
-            <input
-              type="checkbox"
-              checked={agreed}
-              onChange={(e) => setAgreed(e.target.checked)}
-              className="mt-1 h-5 w-5 rounded border-slate-300"
-            />
-
-            <span className="text-sm leading-6 text-slate-700">
-              I confirm that I have read and agree to the BEST SALES GHANA
-              Marketplace Terms & Conditions and Listing Rules.
-            </span>
-
-          </label>
+          <p className="mx-auto mt-3 max-w-2xl text-slate-500">
+            Select the account type that best describes you or your business.
+          </p>
 
         </div>
 
-        {/* ===================================================
-            SUBMIT
-        =================================================== */}
-        <div className="mt-8">
+        <div className="mt-10 grid gap-6 md:grid-cols-3">
 
-          <button
-            type="button"
-            disabled={!accountType || !agreed}
-            className={`w-full rounded-2xl px-6 py-5 text-lg font-black text-white shadow-lg transition ${
-              !accountType || !agreed
-                ? "cursor-not-allowed bg-slate-300"
-                : "bg-blue-700 hover:-translate-y-0.5 hover:bg-blue-800"
-            }`}
-          >
-            {accountType === "business"
-              ? "Continue Business Verification →"
-              : accountType === "individual"
-              ? "Continue Seller Verification →"
-              : "Select Seller Type to Continue"}
-          </button>
+          {/* INDIVIDUAL */}
+          <div className="rounded-3xl border border-slate-200 bg-white p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
 
-          <p className="mt-4 text-center text-xs text-slate-500">
-            Your listing will not be published until the required verification
-            and review process is completed.
-          </p>
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-100 text-3xl">
+              👤
+            </div>
+
+            <h3 className="mt-6 text-2xl font-black text-slate-900">
+              Individual Seller
+            </h3>
+
+            <p className="mt-3 leading-7 text-slate-500">
+              Sell personal products, vehicles, equipment, property and other
+              permitted items as an individual.
+            </p>
+
+            <div className="mt-6 rounded-2xl bg-slate-50 p-5">
+
+              <p className="font-black text-slate-900">
+                Verification required
+              </p>
+
+              <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-600">
+                <li>✓ Valid National ID</li>
+                <li>✓ Identity verification</li>
+                <li>✓ Face verification may be required</li>
+                <li>✓ Manual transaction verification</li>
+              </ul>
+
+            </div>
+
+            <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+
+              <p className="text-sm font-bold text-amber-900">
+                Payment handling
+              </p>
+
+              <p className="mt-1 text-sm leading-6 text-amber-800">
+                Individual sellers do not receive direct platform payouts
+                into a bank account. Eligible transactions may be held for
+                verification.
+              </p>
+
+            </div>
+
+            <Link
+              href="/register?type=individual"
+              className="mt-6 block rounded-xl bg-blue-700 px-5 py-4 text-center font-black text-white transition hover:bg-blue-800"
+            >
+              Register as Individual
+            </Link>
+
+          </div>
+
+          {/* COMPANY */}
+          <div className="relative rounded-3xl border-2 border-blue-600 bg-white p-7 shadow-xl">
+
+            <div className="absolute right-5 top-5 rounded-full bg-blue-700 px-3 py-1 text-xs font-black text-white">
+              RECOMMENDED
+            </div>
+
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-100 text-3xl">
+              🏢
+            </div>
+
+            <h3 className="mt-6 text-2xl font-black text-slate-900">
+              Registered Company
+            </h3>
+
+            <p className="mt-3 leading-7 text-slate-500">
+              For registered companies and businesses that want to sell
+              professionally and receive eligible client payments through
+              the platform.
+            </p>
+
+            <div className="mt-6 rounded-2xl bg-blue-50 p-5">
+
+              <p className="font-black text-slate-900">
+                Business verification
+              </p>
+
+              <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-600">
+                <li>✓ Business Registration Certificate</li>
+                <li>✓ Tax identification details</li>
+                <li>✓ Authorized representative ID</li>
+                <li>✓ Business verification</li>
+              </ul>
+
+            </div>
+
+            <div className="mt-6 rounded-2xl border border-green-200 bg-green-50 p-4">
+
+              <p className="text-sm font-black text-green-900">
+                ✓ Platform payment eligible
+              </p>
+
+              <p className="mt-1 text-sm leading-6 text-green-800">
+                Verified registered companies may receive client payments
+                through the platform, subject to the applicable processing
+                period and platform fee.
+              </p>
+
+            </div>
+
+            <Link
+              href="/register?type=business"
+              className="mt-6 block rounded-xl bg-blue-700 px-5 py-4 text-center font-black text-white shadow-lg transition hover:bg-blue-800"
+            >
+              Register Business
+            </Link>
+
+          </div>
+
+          {/* SERVICE PROVIDER */}
+          <div className="rounded-3xl border border-slate-200 bg-white p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
+
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-100 text-3xl">
+              🛠️
+            </div>
+
+            <h3 className="mt-6 text-2xl font-black text-slate-900">
+              Service Provider
+            </h3>
+
+            <p className="mt-3 leading-7 text-slate-500">
+              Offer professional, technical, physical and other permitted
+              services to customers across Ghana.
+            </p>
+
+            <div className="mt-6 rounded-2xl bg-slate-50 p-5">
+
+              <p className="font-black text-slate-900">
+                Service requirements
+              </p>
+
+              <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-600">
+                <li>✓ Accurate service description</li>
+                <li>✓ Valid contact information</li>
+                <li>✓ Required credentials where applicable</li>
+                <li>✓ Quality standards</li>
+              </ul>
+
+            </div>
+
+            <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-4">
+
+              <p className="text-sm font-bold text-slate-900">
+                Customer protection
+              </p>
+
+              <p className="mt-1 text-sm leading-6 text-slate-600">
+                Service providers are subject to the marketplace dispute and
+                resolution process.
+              </p>
+
+            </div>
+
+            <Link
+              href="/register?type=service"
+              className="mt-6 block rounded-xl border-2 border-blue-700 px-5 py-3.5 text-center font-black text-blue-700 transition hover:bg-blue-50"
+            >
+              Register as Service Provider
+            </Link>
+
+          </div>
 
         </div>
 
       </section>
 
-      {/* =====================================================
-          FOOTER
-      ===================================================== */}
-      <footer className="mt-10 bg-slate-950 py-10 text-white">
+      {/* HOW IT WORKS */}
+      <section className="border-y border-slate-200 bg-white">
 
-        <div className="mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
 
-          <div className="text-xl font-black">
-            BEST SALES GHANA
+          <div className="text-center">
+
+            <p className="text-sm font-black uppercase tracking-widest text-blue-700">
+              Simple process
+            </p>
+
+            <h2 className="mt-2 text-3xl font-black text-slate-900">
+              Start selling in four steps
+            </h2>
+
           </div>
 
-          <p className="mt-2 text-sm text-slate-400">
-            Buy • Sell • Advertise • Connect
-          </p>
+          <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
 
-          <div className="mt-5 flex justify-center gap-5 text-sm text-slate-400">
-            <a href="/terms" className="hover:text-white">
-              Terms
-            </a>
+            {[
+              {
+                number: "01",
+                title: "Create Account",
+                text: "Register as an individual, company or service provider.",
+              },
+              {
+                number: "02",
+                title: "Verify",
+                text: "Complete the required identity or business verification.",
+              },
+              {
+                number: "03",
+                title: "Create Listing",
+                text: "Add your product, service, price, photos and details.",
+              },
+              {
+                number: "04",
+                title: "Connect & Sell",
+                text: "Receive enquiries and connect with buyers across Ghana.",
+              },
+            ].map((step) => (
 
-            <a href="/privacy" className="hover:text-white">
-              Privacy
-            </a>
+              <div
+                key={step.number}
+                className="rounded-2xl border border-slate-200 bg-slate-50 p-6"
+              >
 
-            <a href="/contact" className="hover:text-white">
-              Contact
-            </a>
+                <div className="text-3xl font-black text-blue-700">
+                  {step.number}
+                </div>
+
+                <h3 className="mt-4 text-xl font-black text-slate-900">
+                  {step.title}
+                </h3>
+
+                <p className="mt-2 text-sm leading-6 text-slate-500">
+                  {step.text}
+                </p>
+
+              </div>
+
+            ))}
+
           </div>
 
-          <p className="mt-6 text-xs text-slate-600">
-            © {new Date().getFullYear()} All Prominent Ghana Limited. All
-            rights reserved.
+        </div>
+
+      </section>
+
+      {/* ADVERTISING */}
+      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+
+        <div className="overflow-hidden rounded-3xl bg-slate-950 p-8 text-white sm:p-12 lg:flex lg:items-center lg:justify-between lg:gap-10">
+
+          <div>
+
+            <p className="text-sm font-black uppercase tracking-widest text-cyan-400">
+              Advertising
+            </p>
+
+            <h2 className="mt-3 text-3xl font-black sm:text-4xl">
+              Want more visibility?
+            </h2>
+
+            <p className="mt-4 max-w-2xl leading-7 text-white/70">
+              Promote your products and business with optional advertising
+              and featured listing packages.
+            </p>
+
+            <p className="mt-4 text-sm text-white/50">
+              Advertising fees are non-refundable once an advertising package
+              has been activated.
+            </p>
+
+          </div>
+
+          <Link
+            href="/register"
+            className="mt-7 inline-flex shrink-0 rounded-xl bg-blue-600 px-7 py-4 font-black text-white transition hover:bg-cyan-400 hover:text-slate-950 lg:mt-0"
+          >
+            Start Selling
+          </Link>
+
+        </div>
+
+      </section>
+
+      {/* IMPORTANT POLICY */}
+      <section className="bg-blue-50">
+
+        <div className="mx-auto max-w-5xl px-4 py-12 text-center sm:px-6 lg:px-8">
+
+          <h2 className="text-2xl font-black text-slate-900">
+            Before you list
+          </h2>
+
+          <p className="mx-auto mt-4 max-w-3xl leading-7 text-slate-600">
+            All listings must contain accurate descriptions, correct pricing,
+            clear photographs or representations and must be placed in the
+            correct category. Prohibited goods and services are not allowed.
           </p>
+
+          <Link
+            href="/terms"
+            className="mt-5 inline-block font-black text-blue-700 hover:text-blue-900"
+          >
+            Read Marketplace Terms & Conditions →
+          </Link>
+
+        </div>
+
+      </section>
+
+      {/* FOOTER */}
+      <footer className="bg-slate-950 text-white">
+
+        <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+
+          <div className="grid gap-8 md:grid-cols-3">
+
+            <div>
+              <div className="text-xl font-black">
+                BEST SALES GHANA
+              </div>
+
+              <p className="mt-3 text-sm leading-6 text-slate-400">
+                Buy • Sell • Advertise • Connect
+              </p>
+            </div>
+
+            <div>
+              <h3 className="font-bold">
+                Marketplace
+              </h3>
+
+              <div className="mt-4 space-y-2 text-sm text-slate-400">
+
+                <Link
+                  href="/"
+                  className="block hover:text-white"
+                >
+                  Home
+                </Link>
+
+                <Link
+                  href="/terms"
+                  className="block hover:text-white"
+                >
+                  Terms & Conditions
+                </Link>
+
+                <Link
+                  href="/login"
+                  className="block hover:text-white"
+                >
+                  Sign In
+                </Link>
+
+              </div>
+            </div>
+
+            <div>
+              <h3 className="font-bold">
+                Sell
+              </h3>
+
+              <div className="mt-4 space-y-2 text-sm text-slate-400">
+
+                <Link
+                  href="/register?type=individual"
+                  className="block hover:text-white"
+                >
+                  Individual Seller
+                </Link>
+
+                <Link
+                  href="/register?type=business"
+                  className="block hover:text-white"
+                >
+                  Registered Business
+                </Link>
+
+                <Link
+                  href="/register?type=service"
+                  className="block hover:text-white"
+                >
+                  Service Provider
+                </Link>
+
+              </div>
+            </div>
+
+          </div>
+
+          <div className="mt-10 border-t border-white/10 pt-6 text-center text-sm text-slate-500">
+            © 2026 All Prominent Ghana Limited. All rights reserved.
+          </div>
 
         </div>
 
