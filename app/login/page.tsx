@@ -2,15 +2,101 @@
 
 import Link from "next/link";
 import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
+import { supabaseBrowser } from "@/supabase-browser";
 
 export default function LoginPage() {
-  const [showPassword, setShowPassword] = useState(false);
+  const router = useRouter();
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    // Authentication will be connected later.
-    alert("Login system will be connected in the next phase.");
+    setError("");
+    setLoading(true);
+
+    try {
+      const supabase = supabaseBrowser();
+
+      const { error: signInError } =
+        await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
+
+      if (signInError) {
+        setError(signInError.message);
+        return;
+      }
+
+      router.push("/dashboard");
+      router.refresh();
+    } catch (err) {
+      console.error(err);
+      setError("Unable to sign in. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleGoogleLogin() {
+    setError("");
+    setGoogleLoading(true);
+
+    try {
+      const supabase = supabaseBrowser();
+
+      const { error: oauthError } =
+        await supabase.auth.signInWithOAuth({
+          provider: "google",
+          options: {
+            redirectTo: `${window.location.origin}/auth/callback`,
+          },
+        });
+
+      if (oauthError) {
+        setError(oauthError.message);
+        setGoogleLoading(false);
+      }
+    } catch (err) {
+      console.error(err);
+      setError("Google sign-in could not be started.");
+      setGoogleLoading(false);
+    }
+  }
+
+  async function handleAppleLogin() {
+    setError("");
+    setAppleLoading(true);
+
+    try {
+      const supabase = supabaseBrowser();
+
+      const { error: oauthError } =
+        await supabase.auth.signInWithOAuth({
+          provider: "apple",
+          options: {
+            redirectTo: `${window.location.origin}/auth/callback`,
+          },
+        });
+
+      if (oauthError) {
+        setError(oauthError.message);
+        setAppleLoading(false);
+      }
+    } catch (err) {
+      console.error(err);
+      setError("Apple sign-in could not be started.");
+      setAppleLoading(false);
+    }
   }
 
   return (
@@ -22,7 +108,7 @@ export default function LoginPage() {
 
           <Link href="/" className="flex items-center gap-3">
 
-            {/* ANIMATED LOGO */}
+            {/* LOGO */}
             <div className="logo-mark">
               <div className="logo-ring">
                 <div className="logo-person">
@@ -60,7 +146,7 @@ export default function LoginPage() {
       {/* LOGIN AREA */}
       <section className="relative flex min-h-[calc(100vh-90px)] items-center justify-center overflow-hidden px-4 py-12">
 
-        {/* BACKGROUND DECORATION */}
+        {/* BACKGROUND */}
         <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full bg-blue-100/60" />
         <div className="absolute -bottom-32 -left-32 h-96 w-96 rounded-full bg-cyan-100/60" />
 
@@ -106,7 +192,18 @@ export default function LoginPage() {
             </div>
 
 
-            {/* FORM */}
+            {/* ERROR */}
+            {error && (
+              <div
+                role="alert"
+                className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700"
+              >
+                {error}
+              </div>
+            )}
+
+
+            {/* EMAIL/PASSWORD FORM */}
             <form onSubmit={handleSubmit} className="space-y-5">
 
               {/* EMAIL */}
@@ -124,8 +221,11 @@ export default function LoginPage() {
                   type="email"
                   autoComplete="email"
                   required
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
                   placeholder="you@example.com"
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+                  disabled={loading}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100"
                 />
               </div>
 
@@ -159,13 +259,17 @@ export default function LoginPage() {
                     type={showPassword ? "text" : "password"}
                     autoComplete="current-password"
                     required
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
                     placeholder="Enter your password"
-                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 pr-20 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+                    disabled={loading}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 pr-20 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100"
                   />
 
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
+                    disabled={loading}
                     className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg px-2 py-1 text-sm font-bold text-slate-500 hover:bg-slate-100 hover:text-slate-900"
                   >
                     {showPassword ? "Hide" : "Show"}
@@ -183,6 +287,8 @@ export default function LoginPage() {
                   id="remember"
                   name="remember"
                   type="checkbox"
+                  checked={remember}
+                  onChange={(event) => setRemember(event.target.checked)}
                   className="h-4 w-4 rounded border-slate-300 text-blue-700 focus:ring-blue-600"
                 />
 
@@ -199,9 +305,10 @@ export default function LoginPage() {
               {/* SIGN IN */}
               <button
                 type="submit"
-                className="w-full rounded-xl bg-blue-700 px-5 py-3.5 font-black text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-blue-800 hover:shadow-xl"
+                disabled={loading}
+                className="w-full rounded-xl bg-blue-700 px-5 py-3.5 font-black text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-blue-800 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Sign In
+                {loading ? "Signing in..." : "Sign In"}
               </button>
 
             </form>
@@ -224,7 +331,9 @@ export default function LoginPage() {
             {/* GOOGLE */}
             <button
               type="button"
-              className="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-300 bg-white px-5 py-3.5 font-bold text-slate-700 transition hover:bg-slate-50 hover:shadow-md"
+              onClick={handleGoogleLogin}
+              disabled={googleLoading || appleLoading}
+              className="mb-3 flex w-full items-center justify-center gap-3 rounded-xl border border-slate-300 bg-white px-5 py-3.5 font-bold text-slate-700 transition hover:bg-slate-50 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
             >
 
               <svg
@@ -250,7 +359,29 @@ export default function LoginPage() {
                 />
               </svg>
 
-              Continue with Google
+              {googleLoading ? "Connecting to Google..." : "Continue with Google"}
+
+            </button>
+
+
+            {/* APPLE */}
+            <button
+              type="button"
+              onClick={handleAppleLogin}
+              disabled={googleLoading || appleLoading}
+              className="flex w-full items-center justify-center gap-3 rounded-xl bg-black px-5 py-3.5 font-bold text-white transition hover:bg-slate-800 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+            >
+
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="white"
+              >
+                <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.1.8 1.21-.25 2.37-.94 3.65-.84 1.54.13 2.7.74 3.49 1.83-3.18 1.9-2.43 6.1.49 7.27-.58 1.52-1.26 3.03-2.73 3.91zM12.03 7.25C11.88 4.99 13.71 3.14 15.87 3c.3 2.6-2.35 4.54-3.84 4.25z" />
+              </svg>
+
+              {appleLoading ? "Connecting to Apple..." : "Continue with Apple"}
 
             </button>
 
@@ -289,9 +420,7 @@ export default function LoginPage() {
 
       {/* FOOTER */}
       <footer className="border-t border-slate-200 bg-slate-950 px-4 py-6 text-center text-sm text-slate-400">
-
         © 2026 All Prominent Ghana Limited. All rights reserved.
-
       </footer>
 
     </main>
