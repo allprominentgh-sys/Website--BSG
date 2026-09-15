@@ -117,10 +117,13 @@ export default function RegisterPage() {
       } else if (data.session) {
         window.location.href = "/dashboard";
       }
-    } catch (err: any) {
-      setError(
-        err?.message || "Unable to create your account."
-      );
+    } catch (err: unknown) {
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : "Unable to create your account.";
+
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -144,11 +147,13 @@ export default function RegisterPage() {
       if (error) {
         throw error;
       }
-    } catch (err: any) {
-      setError(
-        err?.message ||
-          "Google sign-in could not be started."
-      );
+    } catch (err: unknown) {
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : "Google sign-in could not be started.";
+
+      setError(errorMessage);
       setGoogleLoading(false);
     }
   }
@@ -171,13 +176,31 @@ export default function RegisterPage() {
       if (error) {
         throw error;
       }
-    } catch (err: any) {
-      setError(
-        err?.message ||
-          "Apple sign-in could not be started."
-      );
+    } catch (err: unknown) {
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : "Apple sign-in could not be started.";
+
+      setError(errorMessage);
       setAppleLoading(false);
     }
+  }
+
+  function getDeliveryName() {
+    if (deliveryOption === "best-sales-delivery") {
+      return "🚚 BEST SALES GHANA Delivery";
+    }
+
+    if (deliveryOption === "seller-delivery") {
+      return "🏪 Seller Handles Delivery";
+    }
+
+    if (deliveryOption === "buyer-pickup") {
+      return "🤝 Buyer Pickup";
+    }
+
+    return "";
   }
 
   return (
@@ -260,15 +283,11 @@ export default function RegisterPage() {
 
           {/* FULL NAME */}
           <div className="mt-8">
-            <label
-              htmlFor="fullName"
-              className="text-sm font-black text-slate-700"
-            >
+            <label className="text-sm font-black text-slate-700">
               Full Name
             </label>
 
             <input
-              id="fullName"
               type="text"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
@@ -280,15 +299,11 @@ export default function RegisterPage() {
 
           {/* EMAIL */}
           <div className="mt-6">
-            <label
-              htmlFor="email"
-              className="text-sm font-black text-slate-700"
-            >
+            <label className="text-sm font-black text-slate-700">
               Email Address
             </label>
 
             <input
-              id="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -300,15 +315,11 @@ export default function RegisterPage() {
 
           {/* PHONE */}
           <div className="mt-6">
-            <label
-              htmlFor="phone"
-              className="text-sm font-black text-slate-700"
-            >
+            <label className="text-sm font-black text-slate-700">
               Phone Number
             </label>
 
             <input
-              id="phone"
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
@@ -320,18 +331,16 @@ export default function RegisterPage() {
 
           {/* ACCOUNT TYPE */}
           <div className="mt-6">
-            <label
-              htmlFor="accountType"
-              className="text-sm font-black text-slate-700"
-            >
+            <label className="text-sm font-black text-slate-700">
               Account Type
             </label>
 
             <select
-              id="accountType"
               value={accountType}
               onChange={(e) =>
-                setAccountType(e.target.value as AccountType)
+                setAccountType(
+                  e.target.value as AccountType
+                )
               }
               className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-5 py-4 text-base outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
             >
@@ -353,7 +362,7 @@ export default function RegisterPage() {
             </select>
           </div>
 
-          {/* DELIVERY PREFERENCE */}
+          {/* DELIVERY */}
           <div className="mt-10">
 
             <h2 className="text-2xl font-black text-slate-900">
@@ -371,10 +380,13 @@ export default function RegisterPage() {
               <button
                 type="button"
                 onClick={() =>
-                  setDeliveryOption("best-sales-delivery")
+                  setDeliveryOption(
+                    "best-sales-delivery"
+                  )
                 }
                 className={`w-full rounded-2xl border-2 p-5 text-left transition ${
-                  deliveryOption === "best-sales-delivery"
+                  deliveryOption ===
+                  "best-sales-delivery"
                     ? "border-blue-600 bg-blue-50 shadow-md"
                     : "border-slate-200 bg-white hover:border-blue-300"
                 }`}
@@ -403,8 +415,8 @@ export default function RegisterPage() {
                     </div>
 
                     <p className="mt-2 leading-6 text-slate-600">
-                      Our delivery system will collect and
-                      deliver the item to the buyer.
+                      Our delivery system will collect
+                      and deliver the item to the buyer.
                     </p>
 
                     <p className="mt-3 font-bold text-blue-700">
@@ -514,35 +526,23 @@ export default function RegisterPage() {
                 </p>
 
                 <p className="mt-2 text-lg font-black text-slate-900">
-
-                  {deliveryOption ===
-                    "best-sales-delivery" &&
-                    "🚚 BEST SALES GHANA Delivery"}
-
-                  {deliveryOption ===
-                    "seller-delivery" &&
-                    "🏪 Seller Handles Delivery"}
-
-                  {deliveryOption ===
-                    "buyer-pickup" &&
-                    "🤝 Buyer Pickup"}
-
+                  {getDeliveryName()}
                 </p>
 
                 {deliveryOption ===
                   "best-sales-delivery" && (
                   <p className="mt-2 text-sm leading-6 text-slate-600">
                     Your delivery can be tracked after
-                    BEST SALES GHANA receives the item and
-                    generates a tracking number.
+                    BEST SALES GHANA receives the item
+                    and generates a tracking number.
                   </p>
                 )}
 
                 {deliveryOption ===
                   "seller-delivery" && (
                   <p className="mt-2 text-sm leading-6 text-slate-600">
-                    The seller will arrange delivery
-                    directly with you.
+                    The seller or company will arrange
+                    delivery directly with you.
                   </p>
                 )}
 
@@ -697,7 +697,7 @@ export default function RegisterPage() {
 
               </div>
 
-              {/* BUSINESS CERTIFICATE */}
+              {/* CERTIFICATE */}
               <div className="mt-5">
 
                 <label className="text-sm font-black text-slate-700">
@@ -795,8 +795,8 @@ export default function RegisterPage() {
                 <p className="mt-3 text-sm leading-6 text-slate-600">
                   A 2.15% platform processing fee is
                   automatically deducted from eligible
-                  transactions before the seller&apos;s net
-                  amount enters the payout process.
+                  transactions before the seller&apos;s
+                  net amount enters the payout process.
                 </p>
 
                 <p className="mt-3 text-sm leading-6 text-slate-600">
@@ -814,20 +814,14 @@ export default function RegisterPage() {
           {/* PASSWORD */}
           <div className="mt-8">
 
-            <label
-              htmlFor="password"
-              className="text-sm font-black text-slate-700"
-            >
+            <label className="text-sm font-black text-slate-700">
               Password
             </label>
 
             <div className="relative">
 
               <input
-                id="password"
-                type={
-                  showPassword ? "text" : "password"
-                }
+                type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) =>
                   setPassword(e.target.value)
@@ -858,17 +852,13 @@ export default function RegisterPage() {
           {/* CONFIRM PASSWORD */}
           <div className="mt-6">
 
-            <label
-              htmlFor="confirmPassword"
-              className="text-sm font-black text-slate-700"
-            >
+            <label className="text-sm font-black text-slate-700">
               Confirm Password
             </label>
 
             <div className="relative">
 
               <input
-                id="confirmPassword"
                 type={
                   showConfirmPassword
                     ? "text"
@@ -892,9 +882,7 @@ export default function RegisterPage() {
                 }
                 className="absolute right-4 top-1/2 mt-1 -translate-y-1/2 font-bold text-slate-500"
               >
-                {showConfirmPassword
-                  ? "Hide"
-                  : "Show"}
+                {showConfirmPassword ? "Hide" : "Show"}
               </button>
 
             </div>
@@ -969,7 +957,9 @@ export default function RegisterPage() {
             type="button"
             onClick={signInWithGoogle}
             disabled={
-              googleLoading || appleLoading
+              googleLoading ||
+              appleLoading ||
+              loading
             }
             className="flex w-full items-center justify-center gap-3 rounded-2xl border border-slate-300 bg-white px-5 py-4 font-black text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
           >
@@ -1011,7 +1001,9 @@ export default function RegisterPage() {
             type="button"
             onClick={signInWithApple}
             disabled={
-              appleLoading || googleLoading
+              appleLoading ||
+              googleLoading ||
+              loading
             }
             className="mt-4 flex w-full items-center justify-center gap-3 rounded-2xl bg-black px-5 py-4 font-black text-white transition hover:bg-slate-800 disabled:opacity-60"
           >
@@ -1063,7 +1055,8 @@ export default function RegisterPage() {
           </p>
 
           <p className="mt-6 text-sm text-slate-500">
-            © 2026 All Prominent Ghana Limited. All rights reserved.
+            © 2026 All Prominent Ghana Limited.
+            All rights reserved.
           </p>
 
         </div>
