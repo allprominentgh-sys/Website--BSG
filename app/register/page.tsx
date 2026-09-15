@@ -1,14 +1,167 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { FormEvent, useState } from "react";
+import { supabaseBrowser } from "@/supabase-browser";
 
 type AccountType = "buyer" | "seller" | "business" | "";
 
+type DeliveryOption =
+  | "best-sales-delivery"
+  | "seller-delivery"
+  | "buyer-pickup"
+  | "";
+
 export default function RegisterPage() {
+  const supabase = supabaseBrowser();
+
   const [accountType, setAccountType] = useState<AccountType>("");
+  const [deliveryOption, setDeliveryOption] =
+    useState<DeliveryOption>("");
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  const [agreeTerms, setAgreeTerms] = useState(false);
+
+  const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
+
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    setMessage("");
+    setError("");
+
+    if (!fullName.trim()) {
+      setError("Please enter your full name.");
+      return;
+    }
+
+    if (!email.trim()) {
+      setError("Please enter your email address.");
+      return;
+    }
+
+    if (!phone.trim()) {
+      setError("Please enter your phone number.");
+      return;
+    }
+
+    if (!accountType) {
+      setError("Please select an account type.");
+      return;
+    }
+
+    if (!deliveryOption) {
+      setError("Please select your preferred delivery option.");
+      return;
+    }
+
+    if (password.length < 8) {
+      setError("Password must contain at least 8 characters.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
+    if (!agreeTerms) {
+      setError("You must agree to the Terms & Conditions and Privacy Policy.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          data: {
+            full_name: fullName.trim(),
+            phone: phone.trim(),
+            account_type: accountType,
+            delivery_option: deliveryOption,
+          },
+        },
+      });
+
+      if (signUpError) {
+        throw signUpError;
+      }
+
+      if (data.user && !data.session) {
+        setMessage(
+          "Account created successfully. Please check your email to confirm your account."
+        );
+      } else if (data.session) {
+        window.location.href = "/dashboard";
+      }
+    } catch (err: any) {
+      setError(err?.message || "Unable to create your account.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function signInWithGoogle() {
+    setError("");
+    setMessage("");
+    setGoogleLoading(true);
+
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+    } catch (err: any) {
+      setError(err?.message || "Google sign-in could not be started.");
+      setGoogleLoading(false);
+    }
+  }
+
+  async function signInWithApple() {
+    setError("");
+    setMessage("");
+    setAppleLoading(true);
+
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "apple",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+    } catch (err: any) {
+      setError(err?.message || "Apple sign-in could not be started.");
+      setAppleLoading(false);
+    }
+  }
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-800">
@@ -61,6 +214,19 @@ export default function RegisterPage() {
 
         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-10">
 
+          {/* STATUS */}
+          {error && (
+            <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
+              {error}
+            </div>
+          )}
+
+          {message && (
+            <div className="mb-6 rounded-2xl border border-green-200 bg-green-50 p-4 text-sm font-semibold text-green-700">
+              {message}
+            </div>
+          )}
+
           {/* BASIC INFORMATION */}
           <div>
             <h2 className="text-2xl font-black text-slate-900">
@@ -80,7 +246,10 @@ export default function RegisterPage() {
 
             <input
               type="text"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
               placeholder="Enter your full name"
+              autoComplete="name"
               className="mt-2 w-full rounded-2xl border border-slate-300 px-5 py-4 text-base outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
             />
           </div>
@@ -93,7 +262,10 @@ export default function RegisterPage() {
 
             <input
               type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
+              autoComplete="email"
               className="mt-2 w-full rounded-2xl border border-slate-300 px-5 py-4 text-base outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
             />
           </div>
@@ -106,7 +278,10 @@ export default function RegisterPage() {
 
             <input
               type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
               placeholder="e.g. 024 000 0000"
+              autoComplete="tel"
               className="mt-2 w-full rounded-2xl border border-slate-300 px-5 py-4 text-base outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
             />
           </div>
@@ -131,348 +306,5 @@ export default function RegisterPage() {
             </select>
           </div>
 
-          {/* BUYER VERIFICATION */}
-          {accountType === "buyer" && (
-            <div className="mt-8 rounded-2xl border border-blue-100 bg-blue-50 p-6">
-
-              <h3 className="text-xl font-black text-slate-900">
-                Buyer Verification
-              </h3>
-
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                Registered buyers must provide a valid phone number and
-                passport picture for account verification.
-              </p>
-
-              <div className="mt-5">
-                <label className="text-sm font-black text-slate-700">
-                  Passport Picture
-                </label>
-
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="mt-2 block w-full rounded-2xl border border-slate-300 bg-white px-4 py-4 text-sm"
-                />
-
-                <p className="mt-2 text-xs text-slate-500">
-                  Upload a clear recent passport-size photograph.
-                </p>
-              </div>
-
-            </div>
-          )}
-
-          {/* INDIVIDUAL SELLER VERIFICATION */}
-          {accountType === "seller" && (
-            <div className="mt-8 rounded-2xl border border-blue-100 bg-blue-50 p-6">
-
-              <h3 className="text-xl font-black text-slate-900">
-                Individual Seller Verification
-              </h3>
-
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                Individual sellers must verify their identity before selling
-                on BEST SALES GHANA.
-              </p>
-
-              <div className="mt-5">
-                <label className="text-sm font-black text-slate-700">
-                  Identification Type
-                </label>
-
-                <select className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-5 py-4 outline-none">
-                  <option value="">Select identification type</option>
-                  <option value="ghana-card">
-                    Ghana Card / NIA
-                  </option>
-                  <option value="passport">
-                    Passport
-                  </option>
-                </select>
-              </div>
-
-              <div className="mt-5">
-                <label className="text-sm font-black text-slate-700">
-                  Upload Identification Document
-                </label>
-
-                <input
-                  type="file"
-                  accept="image/*,.pdf"
-                  className="mt-2 block w-full rounded-2xl border border-slate-300 bg-white px-4 py-4 text-sm"
-                />
-              </div>
-
-              <div className="mt-5">
-                <label className="text-sm font-black text-slate-700">
-                  Passport Picture
-                </label>
-
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="mt-2 block w-full rounded-2xl border border-slate-300 bg-white px-4 py-4 text-sm"
-                />
-              </div>
-
-              <div className="mt-5 rounded-xl bg-white p-4 text-sm text-slate-600">
-                <strong>Important:</strong> Individual sellers are subject to
-                identity verification and do not receive direct platform
-                payouts.
-              </div>
-
-            </div>
-          )}
-
-          {/* BUSINESS VERIFICATION */}
-          {accountType === "business" && (
-            <div className="mt-8 rounded-2xl border border-blue-100 bg-blue-50 p-6">
-
-              <h3 className="text-xl font-black text-slate-900">
-                Business / Company Verification
-              </h3>
-
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                Registered businesses and companies must provide valid
-                corporate credentials before receiving platform payment
-                privileges.
-              </p>
-
-              {/* BUSINESS NAME */}
-              <div className="mt-5">
-                <label className="text-sm font-black text-slate-700">
-                  Registered Business / Company Name
-                </label>
-
-                <input
-                  type="text"
-                  placeholder="Enter registered company name"
-                  className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-5 py-4 outline-none focus:border-blue-600"
-                />
-              </div>
-
-              {/* BUSINESS CERTIFICATE */}
-              <div className="mt-5">
-                <label className="text-sm font-black text-slate-700">
-                  Business Registration Certificate
-                </label>
-
-                <input
-                  type="file"
-                  accept="image/*,.pdf"
-                  className="mt-2 block w-full rounded-2xl border border-slate-300 bg-white px-4 py-4 text-sm"
-                />
-              </div>
-
-              {/* TAX */}
-              <div className="mt-5">
-                <label className="text-sm font-black text-slate-700">
-                  Tax Identification Details
-                </label>
-
-                <input
-                  type="text"
-                  placeholder="Enter tax identification details"
-                  className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-5 py-4 outline-none focus:border-blue-600"
-                />
-              </div>
-
-              {/* REPRESENTATIVE */}
-              <div className="mt-5">
-                <label className="text-sm font-black text-slate-700">
-                  Authorized Representative
-                </label>
-
-                <input
-                  type="text"
-                  placeholder="Name of authorized representative"
-                  className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-5 py-4 outline-none focus:border-blue-600"
-                />
-              </div>
-
-              {/* REPRESENTATIVE ID */}
-              <div className="mt-5">
-                <label className="text-sm font-black text-slate-700">
-                  Representative Identification
-                </label>
-
-                <input
-                  type="file"
-                  accept="image/*,.pdf"
-                  className="mt-2 block w-full rounded-2xl border border-slate-300 bg-white px-4 py-4 text-sm"
-                />
-              </div>
-
-              {/* COMPANY CREDENTIALS */}
-              <div className="mt-5">
-                <label className="text-sm font-black text-slate-700">
-                  Company Credentials / Supporting Documents
-                </label>
-
-                <input
-                  type="file"
-                  multiple
-                  accept="image/*,.pdf"
-                  className="mt-2 block w-full rounded-2xl border border-slate-300 bg-white px-4 py-4 text-sm"
-                />
-
-                <p className="mt-2 text-xs text-slate-500">
-                  Upload relevant company credentials required for verification.
-                </p>
-              </div>
-
-              {/* PAYMENT NOTICE */}
-              <div className="mt-6 rounded-xl border border-blue-200 bg-white p-5">
-
-                <h4 className="font-black text-blue-700">
-                  Platform Payment Eligibility
-                </h4>
-
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Verified registered businesses and companies are eligible
-                  to receive client payments through the BEST SALES GHANA
-                  platform.
-                </p>
-
-                <p className="mt-3 text-sm leading-6 text-slate-600">
-                  A 2.15% platform processing fee is automatically deducted
-                  from eligible transactions before the seller's net amount
-                  enters the payout process.
-                </p>
-
-                <p className="mt-3 text-sm leading-6 text-slate-600">
-                  Eligible payouts are subject to the applicable five (5)
-                  business-day processing period and any active dispute,
-                  compliance or verification review.
-                </p>
-
-              </div>
-
-            </div>
-          )}
-
-          {/* PASSWORD */}
-          <div className="mt-8">
-            <label className="text-sm font-black text-slate-700">
-              Password
-            </label>
-
-            <div className="relative">
-              <input
-                type={showPassword ? "text" : "password"}
-                placeholder="Create a password"
-                className="mt-2 w-full rounded-2xl border border-slate-300 px-5 py-4 pr-20 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
-              />
-
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-1/2 mt-1 -translate-y-1/2 font-bold text-slate-500"
-              >
-                {showPassword ? "Hide" : "Show"}
-              </button>
-            </div>
-
-            <p className="mt-2 text-xs text-slate-400">
-              Password must contain at least 8 characters.
-            </p>
-          </div>
-
-          {/* CONFIRM PASSWORD */}
-          <div className="mt-6">
-            <label className="text-sm font-black text-slate-700">
-              Confirm Password
-            </label>
-
-            <div className="relative">
-              <input
-                type={showConfirmPassword ? "text" : "password"}
-                placeholder="Confirm your password"
-                className="mt-2 w-full rounded-2xl border border-slate-300 px-5 py-4 pr-20 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
-              />
-
-              <button
-                type="button"
-                onClick={() =>
-                  setShowConfirmPassword(!showConfirmPassword)
-                }
-                className="absolute right-4 top-1/2 mt-1 -translate-y-1/2 font-bold text-slate-500"
-              >
-                {showConfirmPassword ? "Hide" : "Show"}
-              </button>
-            </div>
-          </div>
-
-          {/* TERMS */}
-          <div className="mt-8 flex items-start gap-3">
-
-            <input
-              type="checkbox"
-              className="mt-1 h-5 w-5 rounded border-slate-300"
-            />
-
-            <p className="text-sm leading-6 text-slate-600">
-              I agree to the{" "}
-              <Link
-                href="/terms"
-                className="font-bold text-blue-700 hover:underline"
-              >
-                Terms & Conditions
-              </Link>{" "}
-              and{" "}
-              <Link
-                href="/privacy"
-                className="font-bold text-blue-700 hover:underline"
-              >
-                Privacy Policy
-              </Link>
-              .
-            </p>
-
-          </div>
-
-          {/* CREATE ACCOUNT */}
-          <button
-            type="button"
-            className="mt-8 w-full rounded-2xl bg-blue-700 px-6 py-5 text-lg font-black text-white shadow-lg transition hover:bg-blue-800"
-          >
-            Create Account
-          </button>
-
-          {/* LOGIN */}
-          <p className="mt-6 text-center text-sm text-slate-500">
-            Already have an account?{" "}
-            <Link
-              href="/login"
-              className="font-black text-blue-700 hover:underline"
-            >
-              Sign In
-            </Link>
-          </p>
-
-        </div>
-      </section>
-
-      {/* FOOTER */}
-      <footer className="bg-slate-950 text-white">
-        <div className="mx-auto max-w-7xl px-4 py-10 text-center">
-
-          <div className="text-xl font-black">
-            BEST SALES GHANA
-          </div>
-
-          <p className="mt-2 text-sm text-slate-400">
-            Buy • Sell • Advertise • Connect
-          </p>
-
-          <p className="mt-6 text-sm text-slate-500">
-            © 2026 All Prominent Ghana Limited. All rights reserved.
-          </p>
-
-        </div>
-      </footer>
-
-    </main>
-  );
-}
+          {/* DELIVERY OPTION */}
+          <
