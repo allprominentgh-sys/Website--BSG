@@ -8,73 +8,40 @@ import { supabaseBrowser } from "@/supabase-browser";
 export default function LoginPage() {
   const router = useRouter();
 
+  const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-
-  const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
-
   const [loading, setLoading] = useState(false);
-  const [socialLoading, setSocialLoading] = useState<
-    "google" | "apple" | null
-  >(null);
-
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
 
-  async function handleSubmit(
-    event: FormEvent<HTMLFormElement>
-  ) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     setError("");
-    setSuccess("");
     setLoading(true);
 
     try {
       const supabase = supabaseBrowser();
 
-      const {
-        data,
-        error: loginError,
-      } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
+      const { error: signInError } =
+        await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
 
-      if (loginError) {
-        throw loginError;
+      if (signInError) {
+        setError(signInError.message);
+        return;
       }
 
-      if (!data.user) {
-        throw new Error("Login failed. Please try again.");
-      }
-
-      setSuccess("Login successful. Redirecting...");
-
-      router.replace("/dashboard");
+      router.push("/dashboard");
       router.refresh();
     } catch (err) {
-      const message =
-        err instanceof Error
-          ? err.message
-          : "Unable to sign in.";
-
-      if (
-        message.toLowerCase().includes("invalid login")
-      ) {
-        setError(
-          "Incorrect email or password. Please check your details and try again."
-        );
-      } else if (
-        message.toLowerCase().includes("email not confirmed")
-      ) {
-        setError(
-          "Your email address has not been confirmed. Please check your email."
-        );
-      } else {
-        setError(message);
-      }
+      console.error(err);
+      setError("Unable to sign in. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -82,67 +49,53 @@ export default function LoginPage() {
 
   async function handleGoogleLogin() {
     setError("");
-    setSuccess("");
-    setSocialLoading("google");
+    setGoogleLoading(true);
 
     try {
       const supabase = supabaseBrowser();
-
-      const redirectTo =
-        `${window.location.origin}/auth/callback`;
 
       const { error: oauthError } =
         await supabase.auth.signInWithOAuth({
           provider: "google",
           options: {
-            redirectTo,
+            redirectTo: `${window.location.origin}/auth/callback`,
           },
         });
 
       if (oauthError) {
-        throw oauthError;
+        setError(oauthError.message);
+        setGoogleLoading(false);
       }
     } catch (err) {
-      setSocialLoading(null);
-
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Google sign-in failed."
-      );
+      console.error(err);
+      setError("Google sign-in could not be started.");
+      setGoogleLoading(false);
     }
   }
 
   async function handleAppleLogin() {
     setError("");
-    setSuccess("");
-    setSocialLoading("apple");
+    setAppleLoading(true);
 
     try {
       const supabase = supabaseBrowser();
-
-      const redirectTo =
-        `${window.location.origin}/auth/callback`;
 
       const { error: oauthError } =
         await supabase.auth.signInWithOAuth({
           provider: "apple",
           options: {
-            redirectTo,
+            redirectTo: `${window.location.origin}/auth/callback`,
           },
         });
 
       if (oauthError) {
-        throw oauthError;
+        setError(oauthError.message);
+        setAppleLoading(false);
       }
     } catch (err) {
-      setSocialLoading(null);
-
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Apple sign-in failed."
-      );
+      console.error(err);
+      setError("Apple sign-in could not be started.");
+      setAppleLoading(false);
     }
   }
 
@@ -153,10 +106,7 @@ export default function LoginPage() {
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-5 sm:px-6 lg:px-8">
 
-          <Link
-            href="/"
-            className="flex items-center gap-3"
-          >
+          <Link href="/" className="flex items-center gap-3">
 
             {/* LOGO */}
             <div className="logo-mark">
@@ -198,15 +148,12 @@ export default function LoginPage() {
 
         {/* BACKGROUND */}
         <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full bg-blue-100/60" />
-
         <div className="absolute -bottom-32 -left-32 h-96 w-96 rounded-full bg-cyan-100/60" />
-
 
         <div className="relative z-10 w-full max-w-md">
 
           {/* CARD */}
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl sm:p-8">
-
 
             {/* TITLE */}
             <div className="mb-8 text-center">
@@ -225,12 +172,7 @@ export default function LoginPage() {
                 >
                   <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
                   <polyline points="10 17 15 12 10 7" />
-                  <line
-                    x1="15"
-                    y1="12"
-                    x2="3"
-                    y2="12"
-                  />
+                  <line x1="15" y1="12" x2="3" y2="12" />
                 </svg>
 
               </div>
@@ -252,29 +194,20 @@ export default function LoginPage() {
 
             {/* ERROR */}
             {error && (
-              <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+              <div
+                role="alert"
+                className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700"
+              >
                 {error}
               </div>
             )}
 
 
-            {/* SUCCESS */}
-            {success && (
-              <div className="mb-5 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-700">
-                {success}
-              </div>
-            )}
-
-
-            {/* EMAIL LOGIN */}
-            <form
-              onSubmit={handleSubmit}
-              className="space-y-5"
-            >
+            {/* EMAIL/PASSWORD FORM */}
+            <form onSubmit={handleSubmit} className="space-y-5">
 
               {/* EMAIL */}
               <div>
-
                 <label
                   htmlFor="email"
                   className="mb-2 block text-sm font-bold text-slate-700"
@@ -289,14 +222,11 @@ export default function LoginPage() {
                   autoComplete="email"
                   required
                   value={email}
-                  onChange={(event) =>
-                    setEmail(event.target.value)
-                  }
+                  onChange={(event) => setEmail(event.target.value)}
                   placeholder="you@example.com"
                   disabled={loading}
                   className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100"
                 />
-
               </div>
 
 
@@ -321,23 +251,16 @@ export default function LoginPage() {
 
                 </div>
 
-
                 <div className="relative">
 
                   <input
                     id="password"
                     name="password"
-                    type={
-                      showPassword
-                        ? "text"
-                        : "password"
-                    }
+                    type={showPassword ? "text" : "password"}
                     autoComplete="current-password"
                     required
                     value={password}
-                    onChange={(event) =>
-                      setPassword(event.target.value)
-                    }
+                    onChange={(event) => setPassword(event.target.value)}
                     placeholder="Enter your password"
                     disabled={loading}
                     className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 pr-20 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100"
@@ -345,15 +268,11 @@ export default function LoginPage() {
 
                   <button
                     type="button"
-                    onClick={() =>
-                      setShowPassword(!showPassword)
-                    }
+                    onClick={() => setShowPassword(!showPassword)}
                     disabled={loading}
                     className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg px-2 py-1 text-sm font-bold text-slate-500 hover:bg-slate-100 hover:text-slate-900"
                   >
-                    {showPassword
-                      ? "Hide"
-                      : "Show"}
+                    {showPassword ? "Hide" : "Show"}
                   </button>
 
                 </div>
@@ -369,11 +288,7 @@ export default function LoginPage() {
                   name="remember"
                   type="checkbox"
                   checked={remember}
-                  onChange={(event) =>
-                    setRemember(
-                      event.target.checked
-                    )
-                  }
+                  onChange={(event) => setRemember(event.target.checked)}
                   className="h-4 w-4 rounded border-slate-300 text-blue-700 focus:ring-blue-600"
                 />
 
@@ -393,16 +308,7 @@ export default function LoginPage() {
                 disabled={loading}
                 className="w-full rounded-xl bg-blue-700 px-5 py-3.5 font-black text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-blue-800 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60"
               >
-
-                {loading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    Signing in...
-                  </span>
-                ) : (
-                  "Sign In"
-                )}
-
+                {loading ? "Signing in..." : "Sign In"}
               </button>
 
             </form>
@@ -426,46 +332,34 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={handleGoogleLogin}
-              disabled={
-                socialLoading !== null ||
-                loading
-              }
+              disabled={googleLoading || appleLoading}
               className="mb-3 flex w-full items-center justify-center gap-3 rounded-xl border border-slate-300 bg-white px-5 py-3.5 font-bold text-slate-700 transition hover:bg-slate-50 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
             >
 
-              {socialLoading === "google" ? (
-                <span className="h-5 w-5 animate-spin rounded-full border-2 border-slate-500 border-t-transparent" />
-              ) : (
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    fill="#4285F4"
-                    d="M21.35 12.23c0-.72-.06-1.42-.18-2.09H12v3.95h5.24a4.48 4.48 0 0 1-1.94 2.94v2.45h3.14c1.84-1.69 2.91-4.18 2.91-7.25Z"
-                  />
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  fill="#4285F4"
+                  d="M21.35 12.23c0-.72-.06-1.42-.18-2.09H12v3.95h5.24a4.48 4.48 0 0 1-1.94 2.94v2.45h3.14c1.84-1.69 2.91-4.18 2.91-7.25Z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 21.7c2.63 0 4.84-.87 6.45-2.37l-3.14-2.45c-.87.58-1.98.92-3.31.92-2.54 0-4.69-1.72-5.46-4.03H3.29v2.53A9.74 9.74 0 0 0 12 21.7Z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M6.54 13.77A5.86 5.86 0 0 1 6.23 12c0-.61.1-1.2.31-1.77V7.7H3.29A9.72 9.72 0 0 0 2.25 12c0 1.57.38 3.05 1.04 4.3l3.25-2.53Z"
+                />
+                <path
+                  fill="#EA4335"
+                  d="M12 6.2c1.43 0 2.71.49 3.72 1.46l2.79-2.79C16.83 3.28 14.63 2.3 12 2.3a9.74 9.74 0 0 0-8.71 5.4l3.25 2.53C7.31 7.92 9.46 6.2 12 6.2Z"
+                />
+              </svg>
 
-                  <path
-                    fill="#34A853"
-                    d="M12 21.7c2.63 0 4.84-.87 6.45-2.37l-3.14-2.45c-.87.58-1.98.92-3.31.92-2.54 0-4.69-1.72-5.46-4.03H3.29v2.53A9.74 9.74 0 0 0 12 21.7Z"
-                  />
-
-                  <path
-                    fill="#FBBC05"
-                    d="M6.54 13.77A5.86 5.86 0 0 1 6.23 12c0-.61.1-1.2.31-1.77V7.7H3.29A9.72 9.72 0 0 0 2.25 12c0 1.57.38 3.05 1.04 4.3l3.25-2.53Z"
-                  />
-
-                  <path
-                    fill="#EA4335"
-                    d="M12 6.2c1.43 0 2.71.49 3.72 1.46l2.79-2.79C16.83 3.28 14.63 2.3 12 2.3a9.74 9.74 0 0 0-8.71 5.4l3.25 2.53C7.31 7.92 9.46 6.2 12 6.2Z"
-                  />
-                </svg>
-              )}
-
-              {socialLoading === "google"
-                ? "Connecting..."
-                : "Continue with Google"}
+              {googleLoading ? "Connecting to Google..." : "Continue with Google"}
 
             </button>
 
@@ -474,29 +368,20 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={handleAppleLogin}
-              disabled={
-                socialLoading !== null ||
-                loading
-              }
-              className="flex w-full items-center justify-center gap-3 rounded-xl bg-black px-5 py-3.5 font-bold text-white transition hover:bg-slate-900 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={googleLoading || appleLoading}
+              className="flex w-full items-center justify-center gap-3 rounded-xl bg-black px-5 py-3.5 font-bold text-white transition hover:bg-slate-800 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
             >
 
-              {socialLoading === "apple" ? (
-                <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-              ) : (
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="white"
-                >
-                  <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.1.79 1.21-.24 2.37-.93 3.66-.84 1.55.12 2.72.74 3.5 1.84-3.2 1.92-2.44 6.13.49 7.31-.59 1.55-1.36 3.09-2.75 3.87ZM12.05 7.25C11.9 4.94 13.77 3.04 15.93 2.91c.3 2.66-2.42 4.64-3.88 4.34Z" />
-                </svg>
-              )}
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="white"
+              >
+                <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.1.8 1.21-.25 2.37-.94 3.65-.84 1.54.13 2.7.74 3.49 1.83-3.18 1.9-2.43 6.1.49 7.27-.58 1.52-1.26 3.03-2.73 3.91zM12.03 7.25C11.88 4.99 13.71 3.14 15.87 3c.3 2.6-2.35 4.54-3.84 4.25z" />
+              </svg>
 
-              {socialLoading === "apple"
-                ? "Connecting..."
-                : "Continue with Apple"}
+              {appleLoading ? "Connecting to Apple..." : "Continue with Apple"}
 
             </button>
 
