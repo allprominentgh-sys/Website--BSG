@@ -1,7 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import {
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
 import { supabaseBrowser } from "@/supabase-browser";
 
 type Category = {
@@ -186,6 +192,28 @@ const regions = [
   "Ahafo",
 ];
 
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const MAX_MEDIA_FILES = 9;
+
+const ALLOWED_TYPES = [
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "video/mp4",
+];
+
+function getFileExtension(file: File) {
+  const parts = file.name.split(".");
+  return parts.length > 1
+    ? parts[parts.length - 1].toLowerCase()
+    : "bin";
+}
+
+function isVideo(file: File) {
+  return file.type === "video/mp4";
+}
+
 export default function SellPage() {
   const [sellerType, setSellerType] = useState<
     "individual" | "company"
@@ -201,6 +229,12 @@ export default function SellPage() {
   const [trackingNumber, setTrackingNumber] = useState("");
 
   const [publishing, setPublishing] = useState(false);
+
+  const [mediaFiles, setMediaFiles] = useState<File[]>([]);
+
+  const [mediaError, setMediaError] = useState("");
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const selectedCategory = useMemo(
     () =>
@@ -225,8 +259,69 @@ export default function SellPage() {
     setTrackingNumber(generated);
   }
 
+  function handleMediaChange(
+    event: ChangeEvent<HTMLInputElement>
+  ) {
+    setMediaError("");
+
+    const selectedFiles = Array.from(
+      event.target.files || []
+    );
+
+    if (selectedFiles.length === 0) {
+      return;
+    }
+
+    const totalFiles =
+      mediaFiles.length + selectedFiles.length;
+
+    if (totalFiles > MAX_MEDIA_FILES) {
+      setMediaError(
+        `You can upload a maximum of ${MAX_MEDIA_FILES} photos/videos per advertisement.`
+      );
+
+      event.target.value = "";
+      return;
+    }
+
+    for (const file of selectedFiles) {
+      if (!ALLOWED_TYPES.includes(file.type)) {
+        setMediaError(
+          `${file.name} is not supported. Use JPG, PNG, WebP or MP4.`
+        );
+
+        event.target.value = "";
+        return;
+      }
+
+      if (file.size > MAX_FILE_SIZE) {
+        setMediaError(
+          `${file.name} is larger than 5 MB. Please choose a smaller file.`
+        );
+
+        event.target.value = "";
+        return;
+      }
+    }
+
+    setMediaFiles((current) => [
+      ...current,
+      ...selectedFiles,
+    ]);
+
+    event.target.value = "";
+  }
+
+  function removeMedia(index: number) {
+    setMediaFiles((current) =>
+      current.filter((_, fileIndex) => fileIndex !== index)
+    );
+
+    setMediaError("");
+  }
+
   async function handleSubmit(
-    event: React.FormEvent<HTMLFormElement>
+    event: FormEvent<HTMLFormElement>
   ) {
     event.preventDefault();
 
@@ -303,55 +398,79 @@ export default function SellPage() {
       // --------------------------------------------------
 
       if (!title) {
-        alert("Please enter an advertisement title.");
+        alert(
+          "Please enter an advertisement title."
+        );
+
         setPublishing(false);
         return;
       }
 
       if (!description) {
-        alert("Please enter a description.");
+        alert(
+          "Please enter a description."
+        );
+
         setPublishing(false);
         return;
       }
 
       if (!category) {
-        alert("Please select a main category.");
+        alert(
+          "Please select a main category."
+        );
+
         setPublishing(false);
         return;
       }
 
       if (!subcategory) {
-        alert("Please select a subcategory.");
+        alert(
+          "Please select a subcategory."
+        );
+
         setPublishing(false);
         return;
       }
 
       if (!priceValue || price <= 0) {
-        alert("Please enter a valid price.");
+        alert(
+          "Please enter a valid price."
+        );
+
         setPublishing(false);
         return;
       }
 
       if (!region) {
-        alert("Please select a region.");
+        alert(
+          "Please select a region."
+        );
+
         setPublishing(false);
         return;
       }
 
       if (!city) {
-        alert("Please enter the city or town.");
+        alert(
+          "Please enter the city or town."
+        );
+
         setPublishing(false);
         return;
       }
 
       if (!ghanaPostGps) {
-        alert("Please enter your GhanaPost GPS address.");
+        alert(
+          "Please enter your GhanaPost GPS address."
+        );
+
         setPublishing(false);
         return;
       }
 
       // --------------------------------------------------
-      // CREATE LOCATION
+      // LOCATION
       // --------------------------------------------------
 
       const location = [
@@ -367,7 +486,10 @@ export default function SellPage() {
       // CREATE LISTING
       // --------------------------------------------------
 
-      const { data: listing, error } = await supabase
+      const {
+        data: listing,
+        error: listingError,
+      } = await supabase
         .from("listings")
         .insert({
           seller_id: user.id,
@@ -385,22 +507,151 @@ export default function SellPage() {
         .select()
         .single();
 
-      // --------------------------------------------------
-      // HANDLE DATABASE ERROR
-      // --------------------------------------------------
-
-      if (error) {
+      if (listingError) {
         console.error(
           "LISTING INSERT ERROR:",
-          error
+          listingError
         );
 
         alert(
-          `Unable to publish listing: ${error.message}`
+          `Unable to publish listing: ${listingError.message}`
         );
 
         setPublishing(false);
         return;
+      }
+
+      if (!listing) {
+        alert(
+          "The listing was not created."
+        );
+
+        setPublishing(false);
+        return;
+      }
+
+      // --------------------------------------------------
+      // UPLOAD MEDIA
+      // --------------------------------------------------
+
+      if (mediaFiles.length > 0) {
+        for (
+          let index = 0;
+          index < mediaFiles.length;
+          index++
+        ) {
+          const file = mediaFiles[index];
+
+          const extension =
+            getFileExtension(file);
+
+          const safeExtension =
+            extension.replace(
+              /[^a-zA-Z0-9]/g,
+              ""
+            ) || "bin";
+
+          const fileName =
+            `${Date.now()}-${index}-${Math.random()
+              .toString(36)
+              .slice(2, 10)}.${safeExtension}`;
+
+          const filePath =
+            `${user.id}/${listing.id}/${fileName}`;
+
+          const {
+            error: uploadError,
+          } = await supabase.storage
+            .from("listing-images")
+            .upload(
+              filePath,
+              file,
+              {
+                cacheControl: "3600",
+                upsert: false,
+                contentType: file.type,
+              }
+            );
+
+          if (uploadError) {
+            console.error(
+              "MEDIA UPLOAD ERROR:",
+              uploadError
+            );
+
+            // Try to remove the listing because
+            // media upload failed.
+            await supabase
+              .from("listings")
+              .delete()
+              .eq("id", listing.id);
+
+            alert(
+              `The advertisement was not published because ${file.name} could not be uploaded: ${uploadError.message}`
+            );
+
+            setPublishing(false);
+            return;
+          }
+
+          // ------------------------------------------------
+          // GET PUBLIC URL
+          // ------------------------------------------------
+
+          const {
+            data: publicUrlData,
+          } = supabase.storage
+            .from("listing-images")
+            .getPublicUrl(filePath);
+
+          const publicUrl =
+            publicUrlData.publicUrl;
+
+          if (!publicUrl) {
+            console.error(
+              "PUBLIC URL ERROR"
+            );
+
+            await supabase
+              .from("listings")
+              .delete()
+              .eq("id", listing.id);
+
+            alert(
+              "The media uploaded but its public URL could not be created."
+            );
+
+            setPublishing(false);
+            return;
+          }
+
+          // ------------------------------------------------
+          // SAVE MEDIA URL
+          // ------------------------------------------------
+
+          const {
+            error: imageInsertError,
+          } = await supabase
+            .from("listing_images")
+            .insert({
+              listing_id: listing.id,
+              image_url: publicUrl,
+            });
+
+          if (imageInsertError) {
+            console.error(
+              "LISTING IMAGE INSERT ERROR:",
+              imageInsertError
+            );
+
+            alert(
+              `The advertisement was created, but the media record could not be saved: ${imageInsertError.message}`
+            );
+
+            setPublishing(false);
+            return;
+          }
+        }
       }
 
       // --------------------------------------------------
@@ -424,8 +675,13 @@ export default function SellPage() {
         error
       );
 
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unknown error";
+
       alert(
-        "Something went wrong while publishing your listing. Please try again."
+        `Something went wrong while publishing your listing: ${message}`
       );
 
       setPublishing(false);
@@ -648,7 +904,6 @@ export default function SellPage() {
 
             <div className="grid gap-5 md:grid-cols-2">
 
-              {/* CATEGORY */}
               <div>
 
                 <label className="text-sm font-bold">
@@ -683,7 +938,6 @@ export default function SellPage() {
 
               </div>
 
-              {/* SUBCATEGORY */}
               <div>
 
                 <label className="text-sm font-bold">
@@ -725,7 +979,6 @@ export default function SellPage() {
 
             </div>
 
-            {/* TITLE */}
             <div className="mt-5">
 
               <label className="text-sm font-bold">
@@ -742,7 +995,6 @@ export default function SellPage() {
 
             </div>
 
-            {/* DESCRIPTION */}
             <div className="mt-5">
 
               <label className="text-sm font-bold">
@@ -759,7 +1011,6 @@ export default function SellPage() {
 
             </div>
 
-            {/* PRICE */}
             <div className="mt-5 grid gap-5 md:grid-cols-2">
 
               <div>
@@ -820,13 +1071,149 @@ export default function SellPage() {
 
           </section>
 
-          {/* STEP 3 */}
+          {/* STEP 3 MEDIA */}
           <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
 
             <div className="mb-6">
 
               <p className="text-sm font-black uppercase tracking-widest text-blue-700">
                 Step 3
+              </p>
+
+              <h2 className="mt-2 text-2xl font-black">
+                Photos & Video
+              </h2>
+
+              <p className="mt-2 text-sm text-slate-500">
+                Add up to 9 photos or videos of the item.
+                Each file must be 5 MB or smaller.
+              </p>
+
+            </div>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,video/mp4"
+              multiple
+              onChange={handleMediaChange}
+              className="hidden"
+            />
+
+            <button
+              type="button"
+              onClick={() =>
+                fileInputRef.current?.click()
+              }
+              disabled={
+                mediaFiles.length >=
+                MAX_MEDIA_FILES
+              }
+              className="w-full rounded-2xl border-2 border-dashed border-blue-300 bg-blue-50 p-8 text-center transition hover:border-blue-600 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+
+              <div className="text-5xl">
+                📷
+              </div>
+
+              <div className="mt-3 text-lg font-black text-slate-900">
+                Choose Photos or Video
+              </div>
+
+              <p className="mt-2 text-sm text-slate-500">
+                JPG, PNG, WebP or MP4
+              </p>
+
+              <p className="mt-1 text-xs text-slate-400">
+                Maximum 5 MB per file • Maximum 9 files
+              </p>
+
+            </button>
+
+            {mediaError && (
+              <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
+                {mediaError}
+              </div>
+            )}
+
+            {mediaFiles.length > 0 && (
+              <div className="mt-6">
+
+                <div className="mb-3 flex items-center justify-between">
+
+                  <h3 className="font-black">
+                    Selected Media
+                  </h3>
+
+                  <span className="text-sm font-bold text-blue-700">
+                    {mediaFiles.length} / {MAX_MEDIA_FILES}
+                  </span>
+
+                </div>
+
+                <div className="space-y-3">
+
+                  {mediaFiles.map(
+                    (file, index) => (
+                      <div
+                        key={`${file.name}-${index}`}
+                        className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                      >
+
+                        <div className="flex min-w-0 items-center gap-3">
+
+                          <div className="text-3xl">
+                            {isVideo(file)
+                              ? "🎥"
+                              : "🖼️"}
+                          </div>
+
+                          <div className="min-w-0">
+
+                            <div className="truncate font-bold">
+                              {file.name}
+                            </div>
+
+                            <div className="text-xs text-slate-500">
+                              {(
+                                file.size /
+                                (1024 * 1024)
+                              ).toFixed(2)}{" "}
+                              MB
+                            </div>
+
+                          </div>
+
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            removeMedia(index)
+                          }
+                          className="shrink-0 rounded-lg bg-red-100 px-3 py-2 text-sm font-bold text-red-700 hover:bg-red-200"
+                        >
+                          Remove
+                        </button>
+
+                      </div>
+                    )
+                  )}
+
+                </div>
+
+              </div>
+            )}
+
+          </section>
+
+          {/* STEP 4 LOCATION */}
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+
+            <div className="mb-6">
+
+              <p className="text-sm font-black uppercase tracking-widest text-blue-700">
+                Step 4
               </p>
 
               <h2 className="mt-2 text-2xl font-black">
@@ -890,7 +1277,6 @@ export default function SellPage() {
 
             </div>
 
-            {/* GHANA POST GPS */}
             <div className="mt-5">
 
               <label className="text-sm font-bold">
@@ -904,7 +1290,7 @@ export default function SellPage() {
                   name="ghanaPostGps"
                   type="text"
                   placeholder="Example: GA-123-4567"
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 uppercase outline-none focus:border-blue-600"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 uppercase outline-none focus:border-blue-600"
                 />
 
                 <button
@@ -912,7 +1298,7 @@ export default function SellPage() {
                   className="shrink-0 rounded-xl border border-blue-700 px-5 py-3 font-bold text-blue-700 hover:bg-blue-50"
                   onClick={() =>
                     alert(
-                      "GhanaPost GPS/map integration will be connected in the delivery and maps step."
+                      "GhanaPost GPS/map integration will be connected in the maps and delivery step."
                     )
                   }
                 >
@@ -928,7 +1314,6 @@ export default function SellPage() {
 
             </div>
 
-            {/* EXACT ADDRESS */}
             <div className="mt-5">
 
               <label className="text-sm font-bold">
@@ -946,13 +1331,13 @@ export default function SellPage() {
 
           </section>
 
-          {/* STEP 4 */}
+          {/* STEP 5 DELIVERY */}
           <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
 
             <div className="mb-6">
 
               <p className="text-sm font-black uppercase tracking-widest text-blue-700">
-                Step 4
+                Step 5
               </p>
 
               <h2 className="mt-2 text-2xl font-black">
@@ -968,7 +1353,6 @@ export default function SellPage() {
 
             <div className="space-y-4">
 
-              {/* OUR DELIVERY */}
               <button
                 type="button"
                 onClick={() =>
@@ -1011,7 +1395,6 @@ export default function SellPage() {
 
               </button>
 
-              {/* SELLER DELIVERY */}
               <button
                 type="button"
                 onClick={() =>
@@ -1050,7 +1433,6 @@ export default function SellPage() {
 
               </button>
 
-              {/* PICKUP */}
               <button
                 type="button"
                 onClick={() =>
@@ -1088,7 +1470,6 @@ export default function SellPage() {
 
             </div>
 
-            {/* TRACKING */}
             {deliveryOption ===
               "our-delivery" && (
               <div className="mt-6 rounded-2xl border border-blue-200 bg-blue-50 p-5">
@@ -1106,9 +1487,8 @@ export default function SellPage() {
                     </h3>
 
                     <p className="mt-1 text-sm text-slate-600">
-                      When our delivery service receives
-                      the item, a unique tracking number will
-                      be attached to the order.
+                      A tracking number will be created when
+                      the delivery order is created.
                     </p>
 
                   </div>
@@ -1148,12 +1528,6 @@ export default function SellPage() {
 
                   </div>
 
-                  <p className="mt-2 text-xs text-slate-500">
-                    In the final system, this number will be
-                    generated automatically when a delivery
-                    order is created.
-                  </p>
-
                 </div>
 
               </div>
@@ -1161,13 +1535,13 @@ export default function SellPage() {
 
           </section>
 
-          {/* STEP 5 */}
+          {/* STEP 6 CONTACT */}
           <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
 
             <div className="mb-6">
 
               <p className="text-sm font-black uppercase tracking-widest text-blue-700">
-                Step 5
+                Step 6
               </p>
 
               <h2 className="mt-2 text-2xl font-black">
@@ -1229,7 +1603,7 @@ export default function SellPage() {
 
           </section>
 
-          {/* FINAL SUBMIT */}
+          {/* FINAL */}
           <section className="rounded-3xl bg-slate-950 p-6 text-white shadow-xl sm:p-8">
 
             <div className="flex flex-col justify-between gap-6 md:flex-row md:items-center">
@@ -1245,8 +1619,8 @@ export default function SellPage() {
                 </h2>
 
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
-                  Your listing will be saved to your seller
-                  account and will appear in your dashboard.
+                  Your advertisement and selected media will
+                  be saved to your seller account.
                 </p>
 
               </div>
