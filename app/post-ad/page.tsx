@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { supabaseBrowser } from "@/utils/supabase/browser";
 
 const categories = [
   "Phones & Tablets",
@@ -15,6 +17,8 @@ const categories = [
 ];
 
 export default function PostAdPage() {
+  const router = useRouter();
+
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("");
   const [price, setPrice] = useState("");
@@ -22,8 +26,12 @@ export default function PostAdPage() {
   const [description, setDescription] = useState("");
   const [featured, setFeatured] = useState(false);
 
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+
   const generateDescription = () => {
-    if (!title) {
+    if (!title.trim()) {
       setDescription(
         "Enter a product or service title first, then use AI Description."
       );
@@ -31,7 +39,7 @@ export default function PostAdPage() {
     }
 
     setDescription(
-      `${title} is available on All Prominent Ghana. ${
+      `${title.trim()} is available on BEST SALES GHANA. ${
         category ? `This listing is in the ${category} category. ` : ""
       }${
         price ? `The asking price is GH₵${price}. ` : ""
@@ -39,6 +47,110 @@ export default function PostAdPage() {
         location ? `The item is located in ${location}. ` : ""
       }Contact the seller for availability, additional details, viewing and delivery arrangements.`
     );
+  };
+
+  const publishListing = async () => {
+    setErrorMessage("");
+    setMessage("");
+
+    if (!title.trim()) {
+      setErrorMessage("Please enter a product or service title.");
+      return;
+    }
+
+    if (!category) {
+      setErrorMessage("Please select a category.");
+      return;
+    }
+
+    if (!price || Number(price) <= 0) {
+      setErrorMessage("Please enter a valid price.");
+      return;
+    }
+
+    if (!location.trim()) {
+      setErrorMessage("Please enter the listing location.");
+      return;
+    }
+
+    if (!description.trim()) {
+      setErrorMessage("Please enter a description.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const supabase = supabaseBrowser();
+
+      // Get the currently logged-in seller.
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError) {
+        throw new Error(userError.message);
+      }
+
+      if (!user) {
+        router.push("/login?error=login_required");
+        return;
+      }
+
+      const numericPrice = Number(price);
+
+      // Create the listing in Supabase.
+      const { data, error } = await supabase
+        .from("listings")
+        .insert({
+          seller_id: user.id,
+          title: title.trim(),
+          description: description.trim(),
+          price: numericPrice,
+          currency_code: "GHS",
+          currency: "GHS",
+          location: location.trim(),
+          status: "active",
+          featured: false,
+          category: category,
+          subcategory: null,
+          category_id: null,
+        })
+        .select("id")
+        .single();
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      // Keep paid promotion separate from ordinary publishing.
+      if (featured) {
+        setMessage(
+          `Listing #${data.id} published successfully. Top Ads promotion has not been activated yet because promotion requires payment.`
+        );
+      } else {
+        setMessage(
+          `Listing #${data.id} published successfully.`
+        );
+      }
+
+      // Give Supabase a moment to complete the response,
+      // then take the seller to My Listings.
+      setTimeout(() => {
+        router.push("/dashboard/listings");
+        router.refresh();
+      }, 1200);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Something went wrong while publishing your listing.";
+
+      setErrorMessage(message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -55,10 +167,11 @@ export default function PostAdPage() {
 
             <div>
               <div className="font-extrabold text-blue-700">
-                ALL PROMINENT
+                BEST SALES
               </div>
+
               <div className="text-xs text-slate-500">
-                GHANA LIMITED
+                GHANA
               </div>
             </div>
           </Link>
@@ -78,7 +191,7 @@ export default function PostAdPage() {
         <div className="mx-auto max-w-4xl text-white">
 
           <p className="font-bold text-blue-100">
-            SELL ON ALL PROMINENT
+            SELL ON BEST SALES GHANA
           </p>
 
           <h1 className="mt-2 text-4xl font-extrabold md:text-5xl">
@@ -107,6 +220,20 @@ export default function PostAdPage() {
               Complete the information below.
             </p>
           </div>
+
+          {/* SUCCESS */}
+          {message && (
+            <div className="mb-6 rounded-2xl border border-green-200 bg-green-50 p-4 text-sm font-bold text-green-700">
+              ✓ {message}
+            </div>
+          )}
+
+          {/* ERROR */}
+          {errorMessage && (
+            <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">
+              ⚠ {errorMessage}
+            </div>
+          )}
 
           {/* TITLE */}
           <div>
@@ -154,6 +281,8 @@ export default function PostAdPage() {
 
               <input
                 type="number"
+                min="0"
+                step="0.01"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
                 placeholder="0.00"
@@ -225,6 +354,11 @@ export default function PostAdPage() {
 
             </div>
 
+            <p className="mt-2 text-xs text-slate-400">
+              Photo upload will be connected to the existing
+              listing_images system next.
+            </p>
+
           </div>
 
           {/* DESCRIPTION */}
@@ -253,11 +387,6 @@ export default function PostAdPage() {
               placeholder="Describe your product, condition, features and other important information..."
               className="mt-2 w-full resize-none rounded-xl border bg-slate-50 px-4 py-4 outline-none focus:border-blue-500"
             />
-
-            <p className="mt-2 text-xs text-slate-400">
-              AI assistance will later be connected to an AI service
-              to generate richer descriptions automatically.
-            </p>
 
           </div>
 
@@ -293,10 +422,15 @@ export default function PostAdPage() {
                   />
 
                   <span className="font-bold">
-                    Add Top Ads promotion
+                    Request Top Ads promotion
                   </span>
 
                 </label>
+
+                <p className="mt-2 text-xs text-slate-500">
+                  Promotion requires payment and will be connected
+                  to the advertising system.
+                </p>
 
               </div>
 
@@ -312,13 +446,14 @@ export default function PostAdPage() {
             </h3>
 
             <p className="mt-1 text-sm text-slate-500">
-              Customers will see your seller profile with the listing.
+              Your logged-in account will automatically be attached
+              to this listing.
             </p>
 
             <div className="mt-4 flex items-center gap-3">
 
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 font-bold text-white">
-                AP
+                👤
               </div>
 
               <div>
@@ -326,8 +461,8 @@ export default function PostAdPage() {
                   Your account
                 </p>
 
-                <p className="text-sm text-slate-500">
-                  ✓ Verification available
+                <p className="text-sm text-green-600">
+                  ✓ Logged-in seller
                 </p>
               </div>
 
@@ -347,9 +482,13 @@ export default function PostAdPage() {
 
             <button
               type="button"
-              className="rounded-xl bg-blue-600 px-8 py-4 font-bold text-white transition hover:bg-blue-700"
+              onClick={publishListing}
+              disabled={loading}
+              className="rounded-xl bg-blue-600 px-8 py-4 font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Publish Listing →
+              {loading
+                ? "Publishing..."
+                : "Publish Listing →"}
             </button>
 
           </div>
