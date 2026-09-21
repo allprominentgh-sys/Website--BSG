@@ -1,120 +1,203 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { supabaseBrowser } from "@/supabase-browser";
 
-const products = {
-  "iphone-15-pro-max": {
-    title: "iPhone 15 Pro Max",
-    category: "Phones & Tablets",
-    price: "GH₵ 14,500",
-    location: "Accra, Ghana",
-    seller: "Prominent Store",
-    emoji: "📱",
-    description:
-      "Premium smartphone available from a verified seller. Contact the seller for availability, specifications and delivery.",
-  },
+type Listing = {
+  id: number;
+  title: string;
+  description: string | null;
+  price: number | null;
+  currency_code: string | null;
+  currency: string | null;
+  location: string | null;
+  status: string | null;
+  featured: boolean | null;
+  category: string | null;
+  subcategory: string | null;
+  created_at: string | null;
+  seller_id: string;
+};
 
-  "toyota-corolla-2020": {
-    title: "Toyota Corolla 2020",
-    category: "Cars & Vehicles",
-    price: "GH₵ 185,000",
-    location: "Kumasi, Ghana",
-    seller: "Ghana Auto Hub",
-    emoji: "🚗",
-    description:
-      "Toyota Corolla available for sale. Contact the verified seller for vehicle details, inspection and location.",
-  },
-
-  "modern-3-bedroom-house": {
-    title: "Modern 3 Bedroom House",
-    category: "Property",
-    price: "GH₵ 850,000",
-    location: "East Legon, Accra",
-    seller: "Prominent Properties",
-    emoji: "🏠",
-    description:
-      "Modern three-bedroom property available in a prime location. Contact the verified seller for viewing and property information.",
-  },
-
-  "hp-laptop-core-i7": {
-    title: "HP Laptop Core i7",
-    category: "Electronics",
-    price: "GH₵ 8,500",
-    location: "Accra, Ghana",
-    seller: "Tech World Ghana",
-    emoji: "💻",
-    description:
-      "HP Core i7 laptop suitable for business, school and professional use.",
-  },
-
-  "office-furniture-set": {
-    title: "Office Furniture Set",
-    category: "Furniture",
-    price: "GH₵ 12,000",
-    location: "Tema, Ghana",
-    seller: "Modern Office Ghana",
-    emoji: "🪑",
-    description:
-      "Complete modern office furniture set available for businesses and offices.",
-  },
-
-  "industrial-generator": {
-    title: "Industrial Generator",
-    category: "Machinery",
-    price: "GH₵ 95,000",
-    location: "Takoradi, Ghana",
-    seller: "Industrial Ghana",
-    emoji: "⚙️",
-    description:
-      "Industrial generator suitable for commercial and business applications.",
-  },
-
-  "fashion-clothing-bundle": {
-    title: "Fashion Clothing Bundle",
-    category: "Fashion",
-    price: "GH₵ 4,500",
-    location: "Accra, Ghana",
-    seller: "Prominent Fashion",
-    emoji: "👕",
-    description:
-      "Fashion clothing collection available for retail and wholesale buyers.",
-  },
-
-  "shipping-container": {
-    title: "40ft Shipping Container",
-    category: "Business & Industry",
-    price: "GH₵ 38,000",
-    location: "Tema, Ghana",
-    seller: "APG Logistics",
-    emoji: "📦",
-    description:
-      "40ft shipping container available for business and storage purposes.",
-  },
+type ListingImage = {
+  id: number;
+  listing_id: number;
+  image_url: string;
 };
 
 export default function ProductPage() {
   const params = useParams();
+  const supabase = supabaseBrowser();
 
-  const id = String(params.id);
+  const [listing, setListing] = useState<Listing | null>(null);
+  const [images, setImages] = useState<ListingImage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const product =
-    products[id as keyof typeof products];
+  useEffect(() => {
+    loadListing();
+  }, []);
 
-  if (!product) {
+  async function loadListing() {
+    setLoading(true);
+    setError("");
+
+    const listingId = Number(params.id);
+
+    if (!Number.isInteger(listingId)) {
+      setError("Invalid listing.");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      /*
+       * GET LISTING
+       */
+      const { data, error: listingError } = await supabase
+        .from("listings")
+        .select(
+          `
+            id,
+            title,
+            description,
+            price,
+            currency_code,
+            currency,
+            location,
+            status,
+            featured,
+            category,
+            subcategory,
+            created_at,
+            seller_id
+          `
+        )
+        .eq("id", listingId)
+        .maybeSingle();
+
+      if (listingError) {
+        throw listingError;
+      }
+
+      if (!data) {
+        setListing(null);
+        setLoading(false);
+        return;
+      }
+
+      setListing(data);
+
+      /*
+       * GET LISTING IMAGES
+       */
+      const { data: imageData, error: imageError } = await supabase
+        .from("listing_images")
+        .select("id, listing_id, image_url")
+        .eq("listing_id", listingId)
+        .order("id", { ascending: true });
+
+      if (!imageError) {
+        setImages(imageData || []);
+      }
+
+      /*
+       * RECORD LISTING VIEW
+       *
+       * This does not stop the listing from loading
+       * if the tracking insert is rejected by RLS.
+       */
+      let viewerId: string | null = null;
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user) {
+        viewerId = user.id;
+      }
+
+      const { error: eventError } = await supabase
+        .from("ad_events")
+        .insert({
+          ad_id: listingId,
+          event_type: "VIEW",
+          viewer_id: viewerId,
+        });
+
+      if (eventError) {
+        console.warn(
+          "Listing view could not be recorded:",
+          eventError.message
+        );
+      }
+    } catch (err: any) {
+      console.error(err);
+      setError(err?.message || "Unable to load this listing.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function formatPrice() {
+    if (!listing || listing.price === null) {
+      return "Price not set";
+    }
+
+    const currency =
+      listing.currency_code ||
+      listing.currency ||
+      "GHS";
+
+    try {
+      return new Intl.NumberFormat("en-GH", {
+        style: "currency",
+        currency,
+        maximumFractionDigits: 2,
+      }).format(Number(listing.price));
+    } catch {
+      return `${currency} ${Number(
+        listing.price
+      ).toLocaleString()}`;
+    }
+  }
+
+  if (loading) {
     return (
-      <main className="product-page">
-        <div className="product-container not-found">
-          <div className="not-found-icon">🔎</div>
+      <main className="min-h-screen bg-slate-50">
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="text-center">
+            <div className="text-5xl">📦</div>
 
-          <h1>Listing not found</h1>
+            <p className="mt-4 font-semibold text-slate-600">
+              Loading listing...
+            </p>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
-          <p>
-            This listing may have been removed or is no
-            longer available.
+  if (error) {
+    return (
+      <main className="min-h-screen bg-slate-50">
+        <div className="mx-auto max-w-3xl px-4 py-20 text-center">
+          <div className="text-5xl">⚠️</div>
+
+          <h1 className="mt-5 text-2xl font-black text-slate-900">
+            Unable to load listing
+          </h1>
+
+          <p className="mt-3 text-slate-500">
+            {error}
           </p>
 
-          <Link href="/listings" className="product-button">
+          <Link
+            href="/listings"
+            className="mt-6 inline-block rounded-xl bg-blue-700 px-6 py-3 font-bold text-white"
+          >
             ← Back to Marketplace
           </Link>
         </div>
@@ -122,158 +205,298 @@ export default function ProductPage() {
     );
   }
 
-  return (
-    <main className="product-page">
+  if (!listing) {
+    return (
+      <main className="min-h-screen bg-slate-50">
+        <div className="mx-auto max-w-3xl px-4 py-20 text-center">
+          <div className="text-5xl">🔎</div>
 
-      {/* HEADER */}
+          <h1 className="mt-5 text-2xl font-black text-slate-900">
+            Listing not found
+          </h1>
 
-      <div className="product-topbar">
-        <div className="product-container">
+          <p className="mt-3 text-slate-500">
+            This listing may have been removed or is no
+            longer available.
+          </p>
+
           <Link
             href="/listings"
-            className="product-back"
+            className="mt-6 inline-block rounded-xl bg-blue-700 px-6 py-3 font-bold text-white"
           >
             ← Back to Marketplace
           </Link>
         </div>
-      </div>
+      </main>
+    );
+  }
 
-      {/* PRODUCT */}
+  const mainImage = images[0]?.image_url;
 
-      <section className="product-section">
-        <div className="product-container">
+  return (
+    <main className="min-h-screen bg-slate-50">
 
-          <div className="product-layout">
+      {/* HEADER */}
 
-            {/* IMAGE */}
+      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+          <Link
+            href="/listings"
+            className="font-bold text-blue-700"
+          >
+            ← Back to Marketplace
+          </Link>
 
-            <div className="product-image">
-              <span>{product.emoji}</span>
+          <Link
+            href="/sell"
+            className="rounded-xl bg-blue-700 px-5 py-3 font-bold text-white hover:bg-blue-800"
+          >
+            Post an Ad
+          </Link>
+        </div>
+      </header>
 
-              <div className="product-image-label">
-                VERIFIED LISTING
-              </div>
+      {/* LISTING */}
+
+      <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+
+        <div className="grid gap-8 lg:grid-cols-2">
+
+          {/* IMAGE */}
+
+          <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+
+            <div className="flex min-h-[420px] items-center justify-center bg-slate-100">
+
+              {mainImage ? (
+                <img
+                  src={mainImage}
+                  alt={listing.title}
+                  className="h-full max-h-[600px] w-full object-contain"
+                />
+              ) : (
+                <div className="text-center">
+                  <div className="text-8xl">📦</div>
+
+                  <p className="mt-4 text-sm font-semibold text-slate-400">
+                    No image available
+                  </p>
+                </div>
+              )}
+
             </div>
 
-            {/* DETAILS */}
+            {/* ADDITIONAL IMAGES */}
 
-            <div className="product-details">
-
-              <span className="product-category">
-                {product.category}
-              </span>
-
-              <h1>{product.title}</h1>
-
-              <div className="product-price">
-                {product.price}
-              </div>
-
-              <div className="product-location">
-                📍 {product.location}
-              </div>
-
-              <div className="seller-card">
-
-                <div className="seller-avatar">
-                  {product.seller.charAt(0)}
-                </div>
-
-                <div>
-                  <span>SELLER</span>
-
-                  <h3>{product.seller}</h3>
-
-                  <div className="verified-text">
-                    ✓ Verified Seller
+            {images.length > 1 && (
+              <div className="grid grid-cols-4 gap-2 p-3">
+                {images.slice(0, 8).map((image) => (
+                  <div
+                    key={image.id}
+                    className="h-20 overflow-hidden rounded-lg bg-slate-100"
+                  >
+                    <img
+                      src={image.image_url}
+                      alt={listing.title}
+                      className="h-full w-full object-cover"
+                    />
                   </div>
-                </div>
-
+                ))}
               </div>
-
-              <div className="product-actions">
-
-                <button
-                  type="button"
-                  className="contact-button"
-                  onClick={() =>
-                    alert(
-                      "Seller contact will be connected to the messaging system."
-                    )
-                  }
-                >
-                  Contact Seller
-                </button>
-
-                <button
-                  type="button"
-                  className="save-button"
-                  onClick={() =>
-                    alert("Listing saved.")
-                  }
-                >
-                  ♡ Save
-                </button>
-
-              </div>
-
-            </div>
+            )}
 
           </div>
 
-          {/* DESCRIPTION */}
+          {/* DETAILS */}
 
-          <div className="product-description">
+          <div>
 
-            <div>
-              <span className="description-label">
-                ABOUT THIS LISTING
-              </span>
+            {listing.featured && (
+              <div className="mb-4 inline-flex rounded-full bg-purple-600 px-4 py-2 text-sm font-black text-white">
+                ⭐ TOP PRIORITY
+              </div>
+            )}
 
-              <h2>Description</h2>
+            {listing.status && (
+              <div className="mb-4">
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-bold ${
+                    listing.status === "active"
+                      ? "bg-green-100 text-green-700"
+                      : "bg-gray-100 text-gray-700"
+                  }`}
+                >
+                  {listing.status}
+                </span>
+              </div>
+            )}
 
-              <p>{product.description}</p>
+            <p className="text-sm font-black uppercase tracking-widest text-blue-700">
+              {listing.category || "Marketplace"}
+            </p>
+
+            <h1 className="mt-3 text-4xl font-black text-slate-900">
+              {listing.title}
+            </h1>
+
+            {listing.subcategory && (
+              <p className="mt-2 text-sm font-semibold text-slate-500">
+                {listing.subcategory}
+              </p>
+            )}
+
+            <div className="mt-6 text-3xl font-black text-blue-700">
+              {formatPrice()}
             </div>
 
-            <div className="safety-card">
+            {listing.location && (
+              <div className="mt-3 text-slate-600">
+                📍 {listing.location}
+              </div>
+            )}
 
-              <h3>🛡️ Shop safely</h3>
+            {/* ACTIONS */}
 
-              <p>
+            <div className="mt-8 grid gap-3 sm:grid-cols-2">
+
+              <Link
+                href={`/chat?listing=${listing.id}`}
+                className="rounded-xl bg-blue-700 px-5 py-4 text-center font-black text-white hover:bg-blue-800"
+              >
+                💬 Contact Seller
+              </Link>
+
+              <button
+                type="button"
+                className="rounded-xl border border-blue-700 bg-white px-5 py-4 font-black text-blue-700 hover:bg-blue-50"
+                onClick={async () => {
+                  const {
+                    data: { user },
+                  } = await supabase.auth.getUser();
+
+                  if (!user) {
+                    window.location.href = "/login";
+                    return;
+                  }
+
+                  const { error } = await supabase
+                    .from("favorites")
+                    .upsert(
+                      {
+                        user_id: user.id,
+                        listing_id: listing.id,
+                      },
+                      {
+                        onConflict:
+                          "user_id,listing_id",
+                      }
+                    );
+
+                  if (error) {
+                    alert(
+                      "Unable to save this listing."
+                    );
+                    return;
+                  }
+
+                  alert("Listing saved to your favourites.");
+                }}
+              >
+                ♡ Save Listing
+              </button>
+
+            </div>
+
+            {/* SAFETY */}
+
+            <div className="mt-8 rounded-2xl bg-blue-50 p-5">
+              <h3 className="font-black text-slate-900">
+                🛡️ Shop safely
+              </h3>
+
+              <p className="mt-2 text-sm leading-6 text-slate-600">
                 Verify the item and seller before making
                 payment. Never share sensitive account
                 information with another person.
               </p>
-
             </div>
+
+          </div>
+        </div>
+
+        {/* DESCRIPTION */}
+
+        <div className="mt-10 grid gap-8 lg:grid-cols-[1fr_350px]">
+
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+
+            <p className="text-sm font-black uppercase tracking-widest text-blue-700">
+              About this listing
+            </p>
+
+            <h2 className="mt-2 text-2xl font-black text-slate-900">
+              Description
+            </h2>
+
+            <p className="mt-5 whitespace-pre-wrap leading-8 text-slate-600">
+              {listing.description ||
+                "The seller has not provided a description."}
+            </p>
 
           </div>
 
           {/* DELIVERY */}
 
-          <div className="delivery-card">
+          <div className="rounded-3xl bg-slate-950 p-6 text-white sm:p-8">
 
-            <div className="delivery-icon">
-              🚚
-            </div>
+            <div className="text-4xl">🚚</div>
 
-            <div>
-              <h3>Delivery available</h3>
+            <h2 className="mt-4 text-2xl font-black">
+              Delivery
+            </h2>
 
-              <p>
-                Delivery and location tracking will be
-                integrated into BestSalesGH.
+            <p className="mt-3 leading-7 text-slate-300">
+              Delivery options can be arranged between
+              the buyer and seller. BEST SALES GHANA
+              tracked delivery can be connected to the
+              marketplace delivery system.
+            </p>
+
+            <div className="mt-6 rounded-xl bg-white/10 p-4">
+              <p className="text-sm font-bold">
+                📍 Location
+              </p>
+
+              <p className="mt-1 text-sm text-slate-300">
+                {listing.location || "Location not provided"}
               </p>
             </div>
-
-            <span className="coming-soon">
-              COMING SOON
-            </span>
 
           </div>
 
         </div>
+
       </section>
+
+      {/* FOOTER */}
+
+      <footer className="mt-10 bg-slate-950 py-10 text-white">
+        <div className="mx-auto max-w-7xl px-4 text-center">
+
+          <div className="text-xl font-black">
+            BEST SALES GHANA
+          </div>
+
+          <p className="mt-2 text-sm text-slate-400">
+            Buy • Sell • Advertise • Connect
+          </p>
+
+          <p className="mt-6 text-sm text-slate-500">
+            © 2026 All Prominent Ghana Limited. All rights reserved.
+          </p>
+
+        </div>
+      </footer>
 
     </main>
   );
