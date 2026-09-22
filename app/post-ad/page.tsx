@@ -1,11 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "@/utils/supabase/browser";
 
-const categories = [
+type Category = {
+  id: number;
+  name: string;
+};
+
+type SelectedPhoto = {
+  file: File;
+  preview: string;
+};
+
+const FALLBACK_CATEGORIES = [
   "Phones & Tablets",
   "Cars & Vehicles",
   "Property",
@@ -16,8 +26,21 @@ const categories = [
   "Jobs & Services",
 ];
 
+const MAX_PHOTOS = 8;
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+
+const ALLOWED_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+];
+
 export default function PostAdPage() {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
 
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("");
@@ -26,9 +49,77 @@ export default function PostAdPage() {
   const [description, setDescription] = useState("");
   const [featured, setFeatured] = useState(false);
 
+  const [photos, setPhotos] = useState<SelectedPhoto[]>([]);
+
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+
+  /*
+   * Load marketplace categories from Supabase.
+   *
+   * The fallback list keeps the page usable if the categories
+   * table temporarily cannot be reached.
+   */
+  useEffect(() => {
+    let mounted = true;
+
+    const loadCategories = async () => {
+      try {
+        const supabase = supabaseBrowser();
+
+        const { data, error } = await supabase
+          .from("categories")
+          .select("id, name")
+          .order("name", { ascending: true });
+
+        if (error) {
+          throw error;
+        }
+
+        if (mounted && data && data.length > 0) {
+          setCategories(data as Category[]);
+        } else if (mounted) {
+          setCategories(
+            FALLBACK_CATEGORIES.map((name, index) => ({
+              id: index + 1,
+              name,
+            }))
+          );
+        }
+      } catch {
+        if (mounted) {
+          setCategories(
+            FALLBACK_CATEGORIES.map((name, index) => ({
+              id: index + 1,
+              name,
+            }))
+          );
+        }
+      } finally {
+        if (mounted) {
+          setCategoriesLoading(false);
+        }
+      }
+    };
+
+    loadCategories();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  /*
+   * Clean up object URLs when the component is removed.
+   */
+  useEffect(() => {
+    return () => {
+      photos.forEach((photo) => {
+        URL.revokeObjectURL(photo.preview);
+      });
+    };
+  }, [photos]);
 
   const generateDescription = () => {
     if (!title.trim()) {
@@ -47,6 +138,137 @@ export default function PostAdPage() {
         location ? `The item is located in ${location}. ` : ""
       }Contact the seller for availability, additional details, viewing and delivery arrangements.`
     );
+  };
+
+  /*
+   * Validate and select photos.
+   *
+   * Only JPEG, PNG and WEBP are accepted.
+   * Maximum size: 5MB per image.
+   */
+  const handlePhotoSelection = (
+    event: ChangeEvent<HTMLInputElement>
+  ) => {
+    setErrorMessage("");
+
+    const selectedFiles = Array.from(event.target.files ?? []);
+
+    if (selectedFiles.length === 0) {
+      return;
+    }
+
+    const remainingSlots = MAX_PHOTOS - photos.length;
+
+    if (remainingSlots <= 0) {
+      setErrorMessage(
+        `You can upload a maximum of ${MAX_PHOTOS} photos.`
+      );
+      event.target.value = "";
+      return;
+    }
+
+    const filesToAdd = selectedFiles.slice(0, remainingSlots);
+
+    if (selectedFiles.length > remainingSlots) {
+      setErrorMessage(
+        `Only ${remainingSlots} more photo${
+          remainingSlots === 1 ? "" : "s"
+        } can be added. Maximum is ${MAX_PHOTOS}.`
+      );
+    }
+
+    const validPhotos: SelectedPhoto[] = [];
+
+    for (const file of filesToAdd) {
+      if (!ALLOWED_TYPES.includes(file.type)) {
+        setErrorMessage(
+          `${file.name} is not supported. Please use JPG, PNG or WEBP.`
+        );
+        continue;
+      }
+
+      if (file.size > MAX_FILE_SIZE) {
+        setErrorMessage(
+          `${file.name} is larger than 5MB. Please choose a smaller image.`
+        );
+        continue;
+      }
+
+      validPhotos.push({
+        file,
+        preview: URL.createObjectURL(file),
+      });
+    }
+
+    if (validPhotos.length > 0) {
+      setPhotos((current) => [...current, ...validPhotos]);
+    }
+
+    event.target.value = "";
+  };
+
+  const removePhoto = (index: number) => {
+    setPhotos((current) => {
+      const photo = current[index];
+
+      if (photo) {
+        URL.revokeObjectURL(photo.preview);
+      }
+
+      return current.filter((_, photoIndex) => photoIndex !== index);
+    });
+  };
+
+  /*
+   * Upload one image to the seller-owned Storage folder.
+   *
+   * Path:
+   * seller-user-id / listing-id / unique-file-name
+   *
+   * This matches the marketplace Storage security policy.
+   */
+  const uploadPhoto = async (
+    supabase: ReturnType<typeof supabaseBrowser>,
+    userId: string,
+    listingId: number,
+    photo: SelectedPhoto,
+    index: number
+  ) => {
+    const extension =
+      photo.file.name.split(".").pop()?.toLowerCase() || "jpg";
+
+    const safeFileName = `${Date.now()}-${index}-${crypto.randomUUID()}.${extension}`;
+
+    const filePath = `${userId}/${listingId}/${safeFileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("listing-images")
+      .upload(filePath, photo.file, {
+        cacheControl: "3600",
+        upsert: false,
+        contentType: photo.file.type,
+      });
+
+    if (uploadError) {
+      throw new Error(
+        `Photo ${index + 1} could not be uploaded: ${uploadError.message}`
+      );
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from("listing-images")
+      .getPublicUrl(filePath);
+
+    if (!publicUrlData?.publicUrl) {
+      throw new Error(
+        `Photo ${index + 1} was uploaded but its public URL could not be created.`
+      );
+    }
+
+    return {
+      listing_id: listingId,
+      image_url: publicUrlData.publicUrl,
+    };
   };
 
   const publishListing = async () => {
@@ -78,12 +300,24 @@ export default function PostAdPage() {
       return;
     }
 
+    if (photos.length === 0) {
+      setErrorMessage(
+        "Please add at least one clear product photo."
+      );
+      return;
+    }
+
     setLoading(true);
+
+    let createdListingId: number | null = null;
 
     try {
       const supabase = supabaseBrowser();
 
-      // Get the currently logged-in seller.
+      /*
+       * SECURITY:
+       * Only authenticated users can create marketplace listings.
+       */
       const {
         data: { user },
         error: userError,
@@ -94,49 +328,128 @@ export default function PostAdPage() {
       }
 
       if (!user) {
-        router.push("/login?error=login_required");
+        router.push(
+          `/login?error=login_required&next=${encodeURIComponent(
+            "/post-ad"
+          )}`
+        );
         return;
       }
 
       const numericPrice = Number(price);
 
-      // Create the listing in Supabase.
-      const { data, error } = await supabase
-        .from("listings")
-        .insert({
-          seller_id: user.id,
-          title: title.trim(),
-          description: description.trim(),
-          price: numericPrice,
-          currency_code: "GHS",
-          currency: "GHS",
-          location: location.trim(),
-          status: "active",
-          featured: false,
-          category: category,
-          subcategory: null,
-          category_id: null,
-        })
-        .select("id")
-        .single();
-
-      if (error) {
-        throw new Error(error.message);
+      if (!Number.isFinite(numericPrice) || numericPrice <= 0) {
+        throw new Error("Please enter a valid price.");
       }
 
-      // Keep paid promotion separate from ordinary publishing.
+      /*
+       * Find the selected category's database ID.
+       */
+      const selectedCategory = categories.find(
+        (item) => item.name === category
+      );
+
+      /*
+       * Create the listing first so we have its database ID.
+       * Photos are then stored under:
+       *
+       * user-id / listing-id / filename
+       */
+      const { data: listing, error: listingError } =
+        await supabase
+          .from("listings")
+          .insert({
+            seller_id: user.id,
+            title: title.trim(),
+            description: description.trim(),
+            price: numericPrice,
+            currency_code: "GHS",
+            currency: "GHS",
+            location: location.trim(),
+
+            /*
+             * Active means the listing can appear publicly.
+             * Security/RLS still controls who can create it.
+             */
+            status: "active",
+
+            /*
+             * Paid promotion is intentionally NOT activated
+             * just because the seller checked the checkbox.
+             */
+            featured: false,
+
+            category: category,
+            category_id: selectedCategory?.id ?? null,
+            subcategory: null,
+          })
+          .select("id")
+          .single();
+
+      if (listingError) {
+        throw new Error(
+          `Listing could not be created: ${listingError.message}`
+        );
+      }
+
+      if (!listing?.id) {
+        throw new Error(
+          "The listing was created but no listing ID was returned."
+        );
+      }
+
+      createdListingId = Number(listing.id);
+
+      /*
+       * Upload all selected photos.
+       */
+      const imageRows = [];
+
+      for (let index = 0; index < photos.length; index++) {
+        const imageRow = await uploadPhoto(
+          supabase,
+          user.id,
+          createdListingId,
+          photos[index],
+          index
+        );
+
+        imageRows.push(imageRow);
+      }
+
+      /*
+       * Save uploaded image URLs in listing_images.
+       */
+      if (imageRows.length > 0) {
+        const { error: imageInsertError } = await supabase
+          .from("listing_images")
+          .insert(imageRows);
+
+        if (imageInsertError) {
+          throw new Error(
+            `Photos uploaded, but image records could not be saved: ${imageInsertError.message}`
+          );
+        }
+      }
+
+      /*
+       * Promotion remains separate from normal publishing.
+       */
       if (featured) {
         setMessage(
-          `Listing #${data.id} published successfully. Top Ads promotion has not been activated yet because promotion requires payment.`
+          `Listing #${createdListingId} published successfully. Top Ads promotion has not been activated because payment is required.`
         );
       } else {
         setMessage(
-          `Listing #${data.id} published successfully.`
+          `Listing #${createdListingId} published successfully with ${imageRows.length} photo${
+            imageRows.length === 1 ? "" : "s"
+          }.`
         );
       }
 
-      // Give Supabase a moment to complete the response,
-      // then take the seller to My Listings.
+      /*
+       * Go to seller's listings after successful publishing.
+       */
       setTimeout(() => {
         router.push("/dashboard/listings");
         router.refresh();
@@ -147,7 +460,17 @@ export default function PostAdPage() {
           ? error.message
           : "Something went wrong while publishing your listing.";
 
-      setErrorMessage(message);
+      /*
+       * If the listing was created but something failed afterward,
+       * don't pretend that everything succeeded.
+       */
+      if (createdListingId) {
+        setErrorMessage(
+          `${message} Your listing #${createdListingId} may have been created. Please check My Listings before trying again.`
+        );
+      } else {
+        setErrorMessage(message);
+      }
     } finally {
       setLoading(false);
     }
@@ -245,6 +568,7 @@ export default function PostAdPage() {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. iPhone 15 Pro 256GB"
+              maxLength={150}
               className="mt-2 w-full rounded-xl border bg-slate-50 px-4 py-4 outline-none focus:border-blue-500"
             />
           </div>
@@ -260,15 +584,18 @@ export default function PostAdPage() {
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="mt-2 w-full rounded-xl border bg-slate-50 px-4 py-4 outline-none focus:border-blue-500"
+                disabled={categoriesLoading}
+                className="mt-2 w-full rounded-xl border bg-slate-50 px-4 py-4 outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <option value="">
-                  Select category
+                  {categoriesLoading
+                    ? "Loading categories..."
+                    : "Select category"}
                 </option>
 
                 {categories.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
+                  <option key={item.id} value={item.name}>
+                    {item.name}
                   </option>
                 ))}
               </select>
@@ -305,6 +632,7 @@ export default function PostAdPage() {
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 placeholder="e.g. Accra, East Legon"
+                maxLength={150}
                 className="min-w-0 flex-1 rounded-xl border bg-slate-50 px-4 py-4 outline-none focus:border-blue-500"
               />
 
@@ -327,11 +655,26 @@ export default function PostAdPage() {
           {/* PHOTOS */}
           <div className="mt-6">
 
-            <label className="text-sm font-bold">
-              Product photos
-            </label>
+            <div className="flex items-center justify-between gap-3">
+              <label className="text-sm font-bold">
+                Product photos
+              </label>
 
-            <div className="mt-2 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 p-8 text-center">
+              <span className="text-xs font-semibold text-slate-400">
+                {photos.length}/{MAX_PHOTOS}
+              </span>
+            </div>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              onChange={handlePhotoSelection}
+              className="hidden"
+            />
+
+            <div className="mt-2 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 p-6 text-center">
 
               <div className="text-4xl">
                 📷
@@ -342,21 +685,59 @@ export default function PostAdPage() {
               </p>
 
               <p className="mt-1 text-sm text-slate-500">
-                Upload clear photos that show the product properly.
+                JPG, PNG or WEBP • Maximum 5MB each
               </p>
 
               <button
                 type="button"
-                className="mt-5 rounded-xl bg-blue-600 px-5 py-3 font-bold text-white"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={photos.length >= MAX_PHOTOS}
+                className="mt-5 rounded-xl bg-blue-600 px-5 py-3 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Choose Photos
               </button>
 
             </div>
 
+            {/* PHOTO PREVIEWS */}
+            {photos.length > 0 && (
+              <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+
+                {photos.map((photo, index) => (
+                  <div
+                    key={`${photo.file.name}-${index}`}
+                    className="group relative overflow-hidden rounded-2xl border bg-slate-100"
+                  >
+
+                    <img
+                      src={photo.preview}
+                      alt={`Listing photo ${index + 1}`}
+                      className="aspect-square w-full object-cover"
+                    />
+
+                    {index === 0 && (
+                      <div className="absolute left-2 top-2 rounded-lg bg-blue-600 px-2 py-1 text-xs font-bold text-white">
+                        Cover
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => removePhoto(index)}
+                      className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-red-600 font-bold text-white shadow"
+                      aria-label={`Remove photo ${index + 1}`}
+                    >
+                      ×
+                    </button>
+
+                  </div>
+                ))}
+
+              </div>
+            )}
+
             <p className="mt-2 text-xs text-slate-400">
-              Photo upload will be connected to the existing
-              listing_images system next.
+              Your first photo will be treated as the cover image.
             </p>
 
           </div>
@@ -384,9 +765,14 @@ export default function PostAdPage() {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={7}
+              maxLength={5000}
               placeholder="Describe your product, condition, features and other important information..."
               className="mt-2 w-full resize-none rounded-xl border bg-slate-50 px-4 py-4 outline-none focus:border-blue-500"
             />
+
+            <div className="mt-1 text-right text-xs text-slate-400">
+              {description.length}/5000
+            </div>
 
           </div>
 
@@ -462,11 +848,26 @@ export default function PostAdPage() {
                 </p>
 
                 <p className="text-sm text-green-600">
-                  ✓ Logged-in seller
+                  ✓ Authenticated seller
                 </p>
               </div>
 
             </div>
+
+          </div>
+
+          {/* SECURITY NOTICE */}
+          <div className="mt-6 rounded-2xl border border-amber-100 bg-amber-50 p-4">
+
+            <p className="text-sm font-bold text-amber-800">
+              🛡️ Marketplace safety
+            </p>
+
+            <p className="mt-1 text-xs leading-5 text-amber-700">
+              Only upload genuine product photos. Best Sales Ghana
+              may review listings and remove content that violates
+              marketplace rules.
+            </p>
 
           </div>
 
