@@ -1,6 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { supabaseBrowser } from "@/supabase-browser";
+
+type Currency = {
+  code: string;
+  name: string;
+  symbol: string;
+  manual_rate_from_ghs: number | null;
+};
 
 const adminSections = [
   {
@@ -86,6 +95,295 @@ const adminSections = [
 ];
 
 export default function AdminPage() {
+  const supabase = supabaseBrowser();
+
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [checkingAdmin, setCheckingAdmin] = useState(true);
+
+  const [currencies, setCurrencies] = useState<Currency[]>([]);
+
+  const [rmbRate, setRmbRate] = useState("");
+  const [usdRate, setUsdRate] = useState("");
+
+  const [rmbAmount, setRmbAmount] = useState("");
+  const [usdAmount, setUsdAmount] = useState("");
+  const [ghsAmount, setGhsAmount] = useState("");
+
+  const [savingCurrency, setSavingCurrency] = useState<
+    "CNY" | "USD" | null
+  >(null);
+
+  const [currencyMessage, setCurrencyMessage] = useState("");
+
+  /*
+   * ADMIN CHECK
+   */
+  useEffect(() => {
+    async function checkAdmin() {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!user) {
+          setIsAdmin(false);
+          setCheckingAdmin(false);
+          return;
+        }
+
+        const { data: profile, error } = await supabase
+          .from("profiles")
+          .select("account_type")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (error) {
+          console.error("Admin check error:", error);
+          setIsAdmin(false);
+        } else {
+          setIsAdmin(profile?.account_type === "admin");
+        }
+      } catch (error) {
+        console.error(error);
+        setIsAdmin(false);
+      } finally {
+        setCheckingAdmin(false);
+      }
+    }
+
+    checkAdmin();
+  }, [supabase]);
+
+  /*
+   * LOAD CURRENCIES
+   */
+  useEffect(() => {
+    async function loadCurrencies() {
+      const { data, error } = await supabase
+        .from("currencies")
+        .select(
+          "code,name,symbol,manual_rate_from_ghs"
+        )
+        .in("code", ["GHS", "USD", "CNY"])
+        .order("code");
+
+      if (error) {
+        console.error("Currency loading error:", error);
+        return;
+      }
+
+      setCurrencies(data || []);
+
+      const usd = data?.find((currency) => currency.code === "USD");
+      const cny = data?.find((currency) => currency.code === "CNY");
+
+      if (usd?.manual_rate_from_ghs != null) {
+        setUsdRate(String(usd.manual_rate_from_ghs));
+      }
+
+      if (cny?.manual_rate_from_ghs != null) {
+        setRmbRate(String(cny.manual_rate_from_ghs));
+      }
+    }
+
+    loadCurrencies();
+  }, [supabase]);
+
+  /*
+   * SAVE RATE
+   */
+  async function saveCurrencyRate(
+    currencyCode: "CNY" | "USD"
+  ) {
+    if (!isAdmin) {
+      setCurrencyMessage(
+        "You do not have permission to change currency rates."
+      );
+      return;
+    }
+
+    const rawRate =
+      currencyCode === "CNY" ? rmbRate : usdRate;
+
+    const newRate = Number(rawRate);
+
+    if (!rawRate || !Number.isFinite(newRate) || newRate <= 0) {
+      setCurrencyMessage(
+        `Please enter a valid ${currencyCode === "CNY" ? "RMB" : "USD"} rate.`
+      );
+      return;
+    }
+
+    setSavingCurrency(currencyCode);
+    setCurrencyMessage("");
+
+    try {
+      const currentCurrency = currencies.find(
+        (currency) => currency.code === currencyCode
+      );
+
+      const oldRate =
+        currentCurrency?.manual_rate_from_ghs ?? null;
+
+      const { error: updateError } = await supabase
+        .from("currencies")
+        .update({
+          manual_rate_from_ghs: newRate,
+        })
+        .eq("code", currencyCode);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      /*
+       * Save audit history.
+       */
+      if (user) {
+        const { error: historyError } = await supabase
+          .from("currency_rate_history")
+          .insert({
+            currency_code: currencyCode,
+            old_rate: oldRate,
+            new_rate: newRate,
+            changed_by: user.id,
+          });
+
+        if (historyError) {
+          console.error(
+            "Rate history error:",
+            historyError
+          );
+        }
+      }
+
+      setCurrencies((current) =>
+        current.map((currency) =>
+          currency.code === currencyCode
+            ? {
+                ...currency,
+                manual_rate_from_ghs: newRate,
+              }
+            : currency
+        )
+      );
+
+      setCurrencyMessage(
+        `${currencyCode === "CNY" ? "RMB" : "USD"} rate saved successfully.`
+      );
+    } catch (error: any) {
+      console.error(error);
+
+      setCurrencyMessage(
+        error?.message ||
+          "Unable to save the currency rate."
+      );
+    } finally {
+      setSavingCurrency(null);
+    }
+  }
+
+  /*
+   * CURRENT RATES
+   */
+  const currentRmbRate =
+    currencies.find(
+      (currency) => currency.code === "CNY"
+    )?.manual_rate_from_ghs ?? null;
+
+  const currentUsdRate =
+    currencies.find(
+      (currency) => currency.code === "USD"
+    )?.manual_rate_from_ghs ?? null;
+
+  /*
+   * CALCULATIONS
+   */
+  const ghsToRmb =
+    ghsAmount &&
+    currentRmbRate &&
+    Number(ghsAmount) > 0
+      ? Number(ghsAmount) * currentRmbRate
+      : null;
+
+  const rmbToGhs =
+    rmbAmount &&
+    currentRmbRate &&
+    Number(rmbAmount) > 0
+      ? Number(rmbAmount) / currentRmbRate
+      : null;
+
+  const ghsToUsd =
+    ghsAmount &&
+    currentUsdRate &&
+    Number(ghsAmount) > 0
+      ? Number(ghsAmount) * currentUsdRate
+      : null;
+
+  const usdToGhs =
+    usdAmount &&
+    currentUsdRate &&
+    Number(usdAmount) > 0
+      ? Number(usdAmount) / currentUsdRate
+      : null;
+
+  function formatNumber(value: number | null) {
+    if (value === null) return "—";
+
+    return value.toLocaleString("en-GH", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }
+
+  if (checkingAdmin) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-100">
+        <div className="rounded-2xl bg-white p-8 text-center shadow-sm">
+          <div className="text-3xl">🔐</div>
+
+          <h1 className="mt-4 text-xl font-black">
+            Checking administrator access...
+          </h1>
+
+          <p className="mt-2 text-sm text-slate-500">
+            Please wait.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
+        <div className="max-w-md rounded-3xl border border-red-200 bg-white p-8 text-center shadow-xl">
+          <div className="text-5xl">🔒</div>
+
+          <h1 className="mt-5 text-2xl font-black">
+            Administrator Access Required
+          </h1>
+
+          <p className="mt-3 leading-7 text-slate-500">
+            Your account does not have administrator
+            permissions for Best Sales Ghana.
+          </p>
+
+          <Link
+            href="/"
+            className="mt-6 inline-flex rounded-xl bg-blue-700 px-6 py-3 font-black text-white hover:bg-blue-800"
+          >
+            Return to Website
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">
 
@@ -93,8 +391,10 @@ export default function AdminPage() {
       <header className="sticky top-0 z-50 border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
 
-          <Link href="/" className="flex items-center gap-3">
-
+          <Link
+            href="/"
+            className="flex items-center gap-3"
+          >
             <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-700 text-2xl shadow-md">
               ⭐
             </div>
@@ -108,7 +408,6 @@ export default function AdminPage() {
                 Administration Portal
               </div>
             </div>
-
           </Link>
 
           <div className="flex items-center gap-2">
@@ -122,20 +421,19 @@ export default function AdminPage() {
 
             <button
               type="button"
-              className="rounded-xl bg-slate-950 px-4 py-2.5 font-bold text-white hover:bg-slate-800"
+              className="rounded-xl bg-slate-950 px-4 py-2.5 font-bold text-white"
             >
               Admin
             </button>
 
           </div>
-
         </div>
       </header>
 
       {/* MAIN */}
       <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
 
-        {/* PAGE TITLE */}
+        {/* TITLE */}
         <div className="mb-8">
 
           <p className="text-sm font-black uppercase tracking-widest text-blue-700">
@@ -149,7 +447,8 @@ export default function AdminPage() {
           <p className="mt-3 max-w-3xl text-slate-500">
             Manage Best Sales Ghana, your direct-sales products,
             marketplace sellers, customers, orders, deliveries,
-            payments, revenue and advertising.
+            payments, revenue, advertising and currency exchange
+            rates.
           </p>
 
         </div>
@@ -157,11 +456,9 @@ export default function AdminPage() {
         {/* SUMMARY CARDS */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 
-          {/* DIRECT SALES */}
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
 
             <div className="flex items-center justify-between">
-
               <span className="text-sm font-bold text-slate-500">
                 Direct Sales
               </span>
@@ -169,7 +466,6 @@ export default function AdminPage() {
               <span className="text-2xl">
                 🛒
               </span>
-
             </div>
 
             <div className="mt-4 text-3xl font-black">
@@ -182,11 +478,9 @@ export default function AdminPage() {
 
           </div>
 
-          {/* MARKETPLACE */}
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
 
             <div className="flex items-center justify-between">
-
               <span className="text-sm font-bold text-slate-500">
                 Marketplace
               </span>
@@ -194,7 +488,6 @@ export default function AdminPage() {
               <span className="text-2xl">
                 📋
               </span>
-
             </div>
 
             <div className="mt-4 text-3xl font-black">
@@ -207,11 +500,9 @@ export default function AdminPage() {
 
           </div>
 
-          {/* ORDERS */}
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
 
             <div className="flex items-center justify-between">
-
               <span className="text-sm font-bold text-slate-500">
                 Orders
               </span>
@@ -219,7 +510,6 @@ export default function AdminPage() {
               <span className="text-2xl">
                 📦
               </span>
-
             </div>
 
             <div className="mt-4 text-3xl font-black">
@@ -232,11 +522,9 @@ export default function AdminPage() {
 
           </div>
 
-          {/* CUSTOMERS */}
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
 
             <div className="flex items-center justify-between">
-
               <span className="text-sm font-bold text-slate-500">
                 Customers
               </span>
@@ -244,7 +532,6 @@ export default function AdminPage() {
               <span className="text-2xl">
                 👤
               </span>
-
             </div>
 
             <div className="mt-4 text-3xl font-black">
@@ -258,6 +545,384 @@ export default function AdminPage() {
           </div>
 
         </div>
+
+        {/* CURRENCY EXCHANGE */}
+        <section className="mt-8 overflow-hidden rounded-3xl border border-blue-200 bg-white shadow-sm">
+
+          <div className="bg-gradient-to-r from-blue-800 to-cyan-600 p-7 text-white sm:p-8">
+
+            <p className="text-sm font-black uppercase tracking-widest text-cyan-100">
+              Financial Control
+            </p>
+
+            <h2 className="mt-2 text-3xl font-black sm:text-4xl">
+              💱 Currency Exchange Control
+            </h2>
+
+            <p className="mt-3 max-w-3xl leading-7 text-white/85">
+              Enter your own exchange rates from the administration
+              dashboard. The marketplace can then automatically
+              calculate prices between Ghana Cedis, RMB and USD.
+            </p>
+
+          </div>
+
+          <div className="p-6 sm:p-8">
+
+            {/* RATE INPUTS */}
+            <div className="grid gap-5 md:grid-cols-2">
+
+              {/* RMB */}
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
+
+                <div className="flex items-center justify-between">
+
+                  <div>
+                    <p className="text-sm font-black uppercase tracking-wider text-slate-500">
+                      Chinese Yuan
+                    </p>
+
+                    <h3 className="mt-1 text-2xl font-black">
+                      🇨🇳 RMB / CNY
+                    </h3>
+                  </div>
+
+                  <div className="text-4xl">
+                    ¥
+                  </div>
+
+                </div>
+
+                <label className="mt-6 block text-sm font-bold text-slate-700">
+                  GHS → RMB rate
+                </label>
+
+                <div className="mt-2 flex gap-3">
+
+                  <input
+                    type="number"
+                    step="0.000001"
+                    min="0"
+                    value={rmbRate}
+                    onChange={(event) =>
+                      setRmbRate(event.target.value)
+                    }
+                    placeholder="Example: 0.544"
+                    className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-4 py-3 font-bold outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      saveCurrencyRate("CNY")
+                    }
+                    disabled={savingCurrency === "CNY"}
+                    className="rounded-xl bg-blue-700 px-5 py-3 font-black text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {savingCurrency === "CNY"
+                      ? "Saving..."
+                      : "Save"}
+                  </button>
+
+                </div>
+
+                <p className="mt-3 text-sm text-slate-500">
+                  Example: enter <strong>0.544</strong> to make
+                  GH₵800 = ¥435.20.
+                </p>
+
+                <div className="mt-4 rounded-xl bg-white p-4">
+
+                  <p className="text-xs font-black uppercase tracking-wider text-slate-400">
+                    Current rate
+                  </p>
+
+                  <p className="mt-1 text-2xl font-black text-blue-700">
+                    {currentRmbRate
+                      ? currentRmbRate
+                      : "Not set"}
+                  </p>
+
+                </div>
+
+              </div>
+
+              {/* USD */}
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
+
+                <div className="flex items-center justify-between">
+
+                  <div>
+                    <p className="text-sm font-black uppercase tracking-wider text-slate-500">
+                      United States Dollar
+                    </p>
+
+                    <h3 className="mt-1 text-2xl font-black">
+                      🇺🇸 USD
+                    </h3>
+                  </div>
+
+                  <div className="text-4xl">
+                    $
+                  </div>
+
+                </div>
+
+                <label className="mt-6 block text-sm font-bold text-slate-700">
+                  GHS → USD rate
+                </label>
+
+                <div className="mt-2 flex gap-3">
+
+                  <input
+                    type="number"
+                    step="0.000001"
+                    min="0"
+                    value={usdRate}
+                    onChange={(event) =>
+                      setUsdRate(event.target.value)
+                    }
+                    placeholder="Example: 0.080000"
+                    className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-4 py-3 font-bold outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      saveCurrencyRate("USD")
+                    }
+                    disabled={savingCurrency === "USD"}
+                    className="rounded-xl bg-blue-700 px-5 py-3 font-black text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {savingCurrency === "USD"
+                      ? "Saving..."
+                      : "Save"}
+                  </button>
+
+                </div>
+
+                <p className="mt-3 text-sm text-slate-500">
+                  Enter the amount of USD received for GH₵1.
+                  For example, <strong>0.08</strong>.
+                </p>
+
+                <div className="mt-4 rounded-xl bg-white p-4">
+
+                  <p className="text-xs font-black uppercase tracking-wider text-slate-400">
+                    Current rate
+                  </p>
+
+                  <p className="mt-1 text-2xl font-black text-blue-700">
+                    {currentUsdRate
+                      ? currentUsdRate
+                      : "Not set"}
+                  </p>
+
+                </div>
+
+              </div>
+
+            </div>
+
+            {/* MESSAGE */}
+            {currencyMessage && (
+              <div className="mt-5 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm font-bold text-blue-900">
+                {currencyMessage}
+              </div>
+            )}
+
+            {/* CALCULATOR */}
+            <div className="mt-8">
+
+              <div className="mb-5">
+
+                <p className="text-sm font-black uppercase tracking-widest text-blue-700">
+                  Automatic Calculator
+                </p>
+
+                <h3 className="mt-2 text-2xl font-black">
+                  Currency Conversion
+                </h3>
+
+                <p className="mt-2 text-slate-500">
+                  These calculations use the rates currently saved
+                  above.
+                </p>
+
+              </div>
+
+              <div className="grid gap-5 lg:grid-cols-2">
+
+                {/* GHS INPUT */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+
+                  <label className="text-sm font-black text-slate-600">
+                    Ghana Cedis
+                  </label>
+
+                  <div className="mt-2 flex items-center rounded-xl border border-slate-300 bg-white">
+
+                    <span className="px-4 text-lg font-black text-slate-500">
+                      GH₵
+                    </span>
+
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={ghsAmount}
+                      onChange={(event) =>
+                        setGhsAmount(event.target.value)
+                      }
+                      placeholder="800"
+                      className="w-full rounded-xl border-0 px-2 py-4 font-black outline-none"
+                    />
+
+                  </div>
+
+                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
+
+                    <div className="rounded-xl bg-blue-50 p-4">
+
+                      <p className="text-xs font-black uppercase text-blue-600">
+                        RMB
+                      </p>
+
+                      <p className="mt-2 text-xl font-black text-blue-900">
+                        ¥{formatNumber(ghsToRmb)}
+                      </p>
+
+                    </div>
+
+                    <div className="rounded-xl bg-green-50 p-4">
+
+                      <p className="text-xs font-black uppercase text-green-600">
+                        USD
+                      </p>
+
+                      <p className="mt-2 text-xl font-black text-green-900">
+                        ${formatNumber(ghsToUsd)}
+                      </p>
+
+                    </div>
+
+                  </div>
+
+                </div>
+
+                {/* RMB / USD INPUTS */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+
+                  <label className="text-sm font-black text-slate-600">
+                    Foreign Currency
+                  </label>
+
+                  <div className="mt-4">
+
+                    <label className="text-xs font-black uppercase tracking-wider text-slate-400">
+                      RMB → GHS
+                    </label>
+
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={rmbAmount}
+                      onChange={(event) =>
+                        setRmbAmount(event.target.value)
+                      }
+                      placeholder="800"
+                      className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-4 font-black outline-none focus:border-blue-600"
+                    />
+
+                    <div className="mt-2 rounded-xl bg-blue-50 p-4">
+
+                      <p className="text-xs font-black text-blue-600">
+                        GH₵ VALUE
+                      </p>
+
+                      <p className="mt-1 text-xl font-black text-blue-900">
+                        GH₵{formatNumber(rmbToGhs)}
+                      </p>
+
+                    </div>
+
+                  </div>
+
+                  <div className="mt-5">
+
+                    <label className="text-xs font-black uppercase tracking-wider text-slate-400">
+                      USD → GHS
+                    </label>
+
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={usdAmount}
+                      onChange={(event) =>
+                        setUsdAmount(event.target.value)
+                      }
+                      placeholder="100"
+                      className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-4 font-black outline-none focus:border-blue-600"
+                    />
+
+                    <div className="mt-2 rounded-xl bg-green-50 p-4">
+
+                      <p className="text-xs font-black text-green-600">
+                        GH₵ VALUE
+                      </p>
+
+                      <p className="mt-1 text-xl font-black text-green-900">
+                        GH₵{formatNumber(usdToGhs)}
+                      </p>
+
+                    </div>
+
+                  </div>
+
+                </div>
+
+              </div>
+
+              {/* EXAMPLE */}
+              <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 p-5">
+
+                <div className="flex gap-3">
+
+                  <div className="text-xl">
+                    ℹ️
+                  </div>
+
+                  <div>
+
+                    <h4 className="font-black text-blue-900">
+                      How the rate works
+                    </h4>
+
+                    <p className="mt-2 text-sm leading-6 text-blue-800">
+                      If your RMB rate is <strong>0.544</strong>,
+                      then GH₵800 × 0.544 = ¥435.20.
+                      To convert back, ¥800 ÷ 0.544 =
+                      GH₵1,470.59.
+                    </p>
+
+                    <p className="mt-2 text-sm leading-6 text-blue-800">
+                      The rate is controlled manually from this
+                      administration dashboard.
+                    </p>
+
+                  </div>
+
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </section>
 
         {/* REVENUE SUMMARY */}
         <section className="mt-8">
@@ -281,7 +946,6 @@ export default function AdminPage() {
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 
-            {/* PLATFORM RATE */}
             <div className="rounded-2xl border border-blue-200 bg-blue-50 p-6">
 
               <div className="flex items-center justify-between">
@@ -306,7 +970,6 @@ export default function AdminPage() {
 
             </div>
 
-            {/* SELLER FUNDS */}
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
 
               <div className="flex items-center justify-between">
@@ -331,7 +994,6 @@ export default function AdminPage() {
 
             </div>
 
-            {/* REVENUE */}
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
 
               <div className="flex items-center justify-between">
@@ -356,7 +1018,6 @@ export default function AdminPage() {
 
             </div>
 
-            {/* SETTLEMENT */}
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
 
               <div className="flex items-center justify-between">
@@ -420,7 +1081,7 @@ export default function AdminPage() {
 
         </section>
 
-        {/* REVENUE & PAYMENT FEATURE */}
+        {/* REVENUE FEATURE */}
         <section className="mt-8 overflow-hidden rounded-3xl border border-slate-200 bg-white p-7 shadow-sm sm:p-10">
 
           <div className="flex flex-col justify-between gap-7 lg:flex-row lg:items-center">
@@ -551,10 +1212,7 @@ export default function AdminPage() {
           <div className="mt-5 grid gap-4 md:grid-cols-3">
 
             <div className="rounded-xl bg-slate-50 p-5">
-
-              <div className="text-2xl">
-                📷
-              </div>
+              <div className="text-2xl">📷</div>
 
               <h3 className="mt-3 font-black">
                 Product Pictures
@@ -563,14 +1221,10 @@ export default function AdminPage() {
               <p className="mt-1 text-sm leading-6 text-slate-500">
                 Upload and replace product images whenever necessary.
               </p>
-
             </div>
 
             <div className="rounded-xl bg-slate-50 p-5">
-
-              <div className="text-2xl">
-                💵
-              </div>
+              <div className="text-2xl">💵</div>
 
               <h3 className="mt-3 font-black">
                 Price Management
@@ -580,14 +1234,10 @@ export default function AdminPage() {
                 Change product prices from the admin area without
                 changing website code.
               </p>
-
             </div>
 
             <div className="rounded-xl bg-slate-50 p-5">
-
-              <div className="text-2xl">
-                📦
-              </div>
+              <div className="text-2xl">📦</div>
 
               <h3 className="mt-3 font-black">
                 Stock Management
@@ -597,7 +1247,6 @@ export default function AdminPage() {
                 Control stock quantities and whether products are
                 available.
               </p>
-
             </div>
 
           </div>
@@ -711,10 +1360,9 @@ export default function AdminPage() {
               </h3>
 
               <p className="mt-1 text-sm leading-6 text-amber-800">
-                This page is currently the dashboard interface.
-                The next stage will connect it to a proper admin
-                login and protected database so ordinary marketplace
-                users cannot access these controls.
+                Currency changes and other administration controls
+                should only be available to authenticated accounts
+                with the admin account type.
               </p>
 
             </div>
