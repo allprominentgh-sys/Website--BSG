@@ -15,6 +15,15 @@ type SelectedPhoto = {
   preview: string;
 };
 
+type AdStatus = {
+  account_type: string;
+  verified: boolean;
+  verification_status: string;
+  published_ads: number;
+  remaining_free_ads: number;
+  verification_required: boolean;
+};
+
 const FALLBACK_CATEGORIES = [
   "Phones & Tablets",
   "Cars & Vehicles",
@@ -51,15 +60,15 @@ export default function PostAdPage() {
 
   const [photos, setPhotos] = useState<SelectedPhoto[]>([]);
 
+  const [adStatus, setAdStatus] = useState<AdStatus | null>(null);
+  const [adStatusLoading, setAdStatusLoading] = useState(true);
+
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
   /*
-   * Load marketplace categories from Supabase.
-   *
-   * The fallback list keeps the page usable if the categories
-   * table temporarily cannot be reached.
+   * Load marketplace categories.
    */
   useEffect(() => {
     let mounted = true;
@@ -111,16 +120,77 @@ export default function PostAdPage() {
   }, []);
 
   /*
-   * Clean up object URLs when the component is removed.
+   * Load the seller's current marketplace ad status.
+   *
+   * This calls the database function created in Step 2A.
    */
   useEffect(() => {
-    return () => {
-      photos.forEach((photo) => {
-        URL.revokeObjectURL(photo.preview);
-      });
-    };
-  }, [photos]);
+    let mounted = true;
 
+    const loadAdStatus = async () => {
+      try {
+        const supabase = supabaseBrowser();
+
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!user) {
+          if (mounted) {
+            setAdStatus(null);
+            setAdStatusLoading(false);
+          }
+
+          return;
+        }
+
+        const { data, error } = await supabase.rpc(
+          "get_my_marketplace_ad_status"
+        );
+
+        if (error) {
+          throw error;
+        }
+
+        if (mounted && data && data.length > 0) {
+          const status = data[0];
+
+          setAdStatus({
+            account_type: status.account_type,
+            verified: Boolean(status.verified),
+            verification_status:
+              status.verification_status ?? "not_required",
+            published_ads: Number(status.published_ads ?? 0),
+            remaining_free_ads: Number(
+              status.remaining_free_ads ?? 0
+            ),
+            verification_required: Boolean(
+              status.verification_required
+            ),
+          });
+        }
+      } catch (error) {
+        console.error(
+          "Unable to load marketplace ad status:",
+          error
+        );
+      } finally {
+        if (mounted) {
+          setAdStatusLoading(false);
+        }
+      }
+    };
+
+    loadAdStatus();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  /*
+   * Generate a basic listing description.
+   */
   const generateDescription = () => {
     if (!title.trim()) {
       setDescription(
@@ -131,27 +201,32 @@ export default function PostAdPage() {
 
     setDescription(
       `${title.trim()} is available on BEST SALES GHANA. ${
-        category ? `This listing is in the ${category} category. ` : ""
+        category
+          ? `This listing is in the ${category} category. `
+          : ""
       }${
-        price ? `The asking price is GH₵${price}. ` : ""
+        price
+          ? `The asking price is GH₵${price}. `
+          : ""
       }${
-        location ? `The item is located in ${location}. ` : ""
+        location
+          ? `The item is located in ${location}. `
+          : ""
       }Contact the seller for availability, additional details, viewing and delivery arrangements.`
     );
   };
 
   /*
    * Validate and select photos.
-   *
-   * Only JPEG, PNG and WEBP are accepted.
-   * Maximum size: 5MB per image.
    */
   const handlePhotoSelection = (
     event: ChangeEvent<HTMLInputElement>
   ) => {
     setErrorMessage("");
 
-    const selectedFiles = Array.from(event.target.files ?? []);
+    const selectedFiles = Array.from(
+      event.target.files ?? []
+    );
 
     if (selectedFiles.length === 0) {
       return;
@@ -163,11 +238,15 @@ export default function PostAdPage() {
       setErrorMessage(
         `You can upload a maximum of ${MAX_PHOTOS} photos.`
       );
+
       event.target.value = "";
       return;
     }
 
-    const filesToAdd = selectedFiles.slice(0, remainingSlots);
+    const filesToAdd = selectedFiles.slice(
+      0,
+      remainingSlots
+    );
 
     if (selectedFiles.length > remainingSlots) {
       setErrorMessage(
@@ -184,6 +263,7 @@ export default function PostAdPage() {
         setErrorMessage(
           `${file.name} is not supported. Please use JPG, PNG or WEBP.`
         );
+
         continue;
       }
 
@@ -191,6 +271,7 @@ export default function PostAdPage() {
         setErrorMessage(
           `${file.name} is larger than 5MB. Please choose a smaller image.`
         );
+
         continue;
       }
 
@@ -201,12 +282,18 @@ export default function PostAdPage() {
     }
 
     if (validPhotos.length > 0) {
-      setPhotos((current) => [...current, ...validPhotos]);
+      setPhotos((current) => [
+        ...current,
+        ...validPhotos,
+      ]);
     }
 
     event.target.value = "";
   };
 
+  /*
+   * Remove a selected photo.
+   */
   const removePhoto = (index: number) => {
     setPhotos((current) => {
       const photo = current[index];
@@ -215,7 +302,9 @@ export default function PostAdPage() {
         URL.revokeObjectURL(photo.preview);
       }
 
-      return current.filter((_, photoIndex) => photoIndex !== index);
+      return current.filter(
+        (_, photoIndex) => photoIndex !== index
+      );
     });
   };
 
@@ -224,8 +313,6 @@ export default function PostAdPage() {
    *
    * Path:
    * seller-user-id / listing-id / unique-file-name
-   *
-   * This matches the marketplace Storage security policy.
    */
   const uploadPhoto = async (
     supabase: ReturnType<typeof supabaseBrowser>,
@@ -235,19 +322,28 @@ export default function PostAdPage() {
     index: number
   ) => {
     const extension =
-      photo.file.name.split(".").pop()?.toLowerCase() || "jpg";
+      photo.file.name
+        .split(".")
+        .pop()
+        ?.toLowerCase() || "jpg";
 
     const safeFileName = `${Date.now()}-${index}-${crypto.randomUUID()}.${extension}`;
 
-    const filePath = `${userId}/${listingId}/${safeFileName}`;
+    const filePath =
+      `${userId}/${listingId}/${safeFileName}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from("listing-images")
-      .upload(filePath, photo.file, {
-        cacheControl: "3600",
-        upsert: false,
-        contentType: photo.file.type,
-      });
+    const { error: uploadError } =
+      await supabase.storage
+        .from("listing-images")
+        .upload(
+          filePath,
+          photo.file,
+          {
+            cacheControl: "3600",
+            upsert: false,
+            contentType: photo.file.type,
+          }
+        );
 
     if (uploadError) {
       throw new Error(
@@ -255,9 +351,10 @@ export default function PostAdPage() {
       );
     }
 
-    const { data: publicUrlData } = supabase.storage
-      .from("listing-images")
-      .getPublicUrl(filePath);
+    const { data: publicUrlData } =
+      supabase.storage
+        .from("listing-images")
+        .getPublicUrl(filePath);
 
     if (!publicUrlData?.publicUrl) {
       throw new Error(
@@ -271,32 +368,48 @@ export default function PostAdPage() {
     };
   };
 
+  /*
+   * Publish listing.
+   *
+   * The database remains the final authority on whether
+   * the seller is allowed to publish.
+   */
   const publishListing = async () => {
     setErrorMessage("");
     setMessage("");
 
     if (!title.trim()) {
-      setErrorMessage("Please enter a product or service title.");
+      setErrorMessage(
+        "Please enter a product or service title."
+      );
       return;
     }
 
     if (!category) {
-      setErrorMessage("Please select a category.");
+      setErrorMessage(
+        "Please select a category."
+      );
       return;
     }
 
     if (!price || Number(price) <= 0) {
-      setErrorMessage("Please enter a valid price.");
+      setErrorMessage(
+        "Please enter a valid price."
+      );
       return;
     }
 
     if (!location.trim()) {
-      setErrorMessage("Please enter the listing location.");
+      setErrorMessage(
+        "Please enter the listing location."
+      );
       return;
     }
 
     if (!description.trim()) {
-      setErrorMessage("Please enter a description.");
+      setErrorMessage(
+        "Please enter a description."
+      );
       return;
     }
 
@@ -304,6 +417,23 @@ export default function PostAdPage() {
       setErrorMessage(
         "Please add at least one clear product photo."
       );
+      return;
+    }
+
+    /*
+     * Friendly frontend check.
+     *
+     * The database trigger still provides the real security.
+     */
+    if (
+      adStatus &&
+      adStatus.verification_required &&
+      !adStatus.verified
+    ) {
+      setErrorMessage(
+        "Seller verification is required before you can publish another listing."
+      );
+
       return;
     }
 
@@ -333,60 +463,91 @@ export default function PostAdPage() {
             "/post-ad"
           )}`
         );
+
         return;
       }
 
       const numericPrice = Number(price);
 
-      if (!Number.isFinite(numericPrice) || numericPrice <= 0) {
-        throw new Error("Please enter a valid price.");
+      if (
+        !Number.isFinite(numericPrice) ||
+        numericPrice <= 0
+      ) {
+        throw new Error(
+          "Please enter a valid price."
+        );
       }
 
       /*
-       * Find the selected category's database ID.
+       * Find selected category database ID.
        */
       const selectedCategory = categories.find(
         (item) => item.name === category
       );
 
       /*
-       * Create the listing first so we have its database ID.
-       * Photos are then stored under:
+       * Create listing.
        *
-       * user-id / listing-id / filename
+       * Step 2A database trigger checks the seller's
+       * publication count before allowing this INSERT.
        */
-      const { data: listing, error: listingError } =
-        await supabase
-          .from("listings")
-          .insert({
-            seller_id: user.id,
-            title: title.trim(),
-            description: description.trim(),
-            price: numericPrice,
-            currency_code: "GHS",
-            currency: "GHS",
-            location: location.trim(),
+      const {
+        data: listing,
+        error: listingError,
+      } = await supabase
+        .from("listings")
+        .insert({
+          seller_id: user.id,
+          title: title.trim(),
+          description: description.trim(),
+          price: numericPrice,
+          currency_code: "GHS",
+          currency: "GHS",
+          location: location.trim(),
 
-            /*
-             * Active means the listing can appear publicly.
-             * Security/RLS still controls who can create it.
-             */
-            status: "active",
+          status: "active",
 
-            /*
-             * Paid promotion is intentionally NOT activated
-             * just because the seller checked the checkbox.
-             */
-            featured: false,
+          /*
+           * Paid promotion is NOT activated simply
+           * because the checkbox was selected.
+           */
+          featured: false,
 
-            category: category,
-            category_id: selectedCategory?.id ?? null,
-            subcategory: null,
-          })
-          .select("id")
-          .single();
+          category: category,
+
+          category_id:
+            selectedCategory?.id ?? null,
+
+          subcategory: null,
+        })
+        .select("id")
+        .single();
 
       if (listingError) {
+        /*
+         * Special handling for the Step 2A
+         * database verification restriction.
+         */
+        if (
+          listingError.message.includes(
+            "SELLER_VERIFICATION_REQUIRED"
+          )
+        ) {
+          setAdStatus((current) =>
+            current
+              ? {
+                  ...current,
+                  verification_required: true,
+                  remaining_free_ads: 0,
+                }
+              : current
+          );
+
+          throw new Error(
+            "SELLER_VERIFICATION_REQUIRED"
+          );
+        }
+
         throw new Error(
           `Listing could not be created: ${listingError.message}`
         );
@@ -405,7 +566,11 @@ export default function PostAdPage() {
        */
       const imageRows = [];
 
-      for (let index = 0; index < photos.length; index++) {
+      for (
+        let index = 0;
+        index < photos.length;
+        index++
+      ) {
         const imageRow = await uploadPhoto(
           supabase,
           user.id,
@@ -418,10 +583,12 @@ export default function PostAdPage() {
       }
 
       /*
-       * Save uploaded image URLs in listing_images.
+       * Save image URLs.
        */
       if (imageRows.length > 0) {
-        const { error: imageInsertError } = await supabase
+        const {
+          error: imageInsertError,
+        } = await supabase
           .from("listing_images")
           .insert(imageRows);
 
@@ -430,6 +597,39 @@ export default function PostAdPage() {
             `Photos uploaded, but image records could not be saved: ${imageInsertError.message}`
           );
         }
+      }
+
+      /*
+       * Refresh publication status.
+       */
+      const {
+        data: refreshedStatus,
+      } = await supabase.rpc(
+        "get_my_marketplace_ad_status"
+      );
+
+      if (
+        refreshedStatus &&
+        refreshedStatus.length > 0
+      ) {
+        const status = refreshedStatus[0];
+
+        setAdStatus({
+          account_type: status.account_type,
+          verified: Boolean(status.verified),
+          verification_status:
+            status.verification_status ??
+            "not_required",
+          published_ads: Number(
+            status.published_ads ?? 0
+          ),
+          remaining_free_ads: Number(
+            status.remaining_free_ads ?? 0
+          ),
+          verification_required: Boolean(
+            status.verification_required
+          ),
+        });
       }
 
       /*
@@ -442,39 +642,70 @@ export default function PostAdPage() {
       } else {
         setMessage(
           `Listing #${createdListingId} published successfully with ${imageRows.length} photo${
-            imageRows.length === 1 ? "" : "s"
+            imageRows.length === 1
+              ? ""
+              : "s"
           }.`
         );
       }
 
       /*
-       * Go to seller's listings after successful publishing.
+       * Go to seller listings.
        */
       setTimeout(() => {
-        router.push("/dashboard/listings");
+        router.push(
+          "/dashboard/listings"
+        );
+
         router.refresh();
       }, 1200);
+
     } catch (error) {
-      const message =
+      const rawMessage =
         error instanceof Error
           ? error.message
           : "Something went wrong while publishing your listing.";
 
       /*
+       * Friendly verification message.
+       */
+      if (
+        rawMessage ===
+        "SELLER_VERIFICATION_REQUIRED"
+      ) {
+        setErrorMessage(
+          "🔐 Seller verification is required. You have used your first 3 free ad publications. Please complete verification before publishing another listing."
+        );
+
+        return;
+      }
+
+      /*
        * If the listing was created but something failed afterward,
-       * don't pretend that everything succeeded.
+       * don't pretend everything succeeded.
        */
       if (createdListingId) {
         setErrorMessage(
-          `${message} Your listing #${createdListingId} may have been created. Please check My Listings before trying again.`
+          `${rawMessage} Your listing #${createdListingId} may have been created. Please check My Listings before trying again.`
         );
       } else {
-        setErrorMessage(message);
+        setErrorMessage(
+          rawMessage
+        );
       }
     } finally {
       setLoading(false);
     }
   };
+
+  /*
+   * Determine whether the user is currently blocked.
+   */
+  const verificationRequired =
+    Boolean(
+      adStatus?.verification_required &&
+      !adStatus?.verified
+    );
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
@@ -483,7 +714,10 @@ export default function PostAdPage() {
       <header className="border-b bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
 
-          <Link href="/" className="flex items-center gap-3">
+          <Link
+            href="/"
+            className="flex items-center gap-3"
+          >
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600 font-extrabold text-white">
               AP
             </div>
@@ -522,8 +756,8 @@ export default function PostAdPage() {
           </h1>
 
           <p className="mt-3 max-w-2xl text-blue-50">
-            Put your product, service, property or vehicle in front
-            of customers across Ghana.
+            Put your product, service, property or vehicle
+            in front of customers across Ghana.
           </p>
 
         </div>
@@ -534,7 +768,111 @@ export default function PostAdPage() {
 
         <div className="rounded-3xl border bg-white p-6 shadow-sm md:p-8">
 
+          {/* AD STATUS */}
+          {!adStatusLoading &&
+            adStatus &&
+            (adStatus.account_type === "seller" ||
+              adStatus.account_type === "business") && (
+              <div
+                className={`mb-8 rounded-2xl border p-5 ${
+                  verificationRequired
+                    ? "border-amber-200 bg-amber-50"
+                    : "border-blue-100 bg-blue-50"
+                }`}
+              >
+
+                <div className="flex items-start gap-4">
+
+                  <div className="text-2xl">
+                    {verificationRequired
+                      ? "🔐"
+                      : "📢"}
+                  </div>
+
+                  <div className="flex-1">
+
+                    {verificationRequired ? (
+                      <>
+                        <h3 className="font-extrabold text-amber-900">
+                          Seller verification required
+                        </h3>
+
+                        <p className="mt-2 text-sm leading-6 text-amber-800">
+                          You have used your first{" "}
+                          <strong>
+                            3 free ad publications
+                          </strong>
+                          . Complete seller or business
+                          verification before publishing
+                          another listing.
+                        </p>
+
+                        <Link
+                          href="/verification"
+                          className="mt-4 inline-flex rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-700"
+                        >
+                          Start Verification →
+                        </Link>
+                      </>
+                    ) : adStatus.verified ? (
+                      <>
+                        <h3 className="font-extrabold text-blue-900">
+                          ✓ Verified seller
+                        </h3>
+
+                        <p className="mt-1 text-sm text-blue-800">
+                          Your seller account is verified.
+                          You can continue publishing listings.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <h3 className="font-extrabold text-blue-900">
+                          Free ad publications
+                        </h3>
+
+                        <p className="mt-1 text-sm text-blue-800">
+                          You have{" "}
+                          <strong>
+                            {adStatus.remaining_free_ads}
+                          </strong>{" "}
+                          free ad publication
+                          {adStatus.remaining_free_ads === 1
+                            ? ""
+                            : "s"}{" "}
+                          remaining.
+                        </p>
+
+                        <div className="mt-4 h-2 overflow-hidden rounded-full bg-blue-100">
+                          <div
+                            className="h-full rounded-full bg-blue-600 transition-all"
+                            style={{
+                              width: `${Math.min(
+                                100,
+                                (adStatus.published_ads /
+                                  3) *
+                                  100
+                              )}%`,
+                            }}
+                          />
+                        </div>
+
+                        <p className="mt-2 text-xs text-blue-700">
+                          {adStatus.published_ads} of 3
+                          free publications used.
+                        </p>
+                      </>
+                    )}
+
+                  </div>
+
+                </div>
+
+              </div>
+            )}
+
           <div className="mb-8">
+
             <h2 className="text-2xl font-extrabold">
               Listing information
             </h2>
@@ -542,6 +880,7 @@ export default function PostAdPage() {
             <p className="mt-1 text-sm text-slate-500">
               Complete the information below.
             </p>
+
           </div>
 
           {/* SUCCESS */}
@@ -560,33 +899,41 @@ export default function PostAdPage() {
 
           {/* TITLE */}
           <div>
+
             <label className="text-sm font-bold">
               Product / Service title
             </label>
 
             <input
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) =>
+                setTitle(e.target.value)
+              }
               placeholder="e.g. iPhone 15 Pro 256GB"
               maxLength={150}
               className="mt-2 w-full rounded-xl border bg-slate-50 px-4 py-4 outline-none focus:border-blue-500"
             />
+
           </div>
 
           {/* CATEGORY + PRICE */}
           <div className="mt-6 grid gap-5 md:grid-cols-2">
 
             <div>
+
               <label className="text-sm font-bold">
                 Category
               </label>
 
               <select
                 value={category}
-                onChange={(e) => setCategory(e.target.value)}
+                onChange={(e) =>
+                  setCategory(e.target.value)
+                }
                 disabled={categoriesLoading}
                 className="mt-2 w-full rounded-xl border bg-slate-50 px-4 py-4 outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
               >
+
                 <option value="">
                   {categoriesLoading
                     ? "Loading categories..."
@@ -594,14 +941,20 @@ export default function PostAdPage() {
                 </option>
 
                 {categories.map((item) => (
-                  <option key={item.id} value={item.name}>
+                  <option
+                    key={item.id}
+                    value={item.name}
+                  >
                     {item.name}
                   </option>
                 ))}
+
               </select>
+
             </div>
 
             <div>
+
               <label className="text-sm font-bold">
                 Price (GH₵)
               </label>
@@ -611,10 +964,13 @@ export default function PostAdPage() {
                 min="0"
                 step="0.01"
                 value={price}
-                onChange={(e) => setPrice(e.target.value)}
+                onChange={(e) =>
+                  setPrice(e.target.value)
+                }
                 placeholder="0.00"
                 className="mt-2 w-full rounded-xl border bg-slate-50 px-4 py-4 outline-none focus:border-blue-500"
               />
+
             </div>
 
           </div>
@@ -630,7 +986,9 @@ export default function PostAdPage() {
 
               <input
                 value={location}
-                onChange={(e) => setLocation(e.target.value)}
+                onChange={(e) =>
+                  setLocation(e.target.value)
+                }
                 placeholder="e.g. Accra, East Legon"
                 maxLength={150}
                 className="min-w-0 flex-1 rounded-xl border bg-slate-50 px-4 py-4 outline-none focus:border-blue-500"
@@ -646,8 +1004,8 @@ export default function PostAdPage() {
             </div>
 
             <p className="mt-2 text-xs text-slate-400">
-              Location pin and live map integration will be connected
-              to the delivery system later.
+              Location pin and live map integration will be
+              connected to the delivery system later.
             </p>
 
           </div>
@@ -656,6 +1014,7 @@ export default function PostAdPage() {
           <div className="mt-6">
 
             <div className="flex items-center justify-between gap-3">
+
               <label className="text-sm font-bold">
                 Product photos
               </label>
@@ -663,6 +1022,7 @@ export default function PostAdPage() {
               <span className="text-xs font-semibold text-slate-400">
                 {photos.length}/{MAX_PHOTOS}
               </span>
+
             </div>
 
             <input
@@ -690,8 +1050,13 @@ export default function PostAdPage() {
 
               <button
                 type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={photos.length >= MAX_PHOTOS}
+                onClick={() =>
+                  fileInputRef.current?.click()
+                }
+                disabled={
+                  photos.length >= MAX_PHOTOS ||
+                  verificationRequired
+                }
                 className="mt-5 rounded-xl bg-blue-600 px-5 py-3 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Choose Photos
@@ -711,7 +1076,9 @@ export default function PostAdPage() {
 
                     <img
                       src={photo.preview}
-                      alt={`Listing photo ${index + 1}`}
+                      alt={`Listing photo ${
+                        index + 1
+                      }`}
                       className="aspect-square w-full object-cover"
                     />
 
@@ -723,9 +1090,13 @@ export default function PostAdPage() {
 
                     <button
                       type="button"
-                      onClick={() => removePhoto(index)}
+                      onClick={() =>
+                        removePhoto(index)
+                      }
                       className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-red-600 font-bold text-white shadow"
-                      aria-label={`Remove photo ${index + 1}`}
+                      aria-label={`Remove photo ${
+                        index + 1
+                      }`}
                     >
                       ×
                     </button>
@@ -737,7 +1108,8 @@ export default function PostAdPage() {
             )}
 
             <p className="mt-2 text-xs text-slate-400">
-              Your first photo will be treated as the cover image.
+              Your first photo will be treated as the
+              cover image.
             </p>
 
           </div>
@@ -754,7 +1126,8 @@ export default function PostAdPage() {
               <button
                 type="button"
                 onClick={generateDescription}
-                className="rounded-xl bg-gradient-to-r from-blue-600 to-sky-500 px-4 py-2 text-sm font-bold text-white"
+                disabled={verificationRequired}
+                className="rounded-xl bg-gradient-to-r from-blue-600 to-sky-500 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
                 🤖 AI Description
               </button>
@@ -763,7 +1136,9 @@ export default function PostAdPage() {
 
             <textarea
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={(e) =>
+                setDescription(e.target.value)
+              }
               rows={7}
               maxLength={5000}
               placeholder="Describe your product, condition, features and other important information..."
@@ -792,8 +1167,8 @@ export default function PostAdPage() {
                 </h3>
 
                 <p className="mt-1 text-sm leading-6 text-slate-600">
-                  Put your listing in prominent positions and reach
-                  more potential customers.
+                  Put your listing in prominent positions
+                  and reach more potential customers.
                 </p>
 
                 <label className="mt-4 flex cursor-pointer items-center gap-3">
@@ -814,8 +1189,8 @@ export default function PostAdPage() {
                 </label>
 
                 <p className="mt-2 text-xs text-slate-500">
-                  Promotion requires payment and will be connected
-                  to the advertising system.
+                  Promotion requires payment and will be
+                  connected to the advertising system.
                 </p>
 
               </div>
@@ -832,8 +1207,8 @@ export default function PostAdPage() {
             </h3>
 
             <p className="mt-1 text-sm text-slate-500">
-              Your logged-in account will automatically be attached
-              to this listing.
+              Your logged-in account will automatically be
+              attached to this listing.
             </p>
 
             <div className="mt-4 flex items-center gap-3">
@@ -843,6 +1218,7 @@ export default function PostAdPage() {
               </div>
 
               <div>
+
                 <p className="font-bold">
                   Your account
                 </p>
@@ -850,6 +1226,7 @@ export default function PostAdPage() {
                 <p className="text-sm text-green-600">
                   ✓ Authenticated seller
                 </p>
+
               </div>
 
             </div>
@@ -864,12 +1241,48 @@ export default function PostAdPage() {
             </p>
 
             <p className="mt-1 text-xs leading-5 text-amber-700">
-              Only upload genuine product photos. Best Sales Ghana
-              may review listings and remove content that violates
-              marketplace rules.
+              Only upload genuine product photos. BEST SALES
+              GHANA may review listings and remove content
+              that violates marketplace rules.
             </p>
 
           </div>
+
+          {/* VERIFICATION BLOCK */}
+          {verificationRequired && (
+            <div className="mt-6 rounded-2xl border-2 border-amber-200 bg-amber-50 p-5">
+
+              <div className="flex items-start gap-4">
+
+                <div className="text-3xl">
+                  🔐
+                </div>
+
+                <div className="flex-1">
+
+                  <h3 className="font-extrabold text-amber-900">
+                    Verification required before your next ad
+                  </h3>
+
+                  <p className="mt-2 text-sm leading-6 text-amber-800">
+                    You have reached the first 3 ad
+                    publications allowed for an unverified
+                    seller or business account.
+                  </p>
+
+                  <Link
+                    href="/verification"
+                    className="mt-4 inline-flex rounded-xl bg-blue-600 px-6 py-3 font-bold text-white hover:bg-blue-700"
+                  >
+                    Continue to Verification →
+                  </Link>
+
+                </div>
+
+              </div>
+
+            </div>
+          )}
 
           {/* SUBMIT */}
           <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
@@ -884,10 +1297,15 @@ export default function PostAdPage() {
             <button
               type="button"
               onClick={publishListing}
-              disabled={loading}
+              disabled={
+                loading ||
+                verificationRequired
+              }
               className="rounded-xl bg-blue-600 px-8 py-4 font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {loading
+              {verificationRequired
+                ? "Verification Required"
+                : loading
                 ? "Publishing..."
                 : "Publish Listing →"}
             </button>
