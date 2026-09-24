@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { supabaseBrowser } from "@/supabase-browser";
 
 type Listing = {
@@ -41,8 +42,129 @@ const categoryIcons: Record<string, string> = {
 
 const fallbackIcon = "🛍️";
 
+/*
+ * CENTRAL GHANA LOCATION SEARCH
+ *
+ * These are search groups.
+ * Listings can still contain specific locations such as:
+ *
+ * East Legon
+ * Cantonments
+ * Kumasi
+ * Adum
+ * Tema
+ * etc.
+ */
+const GHANA_LOCATION_GROUPS: Record<string, string[]> = {
+  "Greater Accra": [
+    "Accra",
+    "Tema",
+    "East Legon",
+    "Cantonments",
+    "Airport Residential",
+    "Osu",
+    "Labone",
+    "Spintex",
+    "Madina",
+    "Adenta",
+    "Kasoa",
+  ],
+
+  Ashanti: [
+    "Kumasi",
+    "Adum",
+    "Bantama",
+    "Asokwa",
+    "Ahodwo",
+    "Suame",
+  ],
+
+  Western: [
+    "Takoradi",
+    "Sekondi",
+    "Tarkwa",
+    "Axim",
+  ],
+
+  Central: [
+    "Cape Coast",
+    "Kasoa",
+    "Winneba",
+    "Elmina",
+  ],
+
+  Eastern: [
+    "Koforidua",
+    "Nkawkaw",
+    "Nsawam",
+    "Akropong",
+  ],
+
+  Volta: [
+    "Ho",
+    "Hohoe",
+    "Keta",
+    "Aflao",
+  ],
+
+  Northern: [
+    "Tamale",
+    "Yendi",
+    "Savelugu",
+  ],
+
+  Bono: [
+    "Sunyani",
+    "Berekum",
+    "Dormaa",
+  ],
+
+  "Bono East": [
+    "Techiman",
+    "Kintampo",
+  ],
+
+  Ahafo: [
+    "Goaso",
+    "Duayaw Nkwanta",
+  ],
+
+  "Upper East": [
+    "Bolgatanga",
+    "Navrongo",
+    "Bawku",
+  ],
+
+  "Upper West": [
+    "Wa",
+    "Lawra",
+    "Tumu",
+  ],
+
+  Oti: [
+    "Dambai",
+    "Jasikan",
+  ],
+
+  Savannah: [
+    "Damongo",
+    "Salaga",
+  ],
+
+  "North East": [
+    "Nalerigu",
+    "Walewale",
+  ],
+
+  "Western North": [
+    "Sefwi Wiawso",
+    "Bibiani",
+  ],
+};
+
 export default function ListingsPage() {
   const supabase = supabaseBrowser();
+  const searchParams = useSearchParams();
 
   const [listings, setListings] = useState<Listing[]>([]);
   const [currencies, setCurrencies] = useState<Currency[]>([]);
@@ -53,11 +175,73 @@ export default function ListingsPage() {
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] =
     useState("All Categories");
+
+  const [selectedSubcategory, setSelectedSubcategory] =
+    useState("All Subcategories");
+
   const [selectedLocation, setSelectedLocation] =
     useState("All Ghana");
 
+  const [selectedRegion, setSelectedRegion] =
+    useState("All Regions");
+
   const [displayCurrency, setDisplayCurrency] =
     useState("GHS");
+
+  /*
+   * READ SEARCH PARAMETERS FROM URL
+   *
+   * Supports:
+   *
+   * /listings?q=Apartment
+   *
+   * /listings?search=Apartment
+   *
+   * /listings?category=Property
+   *
+   * /listings?subcategory=Apartments
+   *
+   * /listings?location=Accra
+   *
+   * All can be combined.
+   */
+  useEffect(() => {
+    const query =
+      searchParams.get("q") ||
+      searchParams.get("search") ||
+      searchParams.get("query") ||
+      "";
+
+    const category =
+      searchParams.get("category") || "";
+
+    const subcategory =
+      searchParams.get("subcategory") || "";
+
+    const location =
+      searchParams.get("location") || "";
+
+    const region =
+      searchParams.get("region") || "";
+
+    setSearch(query);
+
+    setSelectedCategory(
+      category || "All Categories"
+    );
+
+    setSelectedSubcategory(
+      subcategory || "All Subcategories"
+    );
+
+    setSelectedLocation(
+      location || "All Ghana"
+    );
+
+    setSelectedRegion(
+      region || "All Regions"
+    );
+  }, [searchParams]);
 
   /*
    * LOAD MARKETPLACE DATA
@@ -155,19 +339,11 @@ export default function ListingsPage() {
   }
 
   /*
-   * CONVERT ANY LISTING PRICE
+   * PRICE CONVERSION
    *
-   * Our manual rates mean:
+   * manual_rate_from_ghs means:
    *
    * 1 GHS = X foreign currency
-   *
-   * Therefore:
-   *
-   * GHS -> foreign:
-   * amount × rate
-   *
-   * foreign -> GHS:
-   * amount ÷ rate
    */
   function convertPrice(
     amount: number,
@@ -210,9 +386,6 @@ export default function ListingsPage() {
       );
     }
 
-    /*
-     * Foreign -> GHS -> Foreign
-     */
     const sourceCurrency =
       getCurrency(fromCode);
 
@@ -249,7 +422,145 @@ export default function ListingsPage() {
   }
 
   /*
-   * SEARCH / FILTER
+   * GET CATEGORY
+   */
+  const categories = useMemo(() => {
+    const values = new Set<string>();
+
+    listings.forEach((item) => {
+      if (item.category) {
+        values.add(item.category);
+      }
+    });
+
+    return Array.from(values).sort();
+  }, [listings]);
+
+  /*
+   * GET SUBCATEGORIES
+   */
+  const subcategories = useMemo(() => {
+    const values = new Set<string>();
+
+    listings.forEach((item) => {
+      if (
+        selectedCategory === "All Categories" ||
+        item.category === selectedCategory
+      ) {
+        if (item.subcategory) {
+          values.add(item.subcategory);
+        }
+      }
+    });
+
+    return Array.from(values).sort();
+  }, [
+    listings,
+    selectedCategory,
+  ]);
+
+  /*
+   * GET REGIONS
+   */
+  const regions = useMemo(() => {
+    return Object.keys(
+      GHANA_LOCATION_GROUPS
+    );
+  }, []);
+
+  /*
+   * GET SPECIFIC LOCATIONS
+   */
+  const locations = useMemo(() => {
+    const values = new Set<string>();
+
+    listings.forEach((item) => {
+      if (item.location) {
+        values.add(item.location);
+      }
+    });
+
+    Object.values(
+      GHANA_LOCATION_GROUPS
+    ).forEach((areas) => {
+      areas.forEach((area) => {
+        values.add(area);
+      });
+    });
+
+    return Array.from(values).sort();
+  }, [listings]);
+
+  /*
+   * LOCATION MATCHING
+   *
+   * This allows:
+   *
+   * Region → all locations in that region
+   *
+   * City/Area → exact/specific location
+   */
+  function locationMatches(
+    listingLocation: string | null
+  ) {
+    if (!listingLocation) {
+      return false;
+    }
+
+    if (
+      selectedLocation === "All Ghana" &&
+      selectedRegion === "All Regions"
+    ) {
+      return true;
+    }
+
+    const normalized =
+      listingLocation
+        .trim()
+        .toLowerCase();
+
+    /*
+     * Specific location
+     */
+    if (
+      selectedLocation !== "All Ghana"
+    ) {
+      return (
+        normalized ===
+          selectedLocation
+            .trim()
+            .toLowerCase() ||
+        normalized.includes(
+          selectedLocation
+            .trim()
+            .toLowerCase()
+        )
+      );
+    }
+
+    /*
+     * Region search
+     */
+    if (
+      selectedRegion !== "All Regions"
+    ) {
+      const areas =
+        GHANA_LOCATION_GROUPS[
+          selectedRegion
+        ] || [];
+
+      return areas.some((area) =>
+        normalized.includes(
+          area.toLowerCase()
+        )
+      );
+    }
+
+    return true;
+  }
+
+  /*
+   * CENTRAL SEARCH FILTER
    */
   const filteredListings = useMemo(() => {
     const searchText =
@@ -269,27 +580,32 @@ export default function ListingsPage() {
           .includes(searchText) ||
         item.subcategory
           ?.toLowerCase()
+          .includes(searchText) ||
+        item.location
+          ?.toLowerCase()
           .includes(searchText);
-
-      const category =
-        item.category ||
-        item.subcategory ||
-        "";
 
       const matchesCategory =
         selectedCategory ===
           "All Categories" ||
-        category === selectedCategory ||
+        item.category ===
+          selectedCategory ||
         item.subcategory ===
           selectedCategory;
 
+      const matchesSubcategory =
+        selectedSubcategory ===
+          "All Subcategories" ||
+        item.subcategory ===
+          selectedSubcategory;
+
       const matchesLocation =
-        selectedLocation === "All Ghana" ||
-        item.location === selectedLocation;
+        locationMatches(item.location);
 
       return (
         matchesSearch &&
         matchesCategory &&
+        matchesSubcategory &&
         matchesLocation
       );
     });
@@ -297,40 +613,17 @@ export default function ListingsPage() {
     listings,
     search,
     selectedCategory,
+    selectedSubcategory,
+    selectedRegion,
     selectedLocation,
   ]);
 
   /*
-   * AVAILABLE CATEGORIES
+   * LISTING HELPERS
    */
-  const categories = useMemo(() => {
-    const values = new Set<string>();
-
-    listings.forEach((item) => {
-      if (item.category) {
-        values.add(item.category);
-      }
-    });
-
-    return Array.from(values).sort();
-  }, [listings]);
-
-  /*
-   * AVAILABLE LOCATIONS
-   */
-  const locations = useMemo(() => {
-    const values = new Set<string>();
-
-    listings.forEach((item) => {
-      if (item.location) {
-        values.add(item.location);
-      }
-    });
-
-    return Array.from(values).sort();
-  }, [listings]);
-
-  function getListingCurrency(item: Listing) {
+  function getListingCurrency(
+    item: Listing
+  ) {
     return (
       item.currency_code ||
       item.currency ||
@@ -338,11 +631,62 @@ export default function ListingsPage() {
     ).toUpperCase();
   }
 
-  function getListingIcon(item: Listing) {
+  function getListingIcon(
+    item: Listing
+  ) {
     return (
-      categoryIcons[item.category || ""] ||
-      categoryIcons[item.subcategory || ""] ||
+      categoryIcons[
+        item.category || ""
+      ] ||
+      categoryIcons[
+        item.subcategory || ""
+      ] ||
       fallbackIcon
+    );
+  }
+
+  /*
+   * CLEAR FILTERS
+   */
+  function clearFilters() {
+    setSearch("");
+    setSelectedCategory(
+      "All Categories"
+    );
+    setSelectedSubcategory(
+      "All Subcategories"
+    );
+    setSelectedRegion(
+      "All Regions"
+    );
+    setSelectedLocation(
+      "All Ghana"
+    );
+  }
+
+  /*
+   * CHANGE CATEGORY
+   */
+  function handleCategoryChange(
+    value: string
+  ) {
+    setSelectedCategory(value);
+
+    setSelectedSubcategory(
+      "All Subcategories"
+    );
+  }
+
+  /*
+   * CHANGE REGION
+   */
+  function handleRegionChange(
+    value: string
+  ) {
+    setSelectedRegion(value);
+
+    setSelectedLocation(
+      "All Ghana"
     );
   }
 
@@ -351,20 +695,17 @@ export default function ListingsPage() {
 
       {/* HEADER */}
       <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur">
-
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
 
           <Link
             href="/"
             className="flex items-center gap-3"
           >
-
             <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-700 text-2xl text-white shadow-md">
               ⭐
             </div>
 
             <div>
-
               <div className="text-lg font-black text-slate-900">
                 BEST SALES GHANA
               </div>
@@ -372,9 +713,7 @@ export default function ListingsPage() {
               <div className="text-xs text-slate-500">
                 Buy • Sell • Advertise • Connect
               </div>
-
             </div>
-
           </Link>
 
           <nav className="hidden items-center gap-6 md:flex">
@@ -408,9 +747,7 @@ export default function ListingsPage() {
             </Link>
 
           </nav>
-
         </div>
-
       </header>
 
       {/* HERO */}
@@ -427,42 +764,55 @@ export default function ListingsPage() {
           </h1>
 
           <p className="mt-4 max-w-2xl text-lg leading-8 text-white/90">
-            Discover vehicles, property, electronics,
-            machinery, agriculture, services and more from
-            sellers across Ghana.
+            Search vehicles, property, electronics,
+            machinery, agriculture, services and more
+            across Ghana.
           </p>
 
         </div>
-
       </section>
 
-      {/* SEARCH */}
+      {/* CENTRAL SEARCH */}
       <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
 
-          <div className="grid gap-3 md:grid-cols-[1fr_200px_180px_150px]">
+          <div className="mb-5">
+            <h2 className="text-xl font-black text-slate-900">
+              Search BEST SALES GHANA
+            </h2>
+
+            <p className="mt-1 text-sm text-slate-500">
+              Search by item, category, subcategory,
+              region or specific location.
+            </p>
+          </div>
+
+          {/* SEARCH ROW */}
+          <div className="grid gap-3 lg:grid-cols-[1fr_190px_190px_190px_150px]">
 
             <input
               type="search"
               value={search}
               onChange={(event) =>
-                setSearch(event.target.value)
+                setSearch(
+                  event.target.value
+                )
               }
               placeholder="Search products, vehicles, property, machinery..."
               className="rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-600"
             />
 
+            {/* CATEGORY */}
             <select
               value={selectedCategory}
               onChange={(event) =>
-                setSelectedCategory(
+                handleCategoryChange(
                   event.target.value
                 )
               }
-              className="rounded-xl border border-slate-200 px-4 py-3 outline-none"
+              className="rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none"
             >
-
               <option>
                 All Categories
               </option>
@@ -477,34 +827,58 @@ export default function ListingsPage() {
                   </option>
                 )
               )}
-
             </select>
 
+            {/* SUBCATEGORY */}
             <select
-              value={selectedLocation}
+              value={selectedSubcategory}
               onChange={(event) =>
-                setSelectedLocation(
+                setSelectedSubcategory(
                   event.target.value
                 )
               }
-              className="rounded-xl border border-slate-200 px-4 py-3 outline-none"
+              className="rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none"
             >
-
               <option>
-                All Ghana
+                All Subcategories
               </option>
 
-              {locations.map(
-                (location) => (
+              {subcategories.map(
+                (subcategory) => (
                   <option
-                    key={location}
-                    value={location}
+                    key={subcategory}
+                    value={subcategory}
                   >
-                    {location}
+                    {subcategory}
                   </option>
                 )
               )}
+            </select>
 
+            {/* REGION */}
+            <select
+              value={selectedRegion}
+              onChange={(event) =>
+                handleRegionChange(
+                  event.target.value
+                )
+              }
+              className="rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none"
+            >
+              <option>
+                All Regions
+              </option>
+
+              {regions.map(
+                (region) => (
+                  <option
+                    key={region}
+                    value={region}
+                  >
+                    {region}
+                  </option>
+                )
+              )}
             </select>
 
             {/* CURRENCY */}
@@ -517,7 +891,6 @@ export default function ListingsPage() {
               }
               className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 font-bold text-blue-800 outline-none"
             >
-
               <option value="GHS">
                 🇬🇭 GHS
               </option>
@@ -537,16 +910,68 @@ export default function ListingsPage() {
               <option value="GBP">
                 🇬🇧 GBP
               </option>
-
             </select>
 
           </div>
 
-        </div>
+          {/* SPECIFIC LOCATION */}
+          <div className="mt-3 grid gap-3 md:grid-cols-[1fr_auto]">
 
+            <select
+              value={selectedLocation}
+              onChange={(event) =>
+                setSelectedLocation(
+                  event.target.value
+                )
+              }
+              className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 outline-none"
+            >
+              <option value="All Ghana">
+                📍 All Ghana / Any Location
+              </option>
+
+              {locations.map(
+                (location) => (
+                  <option
+                    key={location}
+                    value={location}
+                  >
+                    📍 {location}
+                  </option>
+                )
+              )}
+            </select>
+
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="rounded-xl border border-slate-300 bg-white px-6 py-3 font-bold text-slate-700 hover:bg-slate-50"
+            >
+              Clear Filters
+            </button>
+
+          </div>
+
+          {/* LOCATION INFORMATION */}
+          <div className="mt-4 rounded-xl bg-blue-50 p-4">
+
+            <p className="font-black text-slate-900">
+              📍 Item / Seller Location
+            </p>
+
+            <p className="mt-1 text-sm text-slate-600">
+              Select the location where the item,
+              vehicle, property or service is located.
+              Buyer GPS will be handled separately for
+              delivery and nearby searches.
+            </p>
+
+          </div>
+
+        </div>
       </section>
 
-      {/* LISTINGS */}
+      {/* RESULTS */}
       <section className="mx-auto max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
 
         <div className="mb-8 flex items-end justify-between">
@@ -558,14 +983,14 @@ export default function ListingsPage() {
             </p>
 
             <h2 className="mt-2 text-3xl font-black text-slate-900">
-              Latest Listings
+              Search Results
             </h2>
 
             <p className="mt-2 text-slate-500">
 
               {loading
                 ? "Loading marketplace listings..."
-                : `${filteredListings.length} listings available`}
+                : `${filteredListings.length} listings found`}
 
             </p>
 
@@ -623,7 +1048,6 @@ export default function ListingsPage() {
                 </div>
 
               </div>
-
             ))}
 
           </div>
@@ -633,6 +1057,7 @@ export default function ListingsPage() {
         {!loading &&
           !errorMessage &&
           filteredListings.length === 0 && (
+
             <div className="rounded-3xl border border-slate-200 bg-white p-12 text-center shadow-sm">
 
               <div className="text-5xl">
@@ -644,20 +1069,13 @@ export default function ListingsPage() {
               </h3>
 
               <p className="mt-2 text-slate-500">
-                Try another search, category or location.
+                Try another keyword, category,
+                subcategory or location.
               </p>
 
               <button
                 type="button"
-                onClick={() => {
-                  setSearch("");
-                  setSelectedCategory(
-                    "All Categories"
-                  );
-                  setSelectedLocation(
-                    "All Ghana"
-                  );
-                }}
+                onClick={clearFilters}
                 className="mt-6 rounded-xl bg-blue-700 px-5 py-3 font-bold text-white hover:bg-blue-800"
               >
                 Clear Filters
@@ -666,7 +1084,7 @@ export default function ListingsPage() {
             </div>
           )}
 
-        {/* REAL LISTINGS */}
+        {/* LISTINGS */}
         {!loading &&
           filteredListings.length > 0 && (
 
@@ -699,7 +1117,6 @@ export default function ListingsPage() {
                       className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
                     >
 
-                      {/* IMAGE PLACEHOLDER */}
                       <div className="flex h-48 items-center justify-center bg-gradient-to-br from-blue-50 to-slate-100 text-7xl">
                         {getListingIcon(item)}
                       </div>
@@ -712,6 +1129,12 @@ export default function ListingsPage() {
                             "Marketplace"}
                         </div>
 
+                        {item.subcategory && (
+                          <div className="mt-1 text-xs font-bold text-slate-400">
+                            {item.subcategory}
+                          </div>
+                        )}
+
                         <h3 className="mt-2 text-lg font-black text-slate-900">
                           {item.title}
                         </h3>
@@ -721,8 +1144,8 @@ export default function ListingsPage() {
                             "Contact the seller for more information."}
                         </p>
 
-                        {/* ORIGINAL PRICE */}
                         {item.price != null ? (
+
                           <div className="mt-4">
 
                             <div className="text-lg font-black text-blue-700">
@@ -732,9 +1155,9 @@ export default function ListingsPage() {
                               )}
                             </div>
 
-                            {/* CONVERTED PRICE */}
                             {displayCurrency !==
                               originalCurrency && (
+
                               <div className="mt-1 text-sm font-bold text-slate-500">
 
                                 {hasConversion
@@ -748,10 +1171,13 @@ export default function ListingsPage() {
                             )}
 
                           </div>
+
                         ) : (
+
                           <div className="mt-4 text-lg font-black text-blue-700">
                             Contact Seller
                           </div>
+
                         )}
 
                         <div className="mt-2 text-sm text-slate-500">
@@ -782,12 +1208,11 @@ export default function ListingsPage() {
               )}
 
             </div>
-
           )}
 
       </section>
 
-      {/* DELIVERY INFORMATION */}
+      {/* DELIVERY */}
       <section className="mx-auto max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
 
         <div className="rounded-3xl bg-slate-950 p-8 text-white sm:p-10">
@@ -795,7 +1220,6 @@ export default function ListingsPage() {
           <div className="grid gap-8 md:grid-cols-3">
 
             <div>
-
               <div className="text-3xl">
                 🚚
               </div>
@@ -808,11 +1232,9 @@ export default function ListingsPage() {
                 Individual sellers can choose whether
                 to offer BEST SALES GHANA delivery.
               </p>
-
             </div>
 
             <div>
-
               <div className="text-3xl">
                 📍
               </div>
@@ -822,14 +1244,12 @@ export default function ListingsPage() {
               </h3>
 
               <p className="mt-2 text-sm leading-6 text-slate-400">
-                Buyer and seller locations can be
-                captured using GhanaPost GPS for delivery.
+                Buyer and seller locations can later
+                be captured for delivery.
               </p>
-
             </div>
 
             <div>
-
               <div className="text-3xl">
                 📦
               </div>
@@ -839,11 +1259,9 @@ export default function ListingsPage() {
               </h3>
 
               <p className="mt-2 text-sm leading-6 text-slate-400">
-                Marketplace deliveries will receive a
-                tracking number so the buyer can follow
-                the delivery status.
+                Marketplace deliveries can receive a
+                tracking number.
               </p>
-
             </div>
 
           </div>
