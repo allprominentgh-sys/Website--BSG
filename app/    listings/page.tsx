@@ -2,12 +2,10 @@
 
 import Link from "next/link";
 import {
-  Suspense,
   useEffect,
   useMemo,
   useState,
 } from "react";
-import { useSearchParams } from "next/navigation";
 import { supabaseBrowser } from "@/supabase-browser";
 
 type Listing = {
@@ -402,9 +400,7 @@ const SUBCATEGORY_OPTIONS: Record<
   ],
 };
 
-function ListingsContent() {
-  const searchParams = useSearchParams();
-
+export default function ListingsPage() {
   const [listings, setListings] = useState<Listing[]>(
     []
   );
@@ -417,35 +413,50 @@ function ListingsContent() {
 
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
-  const [subcategory, setSubcategory] = useState("");
+  const [subcategory, setSubcategory] =
+    useState("");
   const [region, setRegion] = useState("");
   const [location, setLocation] = useState("");
 
+  /*
+   * Read URL parameters without useSearchParams().
+   *
+   * This avoids the Next.js/Vercel build error:
+   * "useSearchParams() should be wrapped in a suspense boundary"
+   */
   useEffect(() => {
-    const q =
-      searchParams.get("q") ||
-      searchParams.get("search") ||
-      searchParams.get("query") ||
-      "";
+    if (typeof window === "undefined") {
+      return;
+    }
 
-    const categoryParam =
-      searchParams.get("category") || "";
+    const params =
+      new URLSearchParams(
+        window.location.search
+      );
 
-    const subcategoryParam =
-      searchParams.get("subcategory") || "";
+    setSearch(
+      params.get("q") ||
+        params.get("search") ||
+        params.get("query") ||
+        ""
+    );
 
-    const locationParam =
-      searchParams.get("location") || "";
+    setCategory(
+      params.get("category") || ""
+    );
 
-    const regionParam =
-      searchParams.get("region") || "";
+    setSubcategory(
+      params.get("subcategory") || ""
+    );
 
-    setSearch(q);
-    setCategory(categoryParam);
-    setSubcategory(subcategoryParam);
-    setLocation(locationParam);
-    setRegion(regionParam);
-  }, [searchParams]);
+    setLocation(
+      params.get("location") || ""
+    );
+
+    setRegion(
+      params.get("region") || ""
+    );
+  }, []);
 
   useEffect(() => {
     loadData();
@@ -456,11 +467,11 @@ function ListingsContent() {
 
     try {
       /*
-       * The project's Supabase client currently has a
-       * TypeScript typing issue with .from().
+       * The current Supabase client in this project
+       * has a TypeScript typing issue with .from().
        *
-       * Casting the local client here does NOT change the
-       * actual Supabase connection or database.
+       * This cast only affects TypeScript checking.
+       * It does not change the Supabase connection.
        */
       const supabase =
         supabaseBrowser as any;
@@ -504,15 +515,17 @@ function ListingsContent() {
           ),
       ]);
 
-      const {
-        data: listingsData,
-        error: listingsError,
-      } = listingsResult;
+      const listingsData =
+        listingsResult?.data || [];
 
-      const {
-        data: currenciesData,
-        error: currenciesError,
-      } = currenciesResult;
+      const listingsError =
+        listingsResult?.error;
+
+      const currenciesData =
+        currenciesResult?.data || [];
+
+      const currenciesError =
+        currenciesResult?.error;
 
       if (listingsError) {
         console.error(
@@ -529,11 +542,11 @@ function ListingsContent() {
       }
 
       setListings(
-        (listingsData as Listing[]) || []
+        listingsData as Listing[]
       );
 
       setCurrencies(
-        (currenciesData as Currency[]) || []
+        currenciesData as Currency[]
       );
     } catch (error) {
       console.error(
@@ -557,13 +570,15 @@ function ListingsContent() {
         listing.title?.toLowerCase() || "";
 
       const description =
-        listing.description?.toLowerCase() || "";
+        listing.description?.toLowerCase() ||
+        "";
 
       const listingCategory =
         listing.category?.toLowerCase() || "";
 
       const listingSubcategory =
-        listing.subcategory?.toLowerCase() || "";
+        listing.subcategory?.toLowerCase() ||
+        "";
 
       const listingLocation =
         listing.location?.toLowerCase() || "";
@@ -571,7 +586,9 @@ function ListingsContent() {
       const matchesSearch =
         !normalizedSearch ||
         title.includes(normalizedSearch) ||
-        description.includes(normalizedSearch) ||
+        description.includes(
+          normalizedSearch
+        ) ||
         listingCategory.includes(
           normalizedSearch
         ) ||
@@ -717,6 +734,16 @@ function ListingsContent() {
     setSubcategory("");
     setRegion("");
     setLocation("");
+
+    if (
+      typeof window !== "undefined"
+    ) {
+      window.history.replaceState(
+        {},
+        "",
+        "/listings"
+      );
+    }
   }
 
   function performSearch() {
@@ -724,11 +751,17 @@ function ListingsContent() {
       new URLSearchParams();
 
     if (search.trim()) {
-      params.set("q", search.trim());
+      params.set(
+        "q",
+        search.trim()
+      );
     }
 
     if (category) {
-      params.set("category", category);
+      params.set(
+        "category",
+        category
+      );
     }
 
     if (subcategory) {
@@ -739,7 +772,10 @@ function ListingsContent() {
     }
 
     if (region) {
-      params.set("region", region);
+      params.set(
+        "region",
+        region
+      );
     }
 
     if (location) {
@@ -752,17 +788,29 @@ function ListingsContent() {
     const query =
       params.toString();
 
-    window.location.href = query
+    const newUrl = query
       ? `/listings?${query}`
       : "/listings";
+
+    if (
+      typeof window !== "undefined"
+    ) {
+      window.history.pushState(
+        {},
+        "",
+        newUrl
+      );
+    }
   }
 
   return (
     <main className="min-h-screen bg-white text-gray-900">
+
       {/* HEADER */}
       <header className="border-b bg-white">
         <div className="mx-auto max-w-7xl px-4 py-5">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+
             <div>
               <Link
                 href="/"
@@ -793,13 +841,15 @@ function ListingsContent() {
                 Account
               </Link>
             </div>
+
           </div>
         </div>
       </header>
 
-      {/* SEARCH */}
+      {/* SEARCH SECTION */}
       <section className="border-b bg-gray-50">
         <div className="mx-auto max-w-7xl px-4 py-6">
+
           <form
             onSubmit={(event) => {
               event.preventDefault();
@@ -807,7 +857,8 @@ function ListingsContent() {
             }}
             className="grid gap-3 md:grid-cols-2 lg:grid-cols-6"
           >
-            {/* SEARCH INPUT */}
+
+            {/* SEARCH */}
             <div className="lg:col-span-2">
               <label className="mb-1 block text-xs font-semibold text-gray-600">
                 What are you looking for?
@@ -957,6 +1008,7 @@ function ListingsContent() {
 
             {/* BUTTONS */}
             <div className="flex flex-wrap items-end gap-2 md:col-span-2 lg:col-span-6">
+
               <button
                 type="submit"
                 className="rounded-lg bg-blue-700 px-6 py-3 text-sm font-bold text-white hover:bg-blue-800"
@@ -983,6 +1035,7 @@ function ListingsContent() {
               >
                 Detect Location
               </button>
+
             </div>
           </form>
 
@@ -997,12 +1050,15 @@ function ListingsContent() {
             handled separately for delivery and
             nearby services.
           </div>
+
         </div>
       </section>
 
       {/* RESULTS */}
       <section className="mx-auto max-w-7xl px-4 py-8">
+
         <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+
           <div>
             <h1 className="text-2xl font-bold">
               Marketplace Search
@@ -1026,6 +1082,7 @@ function ListingsContent() {
             region ||
             location) && (
             <div className="flex flex-wrap gap-2">
+
               {search && (
                 <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">
                   Search: {search}
@@ -1055,13 +1112,16 @@ function ListingsContent() {
                   {location}
                 </span>
               )}
+
             </div>
           )}
+
         </div>
 
         {/* LOADING */}
         {loading ? (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+
             {Array.from({
               length: 8,
             }).map((_, index) => (
@@ -1072,19 +1132,23 @@ function ListingsContent() {
                 <div className="h-48 animate-pulse bg-gray-200" />
 
                 <div className="space-y-3 p-4">
+
                   <div className="h-4 animate-pulse rounded bg-gray-200" />
 
                   <div className="h-4 w-2/3 animate-pulse rounded bg-gray-200" />
 
                   <div className="h-6 w-1/2 animate-pulse rounded bg-gray-200" />
+
                 </div>
               </div>
             ))}
+
           </div>
-        ) : filteredListings.length ===
-          0 ? (
-          /* EMPTY */
+        ) : filteredListings.length === 0 ? (
+
+          /* EMPTY RESULTS */
           <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-6 py-16 text-center">
+
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-white text-2xl shadow-sm">
               🔎
             </div>
@@ -1104,39 +1168,50 @@ function ListingsContent() {
             >
               Clear Search
             </button>
+
           </div>
+
         ) : (
+
           /* LISTINGS */
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+
             {filteredListings.map(
               (listing) => (
                 <article
                   key={listing.id}
                   className="group overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
                 >
+
                   <Link
                     href={`/listings/${listing.id}`}
                     className="block"
                   >
-                    {/* IMAGE PLACEHOLDER */}
+
+                    {/* IMAGE */}
                     <div className="flex h-48 items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 text-5xl">
                       🛍️
                     </div>
 
                     <div className="p-4">
+
                       <div className="mb-2 flex items-center justify-between gap-2">
+
                         <span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-bold uppercase text-blue-700">
                           {listing.category ||
                             "Marketplace"}
                         </span>
 
                         <span className="text-[10px] text-gray-400">
-                          {new Date(
-                            listing.created_at
-                          ).toLocaleDateString(
-                            "en-GH"
-                          )}
+                          {listing.created_at
+                            ? new Date(
+                                listing.created_at
+                              ).toLocaleDateString(
+                                "en-GH"
+                              )
+                            : ""}
                         </span>
+
                       </div>
 
                       <h2 className="line-clamp-2 min-h-[48px] text-base font-bold text-gray-900 group-hover:text-blue-700">
@@ -1155,17 +1230,22 @@ function ListingsContent() {
                       </div>
 
                       <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
+
                         <span>📍</span>
 
                         <span className="line-clamp-1">
                           {listing.location ||
                             "Location not specified"}
                         </span>
+
                       </div>
+
                     </div>
+
                   </Link>
 
                   <div className="grid grid-cols-2 gap-2 border-t border-gray-100 p-3">
+
                     <Link
                       href={`/listings/${listing.id}`}
                       className="rounded-lg bg-gray-100 px-3 py-2 text-center text-xs font-semibold text-gray-700 hover:bg-gray-200"
@@ -1179,19 +1259,28 @@ function ListingsContent() {
                     >
                       Chat Seller
                     </Link>
+
                   </div>
+
                 </article>
               )
             )}
+
           </div>
         )}
+
       </section>
 
       {/* DELIVERY INFORMATION */}
       <section className="border-t bg-gray-50">
+
         <div className="mx-auto max-w-7xl px-4 py-10">
+
           <div className="grid gap-5 md:grid-cols-3">
+
+            {/* ITEM LOCATION */}
             <div className="rounded-xl border bg-white p-5">
+
               <div className="mb-3 text-2xl">
                 📍
               </div>
@@ -1204,9 +1293,12 @@ function ListingsContent() {
                 Search listings by the physical
                 location of the item or seller.
               </p>
+
             </div>
 
+            {/* GHANAPOST GPS */}
             <div className="rounded-xl border bg-white p-5">
+
               <div className="mb-3 text-2xl">
                 🛰️
               </div>
@@ -1220,9 +1312,12 @@ function ListingsContent() {
                 support GhanaPost GPS digital
                 addresses for accurate delivery.
               </p>
+
             </div>
 
+            {/* DELIVERY */}
             <div className="rounded-xl border bg-white p-5">
+
               <div className="mb-3 text-2xl">
                 🚚
               </div>
@@ -1236,30 +1331,15 @@ function ListingsContent() {
                 to the marketplace order and
                 delivery system.
               </p>
+
             </div>
+
           </div>
+
         </div>
+
       </section>
+
     </main>
-  );
-}
-
-export default function ListingsPage() {
-  return (
-    <Suspense
-      fallback={
-        <main className="flex min-h-screen items-center justify-center bg-white">
-          <div className="text-center">
-            <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-blue-700" />
-
-            <p className="text-sm font-medium text-gray-600">
-              Loading marketplace...
-            </p>
-          </div>
-        </main>
-      }
-    >
-      <ListingsContent />
-    </Suspense>
   );
 }
