@@ -9,6 +9,13 @@ type Currency = {
   name: string;
   symbol: string;
   manual_rate_from_ghs: number | null;
+  xe_rate: number | null;
+  previous_xe_rate: number | null;
+  xe_change_percent: number | null;
+  adjustment_percent: number | null;
+  auto_adjust_enabled: boolean | null;
+  last_xe_update: string | null;
+  rate_source: string | null;
 };
 
 const adminSections = [
@@ -104,16 +111,24 @@ export default function AdminPage() {
 
   const [rmbRate, setRmbRate] = useState("");
   const [usdRate, setUsdRate] = useState("");
+  const [eurRate, setEurRate] = useState("");
+  const [gbpRate, setGbpRate] = useState("");
 
   const [rmbAmount, setRmbAmount] = useState("");
   const [usdAmount, setUsdAmount] = useState("");
   const [ghsAmount, setGhsAmount] = useState("");
 
   const [savingCurrency, setSavingCurrency] = useState<
-    "CNY" | "USD" | null
+    "CNY" | "USD" | "EUR" | "GBP" | null
   >(null);
 
   const [currencyMessage, setCurrencyMessage] = useState("");
+
+  const [autoAdjustEnabled, setAutoAdjustEnabled] = useState(true);
+  const [adjustmentPercent, setAdjustmentPercent] = useState("100");
+
+  const [savingAdjustmentSettings, setSavingAdjustmentSettings] =
+    useState(false);
 
   /*
    * ADMIN CHECK
@@ -162,9 +177,21 @@ export default function AdminPage() {
       const { data, error } = await supabase
         .from("currencies")
         .select(
-          "code,name,symbol,manual_rate_from_ghs"
+          `
+            code,
+            name,
+            symbol,
+            manual_rate_from_ghs,
+            xe_rate,
+            previous_xe_rate,
+            xe_change_percent,
+            adjustment_percent,
+            auto_adjust_enabled,
+            last_xe_update,
+            rate_source
+          `
         )
-        .in("code", ["GHS", "USD", "CNY"])
+        .in("code", ["GHS", "USD", "CNY", "EUR", "GBP"])
         .order("code");
 
       if (error) {
@@ -174,15 +201,64 @@ export default function AdminPage() {
 
       setCurrencies(data || []);
 
-      const usd = data?.find((currency) => currency.code === "USD");
-      const cny = data?.find((currency) => currency.code === "CNY");
+      const usd = data?.find(
+        (currency) => currency.code === "USD"
+      );
+
+      const cny = data?.find(
+        (currency) => currency.code === "CNY"
+      );
+
+      const eur = data?.find(
+        (currency) => currency.code === "EUR"
+      );
+
+      const gbp = data?.find(
+        (currency) => currency.code === "GBP"
+      );
 
       if (usd?.manual_rate_from_ghs != null) {
-        setUsdRate(String(usd.manual_rate_from_ghs));
+        setUsdRate(
+          String(usd.manual_rate_from_ghs)
+        );
       }
 
       if (cny?.manual_rate_from_ghs != null) {
-        setRmbRate(String(cny.manual_rate_from_ghs));
+        setRmbRate(
+          String(cny.manual_rate_from_ghs)
+        );
+      }
+
+      if (eur?.manual_rate_from_ghs != null) {
+        setEurRate(
+          String(eur.manual_rate_from_ghs)
+        );
+      }
+
+      if (gbp?.manual_rate_from_ghs != null) {
+        setGbpRate(
+          String(gbp.manual_rate_from_ghs)
+        );
+      }
+
+      const settingsCurrency = usd || cny;
+
+      if (
+        settingsCurrency?.auto_adjust_enabled != null
+      ) {
+        setAutoAdjustEnabled(
+          settingsCurrency.auto_adjust_enabled
+        );
+      }
+
+      if (
+        settingsCurrency?.adjustment_percent != null
+      ) {
+        setAdjustmentPercent(
+          String(
+            settingsCurrency.adjustment_percent
+          )
+        );
       }
     }
 
@@ -190,10 +266,10 @@ export default function AdminPage() {
   }, [supabase]);
 
   /*
-   * SAVE RATE
+   * SAVE MANUAL CURRENCY RATE
    */
   async function saveCurrencyRate(
-    currencyCode: "CNY" | "USD"
+    currencyCode: "CNY" | "USD" | "EUR" | "GBP"
   ) {
     if (!isAdmin) {
       setCurrencyMessage(
@@ -203,13 +279,23 @@ export default function AdminPage() {
     }
 
     const rawRate =
-      currencyCode === "CNY" ? rmbRate : usdRate;
+      currencyCode === "CNY"
+        ? rmbRate
+        : currencyCode === "USD"
+        ? usdRate
+        : currencyCode === "EUR"
+        ? eurRate
+        : gbpRate;
 
     const newRate = Number(rawRate);
 
-    if (!rawRate || !Number.isFinite(newRate) || newRate <= 0) {
+    if (
+      !rawRate ||
+      !Number.isFinite(newRate) ||
+      newRate <= 0
+    ) {
       setCurrencyMessage(
-        `Please enter a valid ${currencyCode === "CNY" ? "RMB" : "USD"} rate.`
+        `Please enter a valid ${currencyCode} rate.`
       );
       return;
     }
@@ -219,18 +305,22 @@ export default function AdminPage() {
 
     try {
       const currentCurrency = currencies.find(
-        (currency) => currency.code === currencyCode
+        (currency) =>
+          currency.code === currencyCode
       );
 
       const oldRate =
-        currentCurrency?.manual_rate_from_ghs ?? null;
+        currentCurrency?.manual_rate_from_ghs ??
+        null;
 
-      const { error: updateError } = await supabase
-        .from("currencies")
-        .update({
-          manual_rate_from_ghs: newRate,
-        })
-        .eq("code", currencyCode);
+      const { error: updateError } =
+        await supabase
+          .from("currencies")
+          .update({
+            manual_rate_from_ghs: newRate,
+            rate_source: "MANUAL",
+          })
+          .eq("code", currencyCode);
 
       if (updateError) {
         throw updateError;
@@ -241,22 +331,53 @@ export default function AdminPage() {
       } = await supabase.auth.getUser();
 
       /*
-       * Save audit history.
+       * STANDARD RATE HISTORY
        */
       if (user) {
-        const { error: historyError } = await supabase
-          .from("currency_rate_history")
-          .insert({
-            currency_code: currencyCode,
-            old_rate: oldRate,
-            new_rate: newRate,
-            changed_by: user.id,
-          });
+        const { error: historyError } =
+          await supabase
+            .from("currency_rate_history")
+            .insert({
+              currency_code: currencyCode,
+              old_rate: oldRate,
+              new_rate: newRate,
+              changed_by: user.id,
+            });
 
         if (historyError) {
           console.error(
             "Rate history error:",
             historyError
+          );
+        }
+
+        /*
+         * ADJUSTMENT HISTORY
+         */
+        const { error: adjustmentHistoryError } =
+          await supabase
+            .from("currency_adjustment_history")
+            .insert({
+              currency_code: currencyCode,
+              old_rate: oldRate,
+              reference_rate:
+                currentCurrency?.xe_rate ??
+                null,
+              new_rate: newRate,
+              change_percent:
+                currentCurrency?.xe_change_percent ??
+                0,
+              adjustment_percent:
+                currentCurrency?.adjustment_percent ??
+                100,
+              adjustment_type: "MANUAL",
+              changed_by: user.id,
+            });
+
+        if (adjustmentHistoryError) {
+          console.error(
+            "Adjustment history error:",
+            adjustmentHistoryError
           );
         }
       }
@@ -267,13 +388,19 @@ export default function AdminPage() {
             ? {
                 ...currency,
                 manual_rate_from_ghs: newRate,
+                rate_source: "MANUAL",
               }
             : currency
         )
       );
 
+      const name =
+        currencyCode === "CNY"
+          ? "RMB"
+          : currencyCode;
+
       setCurrencyMessage(
-        `${currencyCode === "CNY" ? "RMB" : "USD"} rate saved successfully.`
+        `${name} rate saved successfully.`
       );
     } catch (error: any) {
       console.error(error);
@@ -284,6 +411,93 @@ export default function AdminPage() {
       );
     } finally {
       setSavingCurrency(null);
+    }
+  }
+
+  /*
+   * SAVE XE SETTINGS
+   *
+   * This saves the adjustment setting to the USD,
+   * CNY, EUR and GBP records.
+   *
+   * The actual live XE API will be connected later.
+   */
+  async function saveAdjustmentSettings() {
+    if (!isAdmin) {
+      setCurrencyMessage(
+        "You do not have administrator permission."
+      );
+      return;
+    }
+
+    const percentage = Number(
+      adjustmentPercent
+    );
+
+    if (
+      !Number.isFinite(percentage) ||
+      percentage < 0 ||
+      percentage > 100
+    ) {
+      setCurrencyMessage(
+        "Adjustment percentage must be between 0% and 100%."
+      );
+      return;
+    }
+
+    setSavingAdjustmentSettings(true);
+    setCurrencyMessage("");
+
+    try {
+      const { error } = await supabase
+        .from("currencies")
+        .update({
+          auto_adjust_enabled:
+            autoAdjustEnabled,
+          adjustment_percent:
+            percentage,
+        })
+        .in("code", [
+          "USD",
+          "CNY",
+          "EUR",
+          "GBP",
+        ]);
+
+      if (error) {
+        throw error;
+      }
+
+      setCurrencies((current) =>
+        current.map((currency) =>
+          ["USD", "CNY", "EUR", "GBP"].includes(
+            currency.code
+          )
+            ? {
+                ...currency,
+                auto_adjust_enabled:
+                  autoAdjustEnabled,
+                adjustment_percent:
+                  percentage,
+              }
+            : currency
+        )
+      );
+
+      setCurrencyMessage(
+        `XE adjustment settings saved. Automatic adjustment is ${
+          autoAdjustEnabled ? "ON" : "OFF"
+        } at ${percentage}%.`
+      );
+    } catch (error: any) {
+      console.error(error);
+
+      setCurrencyMessage(
+        error?.message ||
+          "Unable to save XE adjustment settings."
+      );
+    } finally {
+      setSavingAdjustmentSettings(false);
     }
   }
 
@@ -300,6 +514,16 @@ export default function AdminPage() {
       (currency) => currency.code === "USD"
     )?.manual_rate_from_ghs ?? null;
 
+  const currentEurRate =
+    currencies.find(
+      (currency) => currency.code === "EUR"
+    )?.manual_rate_from_ghs ?? null;
+
+  const currentGbpRate =
+    currencies.find(
+      (currency) => currency.code === "GBP"
+    )?.manual_rate_from_ghs ?? null;
+
   /*
    * CALCULATIONS
    */
@@ -307,44 +531,188 @@ export default function AdminPage() {
     ghsAmount &&
     currentRmbRate &&
     Number(ghsAmount) > 0
-      ? Number(ghsAmount) * currentRmbRate
+      ? Number(ghsAmount) *
+        currentRmbRate
       : null;
 
   const rmbToGhs =
     rmbAmount &&
     currentRmbRate &&
     Number(rmbAmount) > 0
-      ? Number(rmbAmount) / currentRmbRate
+      ? Number(rmbAmount) /
+        currentRmbRate
       : null;
 
   const ghsToUsd =
     ghsAmount &&
     currentUsdRate &&
     Number(ghsAmount) > 0
-      ? Number(ghsAmount) * currentUsdRate
+      ? Number(ghsAmount) *
+        currentUsdRate
       : null;
 
   const usdToGhs =
     usdAmount &&
     currentUsdRate &&
     Number(usdAmount) > 0
-      ? Number(usdAmount) / currentUsdRate
+      ? Number(usdAmount) /
+        currentUsdRate
       : null;
 
-  function formatNumber(value: number | null) {
+  function formatNumber(
+    value: number | null
+  ) {
     if (value === null) return "—";
 
-    return value.toLocaleString("en-GH", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
+    return value.toLocaleString(
+      "en-GH",
+      {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }
+    );
+  }
+
+  /*
+   * FORMAT XE MOVEMENT
+   */
+  function formatMovement(
+    value: number | null
+  ) {
+    if (value == null) {
+      return "Waiting";
+    }
+
+    if (value > 0) {
+      return `+${value.toFixed(4)}%`;
+    }
+
+    return `${value.toFixed(4)}%`;
+  }
+
+  /*
+   * CURRENCY DISPLAY CARD
+   */
+  function CurrencyControlCard({
+    code,
+    name,
+    flag,
+    rate,
+  }: {
+    code: "CNY" | "USD" | "EUR" | "GBP";
+    name: string;
+    flag: string;
+    rate: number | null;
+  }) {
+    const record = currencies.find(
+      (currency) => currency.code === code
+    );
+
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-white p-5">
+
+        <div className="flex items-center justify-between">
+
+          <div>
+
+            <p className="text-xs font-black uppercase tracking-wider text-slate-400">
+              {code}
+            </p>
+
+            <p className="mt-1 font-black">
+              {flag} {name}
+            </p>
+
+          </div>
+
+          <span
+            className={`rounded-full px-2.5 py-1 text-[10px] font-black ${
+              record?.rate_source === "XE"
+                ? "bg-green-100 text-green-700"
+                : "bg-slate-100 text-slate-600"
+            }`}
+          >
+            {record?.rate_source ||
+              "MANUAL"}
+          </span>
+
+        </div>
+
+        <div className="mt-4">
+
+          <p className="text-xs font-black uppercase text-slate-400">
+            Current Rate
+          </p>
+
+          <p className="mt-1 text-2xl font-black text-blue-700">
+            {rate != null
+              ? rate
+              : "Not set"}
+          </p>
+
+        </div>
+
+        <div className="mt-4">
+
+          <p className="text-xs font-black uppercase text-slate-400">
+            XE Reference
+          </p>
+
+          <p className="mt-1 font-black">
+            {record?.xe_rate != null
+              ? record.xe_rate
+              : "Waiting for XE"}
+          </p>
+
+        </div>
+
+        <div className="mt-3">
+
+          <p className="text-xs font-black uppercase text-slate-400">
+            XE Movement
+          </p>
+
+          <p
+            className={`mt-1 font-black ${
+              (record?.xe_change_percent ??
+                0) > 0
+                ? "text-green-600"
+                : (record?.xe_change_percent ??
+                    0) < 0
+                ? "text-red-600"
+                : "text-slate-600"
+            }`}
+          >
+            {formatMovement(
+              record?.xe_change_percent ??
+                null
+            )}
+          </p>
+
+        </div>
+
+        {record?.last_xe_update && (
+          <p className="mt-3 text-[11px] text-slate-400">
+            Updated{" "}
+            {new Date(
+              record.last_xe_update
+            ).toLocaleString("en-GH")}
+          </p>
+        )}
+
+      </div>
+    );
   }
 
   if (checkingAdmin) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-100">
+
         <div className="rounded-2xl bg-white p-8 text-center shadow-sm">
-          <div className="text-3xl">🔐</div>
+
+          <div className="text-3xl">
+            🔐
+          </div>
 
           <h1 className="mt-4 text-xl font-black">
             Checking administrator access...
@@ -353,7 +721,9 @@ export default function AdminPage() {
           <p className="mt-2 text-sm text-slate-500">
             Please wait.
           </p>
+
         </div>
+
       </main>
     );
   }
@@ -361,8 +731,12 @@ export default function AdminPage() {
   if (!isAdmin) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
+
         <div className="max-w-md rounded-3xl border border-red-200 bg-white p-8 text-center shadow-xl">
-          <div className="text-5xl">🔒</div>
+
+          <div className="text-5xl">
+            🔒
+          </div>
 
           <h1 className="mt-5 text-2xl font-black">
             Administrator Access Required
@@ -379,7 +753,9 @@ export default function AdminPage() {
           >
             Return to Website
           </Link>
+
         </div>
+
       </main>
     );
   }
@@ -389,17 +765,20 @@ export default function AdminPage() {
 
       {/* HEADER */}
       <header className="sticky top-0 z-50 border-b border-slate-200 bg-white">
+
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
 
           <Link
             href="/"
             className="flex items-center gap-3"
           >
+
             <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-700 text-2xl shadow-md">
               ⭐
             </div>
 
             <div>
+
               <div className="text-lg font-black tracking-tight sm:text-xl">
                 BEST SALES GHANA
               </div>
@@ -407,7 +786,9 @@ export default function AdminPage() {
               <div className="text-xs text-slate-500">
                 Administration Portal
               </div>
+
             </div>
+
           </Link>
 
           <div className="flex items-center gap-2">
@@ -427,7 +808,9 @@ export default function AdminPage() {
             </button>
 
           </div>
+
         </div>
+
       </header>
 
       {/* MAIN */}
@@ -459,6 +842,7 @@ export default function AdminPage() {
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
 
             <div className="flex items-center justify-between">
+
               <span className="text-sm font-bold text-slate-500">
                 Direct Sales
               </span>
@@ -466,6 +850,7 @@ export default function AdminPage() {
               <span className="text-2xl">
                 🛒
               </span>
+
             </div>
 
             <div className="mt-4 text-3xl font-black">
@@ -481,6 +866,7 @@ export default function AdminPage() {
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
 
             <div className="flex items-center justify-between">
+
               <span className="text-sm font-bold text-slate-500">
                 Marketplace
               </span>
@@ -488,6 +874,7 @@ export default function AdminPage() {
               <span className="text-2xl">
                 📋
               </span>
+
             </div>
 
             <div className="mt-4 text-3xl font-black">
@@ -503,6 +890,7 @@ export default function AdminPage() {
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
 
             <div className="flex items-center justify-between">
+
               <span className="text-sm font-bold text-slate-500">
                 Orders
               </span>
@@ -510,6 +898,7 @@ export default function AdminPage() {
               <span className="text-2xl">
                 📦
               </span>
+
             </div>
 
             <div className="mt-4 text-3xl font-black">
@@ -525,6 +914,7 @@ export default function AdminPage() {
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
 
             <div className="flex items-center justify-between">
+
               <span className="text-sm font-bold text-slate-500">
                 Customers
               </span>
@@ -532,6 +922,7 @@ export default function AdminPage() {
               <span className="text-2xl">
                 👤
               </span>
+
             </div>
 
             <div className="mt-4 text-3xl font-black">
@@ -560,9 +951,9 @@ export default function AdminPage() {
             </h2>
 
             <p className="mt-3 max-w-3xl leading-7 text-white/85">
-              Enter your own exchange rates from the administration
-              dashboard. The marketplace can then automatically
-              calculate prices between Ghana Cedis, RMB and USD.
+              Control your GHS conversion rates for RMB, USD, EUR
+              and GBP. XE will later provide the reference movement
+              used for automatic rate adjustment.
             </p>
 
           </div>
@@ -578,6 +969,7 @@ export default function AdminPage() {
                 <div className="flex items-center justify-between">
 
                   <div>
+
                     <p className="text-sm font-black uppercase tracking-wider text-slate-500">
                       Chinese Yuan
                     </p>
@@ -585,6 +977,7 @@ export default function AdminPage() {
                     <h3 className="mt-1 text-2xl font-black">
                       🇨🇳 RMB / CNY
                     </h3>
+
                   </div>
 
                   <div className="text-4xl">
@@ -605,7 +998,9 @@ export default function AdminPage() {
                     min="0"
                     value={rmbRate}
                     onChange={(event) =>
-                      setRmbRate(event.target.value)
+                      setRmbRate(
+                        event.target.value
+                      )
                     }
                     placeholder="Example: 0.544"
                     className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-4 py-3 font-bold outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
@@ -614,12 +1009,18 @@ export default function AdminPage() {
                   <button
                     type="button"
                     onClick={() =>
-                      saveCurrencyRate("CNY")
+                      saveCurrencyRate(
+                        "CNY"
+                      )
                     }
-                    disabled={savingCurrency === "CNY"}
+                    disabled={
+                      savingCurrency ===
+                      "CNY"
+                    }
                     className="rounded-xl bg-blue-700 px-5 py-3 font-black text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {savingCurrency === "CNY"
+                    {savingCurrency ===
+                    "CNY"
                       ? "Saving..."
                       : "Save"}
                   </button>
@@ -627,8 +1028,11 @@ export default function AdminPage() {
                 </div>
 
                 <p className="mt-3 text-sm text-slate-500">
-                  Example: enter <strong>0.544</strong> to make
-                  GH₵800 = ¥435.20.
+                  Example: enter{" "}
+                  <strong>
+                    0.544
+                  </strong>{" "}
+                  to make GH₵800 = ¥435.20.
                 </p>
 
                 <div className="mt-4 rounded-xl bg-white p-4">
@@ -638,9 +1042,8 @@ export default function AdminPage() {
                   </p>
 
                   <p className="mt-1 text-2xl font-black text-blue-700">
-                    {currentRmbRate
-                      ? currentRmbRate
-                      : "Not set"}
+                    {currentRmbRate ??
+                      "Not set"}
                   </p>
 
                 </div>
@@ -653,6 +1056,7 @@ export default function AdminPage() {
                 <div className="flex items-center justify-between">
 
                   <div>
+
                     <p className="text-sm font-black uppercase tracking-wider text-slate-500">
                       United States Dollar
                     </p>
@@ -660,6 +1064,7 @@ export default function AdminPage() {
                     <h3 className="mt-1 text-2xl font-black">
                       🇺🇸 USD
                     </h3>
+
                   </div>
 
                   <div className="text-4xl">
@@ -680,7 +1085,9 @@ export default function AdminPage() {
                     min="0"
                     value={usdRate}
                     onChange={(event) =>
-                      setUsdRate(event.target.value)
+                      setUsdRate(
+                        event.target.value
+                      )
                     }
                     placeholder="Example: 0.080000"
                     className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-4 py-3 font-bold outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
@@ -689,12 +1096,18 @@ export default function AdminPage() {
                   <button
                     type="button"
                     onClick={() =>
-                      saveCurrencyRate("USD")
+                      saveCurrencyRate(
+                        "USD"
+                      )
                     }
-                    disabled={savingCurrency === "USD"}
+                    disabled={
+                      savingCurrency ===
+                      "USD"
+                    }
                     className="rounded-xl bg-blue-700 px-5 py-3 font-black text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {savingCurrency === "USD"
+                    {savingCurrency ===
+                    "USD"
                       ? "Saving..."
                       : "Save"}
                   </button>
@@ -702,8 +1115,11 @@ export default function AdminPage() {
                 </div>
 
                 <p className="mt-3 text-sm text-slate-500">
-                  Enter the amount of USD received for GH₵1.
-                  For example, <strong>0.08</strong>.
+                  Enter the amount of USD received
+                  for GH₵1. For example,{" "}
+                  <strong>
+                    0.08
+                  </strong>.
                 </p>
 
                 <div className="mt-4 rounded-xl bg-white p-4">
@@ -713,9 +1129,176 @@ export default function AdminPage() {
                   </p>
 
                   <p className="mt-1 text-2xl font-black text-blue-700">
-                    {currentUsdRate
-                      ? currentUsdRate
-                      : "Not set"}
+                    {currentUsdRate ??
+                      "Not set"}
+                  </p>
+
+                </div>
+
+              </div>
+
+              {/* EUR */}
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
+
+                <div className="flex items-center justify-between">
+
+                  <div>
+
+                    <p className="text-sm font-black uppercase tracking-wider text-slate-500">
+                      Euro
+                    </p>
+
+                    <h3 className="mt-1 text-2xl font-black">
+                      🇪🇺 EUR
+                    </h3>
+
+                  </div>
+
+                  <div className="text-4xl">
+                    €
+                  </div>
+
+                </div>
+
+                <label className="mt-6 block text-sm font-bold text-slate-700">
+                  GHS → EUR rate
+                </label>
+
+                <div className="mt-2 flex gap-3">
+
+                  <input
+                    type="number"
+                    step="0.000001"
+                    min="0"
+                    value={eurRate}
+                    onChange={(event) =>
+                      setEurRate(
+                        event.target.value
+                      )
+                    }
+                    placeholder="Example: 0.070000"
+                    className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-4 py-3 font-bold outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      saveCurrencyRate(
+                        "EUR"
+                      )
+                    }
+                    disabled={
+                      savingCurrency ===
+                      "EUR"
+                    }
+                    className="rounded-xl bg-blue-700 px-5 py-3 font-black text-white transition hover:bg-blue-800 disabled:opacity-60"
+                  >
+                    {savingCurrency ===
+                    "EUR"
+                      ? "Saving..."
+                      : "Save"}
+                  </button>
+
+                </div>
+
+                <p className="mt-3 text-sm text-slate-500">
+                  Enter the amount of EUR received
+                  for GH₵1.
+                </p>
+
+                <div className="mt-4 rounded-xl bg-white p-4">
+
+                  <p className="text-xs font-black uppercase tracking-wider text-slate-400">
+                    Current rate
+                  </p>
+
+                  <p className="mt-1 text-2xl font-black text-blue-700">
+                    {currentEurRate ??
+                      "Not set"}
+                  </p>
+
+                </div>
+
+              </div>
+
+              {/* GBP */}
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
+
+                <div className="flex items-center justify-between">
+
+                  <div>
+
+                    <p className="text-sm font-black uppercase tracking-wider text-slate-500">
+                      British Pound
+                    </p>
+
+                    <h3 className="mt-1 text-2xl font-black">
+                      🇬🇧 GBP
+                    </h3>
+
+                  </div>
+
+                  <div className="text-4xl">
+                    £
+                  </div>
+
+                </div>
+
+                <label className="mt-6 block text-sm font-bold text-slate-700">
+                  GHS → GBP rate
+                </label>
+
+                <div className="mt-2 flex gap-3">
+
+                  <input
+                    type="number"
+                    step="0.000001"
+                    min="0"
+                    value={gbpRate}
+                    onChange={(event) =>
+                      setGbpRate(
+                        event.target.value
+                      )
+                    }
+                    placeholder="Example: 0.060000"
+                    className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-4 py-3 font-bold outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      saveCurrencyRate(
+                        "GBP"
+                      )
+                    }
+                    disabled={
+                      savingCurrency ===
+                      "GBP"
+                    }
+                    className="rounded-xl bg-blue-700 px-5 py-3 font-black text-white transition hover:bg-blue-800 disabled:opacity-60"
+                  >
+                    {savingCurrency ===
+                    "GBP"
+                      ? "Saving..."
+                      : "Save"}
+                  </button>
+
+                </div>
+
+                <p className="mt-3 text-sm text-slate-500">
+                  Enter the amount of GBP received
+                  for GH₵1.
+                </p>
+
+                <div className="mt-4 rounded-xl bg-white p-4">
+
+                  <p className="text-xs font-black uppercase tracking-wider text-slate-400">
+                    Current rate
+                  </p>
+
+                  <p className="mt-1 text-2xl font-black text-blue-700">
+                    {currentGbpRate ??
+                      "Not set"}
                   </p>
 
                 </div>
@@ -730,6 +1313,221 @@ export default function AdminPage() {
                 {currencyMessage}
               </div>
             )}
+
+            {/* XE CONTROL */}
+            <div className="mt-8 rounded-3xl border border-indigo-200 bg-indigo-50 p-6 sm:p-8">
+
+              <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
+
+                <div>
+
+                  <p className="text-sm font-black uppercase tracking-widest text-indigo-700">
+                    XE Reference System
+                  </p>
+
+                  <h3 className="mt-2 text-2xl font-black text-indigo-950">
+                    ⚡ Automatic XE Rate Adjustment
+                  </h3>
+
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-indigo-800">
+                    When the XE reference rate changes,
+                    Best Sales Ghana can calculate the
+                    percentage movement and apply that
+                    movement to your current marketplace
+                    rate.
+                  </p>
+
+                </div>
+
+                <div className="flex flex-col gap-3 sm:flex-row">
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setAutoAdjustEnabled(
+                        (value) => !value
+                      )
+                    }
+                    className={`rounded-full px-5 py-3 font-black transition ${
+                      autoAdjustEnabled
+                        ? "bg-green-600 text-white"
+                        : "bg-slate-300 text-slate-700"
+                    }`}
+                  >
+                    {autoAdjustEnabled
+                      ? "AUTO ADJUST: ON"
+                      : "AUTO ADJUST: OFF"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={
+                      saveAdjustmentSettings
+                    }
+                    disabled={
+                      savingAdjustmentSettings
+                    }
+                    className="rounded-full bg-slate-950 px-5 py-3 font-black text-white disabled:opacity-60"
+                  >
+                    {savingAdjustmentSettings
+                      ? "Saving..."
+                      : "Save Settings"}
+                  </button>
+
+                </div>
+
+              </div>
+
+              <div className="mt-6 grid gap-5 md:grid-cols-3">
+
+                {/* ADJUSTMENT */}
+                <div className="rounded-2xl bg-white p-5 shadow-sm">
+
+                  <label className="text-sm font-black text-slate-700">
+                    Adjustment Percentage
+                  </label>
+
+                  <div className="mt-2 flex items-center rounded-xl border border-slate-300 bg-white">
+
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="1"
+                      value={
+                        adjustmentPercent
+                      }
+                      onChange={(event) =>
+                        setAdjustmentPercent(
+                          event.target.value
+                        )
+                      }
+                      className="w-full rounded-xl border-0 px-4 py-3 font-black outline-none"
+                    />
+
+                    <span className="pr-4 font-black text-slate-500">
+                      %
+                    </span>
+
+                  </div>
+
+                  <p className="mt-2 text-xs leading-5 text-slate-500">
+                    100% follows the full XE movement.
+                    50% applies half of the movement.
+                  </p>
+
+                </div>
+
+                {/* CONNECTION */}
+                <div className="rounded-2xl bg-white p-5 shadow-sm">
+
+                  <p className="text-sm font-black text-slate-700">
+                    XE Connection
+                  </p>
+
+                  <div className="mt-3 flex items-center gap-2">
+
+                    <span className="h-3 w-3 rounded-full bg-amber-400" />
+
+                    <span className="font-black text-amber-700">
+                      Awaiting XE API
+                    </span>
+
+                  </div>
+
+                  <p className="mt-2 text-xs leading-5 text-slate-500">
+                    Live XE rates will be activated
+                    after your XE API account is recovered.
+                  </p>
+
+                </div>
+
+                {/* FORMULA */}
+                <div className="rounded-2xl bg-white p-5 shadow-sm">
+
+                  <p className="text-sm font-black text-slate-700">
+                    Adjustment Formula
+                  </p>
+
+                  <div className="mt-3 rounded-xl bg-indigo-50 p-4">
+
+                    <p className="text-sm font-black text-indigo-900">
+                      New Rate = Current Rate ×
+                      (1 + XE Movement × Adjustment %)
+                    </p>
+
+                  </div>
+
+                </div>
+
+              </div>
+
+              {/* CURRENCY STATUS */}
+              <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+
+                <CurrencyControlCard
+                  code="CNY"
+                  name="Chinese Yuan"
+                  flag="🇨🇳"
+                  rate={currentRmbRate}
+                />
+
+                <CurrencyControlCard
+                  code="USD"
+                  name="US Dollar"
+                  flag="🇺🇸"
+                  rate={currentUsdRate}
+                />
+
+                <CurrencyControlCard
+                  code="EUR"
+                  name="Euro"
+                  flag="🇪🇺"
+                  rate={currentEurRate}
+                />
+
+                <CurrencyControlCard
+                  code="GBP"
+                  name="British Pound"
+                  flag="🇬🇧"
+                  rate={currentGbpRate}
+                />
+
+              </div>
+
+              <div className="mt-6 rounded-2xl border border-indigo-200 bg-white p-5">
+
+                <h4 className="font-black text-indigo-950">
+                  How automatic adjustment will work
+                </h4>
+
+                <div className="mt-4 grid gap-3 text-sm text-slate-600 md:grid-cols-4">
+
+                  <div className="rounded-xl bg-slate-50 p-4">
+                    <strong>1.</strong>{" "}
+                    XE provides the new reference rate.
+                  </div>
+
+                  <div className="rounded-xl bg-slate-50 p-4">
+                    <strong>2.</strong>{" "}
+                    The system calculates the percentage movement.
+                  </div>
+
+                  <div className="rounded-xl bg-slate-50 p-4">
+                    <strong>3.</strong>{" "}
+                    Your adjustment percentage is applied.
+                  </div>
+
+                  <div className="rounded-xl bg-slate-50 p-4">
+                    <strong>4.</strong>{" "}
+                    The new marketplace rate is saved in history.
+                  </div>
+
+                </div>
+
+              </div>
+
+            </div>
 
             {/* CALCULATOR */}
             <div className="mt-8">
@@ -772,7 +1570,9 @@ export default function AdminPage() {
                       step="0.01"
                       value={ghsAmount}
                       onChange={(event) =>
-                        setGhsAmount(event.target.value)
+                        setGhsAmount(
+                          event.target.value
+                        )
                       }
                       placeholder="800"
                       className="w-full rounded-xl border-0 px-2 py-4 font-black outline-none"
@@ -789,7 +1589,10 @@ export default function AdminPage() {
                       </p>
 
                       <p className="mt-2 text-xl font-black text-blue-900">
-                        ¥{formatNumber(ghsToRmb)}
+                        ¥
+                        {formatNumber(
+                          ghsToRmb
+                        )}
                       </p>
 
                     </div>
@@ -801,7 +1604,10 @@ export default function AdminPage() {
                       </p>
 
                       <p className="mt-2 text-xl font-black text-green-900">
-                        ${formatNumber(ghsToUsd)}
+                        $
+                        {formatNumber(
+                          ghsToUsd
+                        )}
                       </p>
 
                     </div>
@@ -810,7 +1616,7 @@ export default function AdminPage() {
 
                 </div>
 
-                {/* RMB / USD INPUTS */}
+                {/* FOREIGN CURRENCY */}
                 <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
 
                   <label className="text-sm font-black text-slate-600">
@@ -829,7 +1635,9 @@ export default function AdminPage() {
                       step="0.01"
                       value={rmbAmount}
                       onChange={(event) =>
-                        setRmbAmount(event.target.value)
+                        setRmbAmount(
+                          event.target.value
+                        )
                       }
                       placeholder="800"
                       className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-4 font-black outline-none focus:border-blue-600"
@@ -842,7 +1650,10 @@ export default function AdminPage() {
                       </p>
 
                       <p className="mt-1 text-xl font-black text-blue-900">
-                        GH₵{formatNumber(rmbToGhs)}
+                        GH₵
+                        {formatNumber(
+                          rmbToGhs
+                        )}
                       </p>
 
                     </div>
@@ -861,7 +1672,9 @@ export default function AdminPage() {
                       step="0.01"
                       value={usdAmount}
                       onChange={(event) =>
-                        setUsdAmount(event.target.value)
+                        setUsdAmount(
+                          event.target.value
+                        )
                       }
                       placeholder="100"
                       className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-4 font-black outline-none focus:border-blue-600"
@@ -874,7 +1687,10 @@ export default function AdminPage() {
                       </p>
 
                       <p className="mt-1 text-xl font-black text-green-900">
-                        GH₵{formatNumber(usdToGhs)}
+                        GH₵
+                        {formatNumber(
+                          usdToGhs
+                        )}
                       </p>
 
                     </div>
@@ -901,15 +1717,20 @@ export default function AdminPage() {
                     </h4>
 
                     <p className="mt-2 text-sm leading-6 text-blue-800">
-                      If your RMB rate is <strong>0.544</strong>,
+                      If your RMB rate is{" "}
+                      <strong>
+                        0.544
+                      </strong>,
                       then GH₵800 × 0.544 = ¥435.20.
                       To convert back, ¥800 ÷ 0.544 =
                       GH₵1,470.59.
                     </p>
 
                     <p className="mt-2 text-sm leading-6 text-blue-800">
-                      The rate is controlled manually from this
-                      administration dashboard.
+                      The rate can be controlled manually
+                      or, after the XE API connection is
+                      activated, adjusted according to the
+                      XE percentage movement.
                     </p>
 
                   </div>
@@ -1152,51 +1973,55 @@ export default function AdminPage() {
 
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
 
-            {adminSections.map((section) => (
+            {adminSections.map(
+              (section) => (
 
-              <div
-                key={section.title}
-                className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl"
-              >
+                <div
+                  key={section.title}
+                  className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl"
+                >
 
-                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start justify-between gap-4">
 
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-3xl">
-                    {section.icon}
+                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-3xl">
+                      {section.icon}
+                    </div>
+
+                    {section.title ===
+                      "Direct Sales" && (
+                      <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-black text-blue-700">
+                        YOUR PRODUCTS
+                      </span>
+                    )}
+
+                    {section.title ===
+                      "Revenue & Payments" && (
+                      <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-black text-green-700">
+                        2.15%
+                      </span>
+                    )}
+
                   </div>
 
-                  {section.title === "Direct Sales" && (
-                    <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-black text-blue-700">
-                      YOUR PRODUCTS
-                    </span>
-                  )}
+                  <h3 className="mt-5 text-xl font-black">
+                    {section.title}
+                  </h3>
 
-                  {section.title === "Revenue & Payments" && (
-                    <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-black text-green-700">
-                      2.15%
-                    </span>
-                  )}
+                  <p className="mt-2 min-h-[72px] text-sm leading-6 text-slate-500">
+                    {section.description}
+                  </p>
+
+                  <Link
+                    href={section.href}
+                    className="mt-5 inline-flex rounded-xl border border-blue-700 px-4 py-3 font-bold text-blue-700 transition hover:bg-blue-700 hover:text-white"
+                  >
+                    {section.action}
+                  </Link>
 
                 </div>
 
-                <h3 className="mt-5 text-xl font-black">
-                  {section.title}
-                </h3>
-
-                <p className="mt-2 min-h-[72px] text-sm leading-6 text-slate-500">
-                  {section.description}
-                </p>
-
-                <Link
-                  href={section.href}
-                  className="mt-5 inline-flex rounded-xl border border-blue-700 px-4 py-3 font-bold text-blue-700 transition hover:bg-blue-700 hover:text-white"
-                >
-                  {section.action}
-                </Link>
-
-              </div>
-
-            ))}
+              )
+            )}
 
           </div>
 
@@ -1212,7 +2037,10 @@ export default function AdminPage() {
           <div className="mt-5 grid gap-4 md:grid-cols-3">
 
             <div className="rounded-xl bg-slate-50 p-5">
-              <div className="text-2xl">📷</div>
+
+              <div className="text-2xl">
+                📷
+              </div>
 
               <h3 className="mt-3 font-black">
                 Product Pictures
@@ -1221,10 +2049,14 @@ export default function AdminPage() {
               <p className="mt-1 text-sm leading-6 text-slate-500">
                 Upload and replace product images whenever necessary.
               </p>
+
             </div>
 
             <div className="rounded-xl bg-slate-50 p-5">
-              <div className="text-2xl">💵</div>
+
+              <div className="text-2xl">
+                💵
+              </div>
 
               <h3 className="mt-3 font-black">
                 Price Management
@@ -1234,10 +2066,14 @@ export default function AdminPage() {
                 Change product prices from the admin area without
                 changing website code.
               </p>
+
             </div>
 
             <div className="rounded-xl bg-slate-50 p-5">
-              <div className="text-2xl">📦</div>
+
+              <div className="text-2xl">
+                📦
+              </div>
 
               <h3 className="mt-3 font-black">
                 Stock Management
@@ -1247,6 +2083,7 @@ export default function AdminPage() {
                 Control stock quantities and whether products are
                 available.
               </p>
+
             </div>
 
           </div>
@@ -1327,7 +2164,9 @@ export default function AdminPage() {
 
                 <p className="text-sm leading-6 text-purple-900">
 
-                  <strong>Top Priority advertising:</strong>{" "}
+                  <strong>
+                    Top Priority advertising:
+                  </strong>{" "}
                   Sellers who purchase the Top Priority advertising
                   package are not charged the 2.15% platform payment
                   revenue on payments covered by that specific
