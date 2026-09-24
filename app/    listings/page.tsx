@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabaseBrowser } from "@/supabase-browser";
 
@@ -21,1277 +21,1171 @@ type Listing = {
 
 type Currency = {
   code: string;
-  name: string;
-  symbol: string;
-  manual_rate_from_ghs: number | null;
+  name?: string | null;
+  symbol?: string | null;
+  rate_to_ghs?: number | null;
+  manual_rate_from_ghs?: number | null;
 };
 
-const categoryIcons: Record<string, string> = {
-  Vehicles: "🚗",
-  Cars: "🚗",
-  Property: "🏠",
-  Electronics: "📱",
-  Machinery: "🏭",
-  Agriculture: "🚜",
-  Services: "💼",
-  "Jobs & Services": "💼",
-  Fashion: "👕",
-  "Home & Garden": "🏡",
-  "Phones & Tablets": "📱",
+const GHANA_LOCATION_GROUPS: Record<
+  string,
+  {
+    cities: string[];
+    areas: string[];
+  }
+> = {
+  "Greater Accra": {
+    cities: [
+      "Accra",
+      "Tema",
+      "Madina",
+      "Teshie",
+      "Nungua",
+      "Kasoa",
+    ],
+    areas: [
+      "Osu",
+      "East Legon",
+      "Airport",
+      "Cantonments",
+      "Spintex",
+      "Adabraka",
+      "Dansoman",
+      "Lapaz",
+      "Achimota",
+      "Dzorwulu",
+      "North Legon",
+      "Haatso",
+      "Legon",
+      "Kasoa",
+      "Tema Community 1",
+      "Tema Community 25",
+    ],
+  },
+
+  "Ashanti": {
+    cities: [
+      "Kumasi",
+      "Obuasi",
+      "Konongo",
+      "Ejisu",
+      "Mampong",
+    ],
+    areas: [
+      "Adum",
+      "Bantama",
+      "Suame",
+      "Asokwa",
+      "Ahodwo",
+      "Kwadaso",
+      "Oforikrom",
+      "Tafo",
+      "Dichemso",
+    ],
+  },
+
+  "Western": {
+    cities: [
+      "Takoradi",
+      "Sekondi",
+      "Tarkwa",
+      "Axim",
+      "Elubo",
+    ],
+    areas: [
+      "Market Circle",
+      "Kojokrom",
+      "Effia",
+      "Anaji",
+      "New Takoradi",
+    ],
+  },
+
+  "Central": {
+    cities: [
+      "Cape Coast",
+      "Kasoa",
+      "Winneba",
+      "Mankessim",
+      "Elmina",
+    ],
+    areas: [
+      "Kotokuraba",
+      "Pedu",
+      "Abura",
+      "Ola",
+      "Cape Coast Centre",
+    ],
+  },
+
+  "Eastern": {
+    cities: [
+      "Koforidua",
+      "Nkawkaw",
+      "Suhum",
+      "Nsawam",
+      "Akropong",
+    ],
+    areas: [
+      "Jackson Park",
+      "Effiduase",
+      "Adweso",
+      "Betom",
+      "Koforidua Centre",
+    ],
+  },
+
+  "Volta": {
+    cities: [
+      "Ho",
+      "Hohoe",
+      "Keta",
+      "Aflao",
+      "Sogakope",
+    ],
+    areas: [
+      "Ho Central",
+      "Bankoe",
+      "Klefe",
+      "Adaklu",
+    ],
+  },
+
+  "Northern": {
+    cities: [
+      "Tamale",
+      "Yendi",
+      "Salaga",
+      "Savelugu",
+    ],
+    areas: [
+      "Tamale Central",
+      "Lamashegu",
+      "Jisonayili",
+      "Vittin",
+      "Dungu",
+    ],
+  },
+
+  "Bono": {
+    cities: [
+      "Sunyani",
+      "Berekum",
+      "Dormaa Ahenkro",
+    ],
+    areas: [
+      "Sunyani Central",
+      "New Dormaa",
+      "Magazine",
+    ],
+  },
+
+  "Bono East": {
+    cities: [
+      "Techiman",
+      "Kintampo",
+      "Nkoranza",
+    ],
+    areas: [
+      "Techiman Central",
+      "Tuobodom",
+      "Kentikrono",
+    ],
+  },
+
+  "Ahafo": {
+    cities: [
+      "Goaso",
+      "Bechem",
+      "Duayaw Nkwanta",
+    ],
+    areas: [
+      "Goaso Central",
+      "Bechem Central",
+    ],
+  },
+
+  "Western North": {
+    cities: [
+      "Sefwi Wiawso",
+      "Bibiani",
+      "Enchi",
+    ],
+    areas: [
+      "Wiawso Central",
+      "Bibiani Central",
+    ],
+  },
+
+  "Upper East": {
+    cities: [
+      "Bolgatanga",
+      "Bawku",
+      "Navrongo",
+    ],
+    areas: [
+      "Bolga Central",
+      "Zuarungu",
+      "Daporetindongo",
+    ],
+  },
+
+  "Upper West": {
+    cities: [
+      "Wa",
+      "Lawra",
+      "Tumu",
+    ],
+    areas: [
+      "Wa Central",
+      "Dondoli",
+      "Kpaguri",
+    ],
+  },
+
+  "Oti": {
+    cities: [
+      "Dambai",
+      "Kete Krachi",
+      "Nkwanta",
+    ],
+    areas: [
+      "Dambai Central",
+      "Nkwanta Central",
+    ],
+  },
+
+  "Savannah": {
+    cities: [
+      "Damongo",
+      "Bole",
+      "Salaga",
+    ],
+    areas: [
+      "Damongo Central",
+      "Bole Central",
+    ],
+  },
+
+  "North East": {
+    cities: [
+      "Nalerigu",
+      "Walewale",
+      "Gambaga",
+    ],
+    areas: [
+      "Nalerigu Central",
+      "Walewale Central",
+    ],
+  },
 };
 
-const fallbackIcon = "🛍️";
+const CATEGORY_OPTIONS = [
+  "Property",
+  "Vehicles",
+  "Electronics",
+  "Machinery",
+  "Agriculture",
+  "Services",
+  "Phones & Tablets",
+  "Cars",
+  "Fashion",
+  "Jobs & Services",
+  "Home & Garden",
+];
 
-/*
- * CENTRAL GHANA LOCATION SEARCH
- *
- * These are search groups.
- * Listings can still contain specific locations such as:
- *
- * East Legon
- * Cantonments
- * Kumasi
- * Adum
- * Tema
- * etc.
- */
-const GHANA_LOCATION_GROUPS: Record<string, string[]> = {
-  "Greater Accra": [
-    "Accra",
-    "Tema",
-    "East Legon",
-    "Cantonments",
-    "Airport Residential",
-    "Osu",
-    "Labone",
-    "Spintex",
-    "Madina",
-    "Adenta",
-    "Kasoa",
+const SUBCATEGORY_OPTIONS: Record<string, string[]> = {
+  Property: [
+    "Houses",
+    "Apartments",
+    "Land",
+    "Commercial Property",
+    "Office Space",
+    "Warehouses",
+    "Shops",
   ],
 
-  Ashanti: [
-    "Kumasi",
-    "Adum",
-    "Bantama",
-    "Asokwa",
-    "Ahodwo",
-    "Suame",
+  Vehicles: [
+    "Cars",
+    "Motorcycles",
+    "Trucks",
+    "Buses",
+    "Heavy Equipment",
+    "Spare Parts",
   ],
 
-  Western: [
-    "Takoradi",
-    "Sekondi",
-    "Tarkwa",
-    "Axim",
+  Electronics: [
+    "Televisions",
+    "Computers",
+    "Laptops",
+    "Printers",
+    "Cameras",
+    "Audio",
+    "Accessories",
   ],
 
-  Central: [
-    "Cape Coast",
-    "Kasoa",
-    "Winneba",
-    "Elmina",
+  Machinery: [
+    "Industrial Machines",
+    "Printing Equipment",
+    "Construction Equipment",
+    "Agricultural Machines",
+    "Generators",
+    "Factory Equipment",
   ],
 
-  Eastern: [
-    "Koforidua",
-    "Nkawkaw",
-    "Nsawam",
-    "Akropong",
+  Agriculture: [
+    "Farm Produce",
+    "Livestock",
+    "Farm Equipment",
+    "Seeds",
+    "Fertilizer",
+    "Poultry",
   ],
 
-  Volta: [
-    "Ho",
-    "Hohoe",
-    "Keta",
-    "Aflao",
+  Services: [
+    "Business Services",
+    "Repairs",
+    "Graphic Design",
+    "Construction",
+    "Transport",
+    "Cleaning",
+    "Professional Services",
   ],
 
-  Northern: [
-    "Tamale",
-    "Yendi",
-    "Savelugu",
+  "Phones & Tablets": [
+    "Mobile Phones",
+    "Tablets",
+    "Smart Watches",
+    "Phone Accessories",
   ],
 
-  Bono: [
-    "Sunyani",
-    "Berekum",
-    "Dormaa",
+  Cars: [
+    "Toyota",
+    "Mercedes-Benz",
+    "BMW",
+    "Hyundai",
+    "Kia",
+    "Honda",
+    "Other Cars",
   ],
 
-  "Bono East": [
-    "Techiman",
-    "Kintampo",
+  Fashion: [
+    "Men",
+    "Women",
+    "Children",
+    "Shoes",
+    "Bags",
+    "Accessories",
   ],
 
-  Ahafo: [
-    "Goaso",
-    "Duayaw Nkwanta",
+  "Jobs & Services": [
+    "Jobs",
+    "Freelance",
+    "Professional Services",
+    "Domestic Services",
   ],
 
-  "Upper East": [
-    "Bolgatanga",
-    "Navrongo",
-    "Bawku",
-  ],
-
-  "Upper West": [
-    "Wa",
-    "Lawra",
-    "Tumu",
-  ],
-
-  Oti: [
-    "Dambai",
-    "Jasikan",
-  ],
-
-  Savannah: [
-    "Damongo",
-    "Salaga",
-  ],
-
-  "North East": [
-    "Nalerigu",
-    "Walewale",
-  ],
-
-  "Western North": [
-    "Sefwi Wiawso",
-    "Bibiani",
+  "Home & Garden": [
+    "Furniture",
+    "Kitchen",
+    "Home Appliances",
+    "Garden",
+    "Decor",
   ],
 };
 
-export default function ListingsPage() {
-  const supabase = supabaseBrowser();
+function ListingsContent() {
   const searchParams = useSearchParams();
 
   const [listings, setListings] = useState<Listing[]>([]);
   const [currencies, setCurrencies] = useState<Currency[]>([]);
-
   const [loading, setLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState("");
 
   const [search, setSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] =
-    useState("All Categories");
+  const [category, setCategory] = useState("");
+  const [subcategory, setSubcategory] = useState("");
+  const [region, setRegion] = useState("");
+  const [location, setLocation] = useState("");
 
-  const [selectedSubcategory, setSelectedSubcategory] =
-    useState("All Subcategories");
-
-  const [selectedLocation, setSelectedLocation] =
-    useState("All Ghana");
-
-  const [selectedRegion, setSelectedRegion] =
-    useState("All Regions");
-
-  const [displayCurrency, setDisplayCurrency] =
-    useState("GHS");
-
-  /*
-   * READ SEARCH PARAMETERS FROM URL
-   *
-   * Supports:
-   *
-   * /listings?q=Apartment
-   *
-   * /listings?search=Apartment
-   *
-   * /listings?category=Property
-   *
-   * /listings?subcategory=Apartments
-   *
-   * /listings?location=Accra
-   *
-   * All can be combined.
-   */
   useEffect(() => {
-    const query =
+    const q =
       searchParams.get("q") ||
       searchParams.get("search") ||
       searchParams.get("query") ||
       "";
 
-    const category =
+    const categoryParam =
       searchParams.get("category") || "";
 
-    const subcategory =
+    const subcategoryParam =
       searchParams.get("subcategory") || "";
 
-    const location =
+    const locationParam =
       searchParams.get("location") || "";
 
-    const region =
+    const regionParam =
       searchParams.get("region") || "";
 
-    setSearch(query);
-
-    setSelectedCategory(
-      category || "All Categories"
-    );
-
-    setSelectedSubcategory(
-      subcategory || "All Subcategories"
-    );
-
-    setSelectedLocation(
-      location || "All Ghana"
-    );
-
-    setSelectedRegion(
-      region || "All Regions"
-    );
+    setSearch(q);
+    setCategory(categoryParam);
+    setSubcategory(subcategoryParam);
+    setLocation(locationParam);
+    setRegion(regionParam);
   }, [searchParams]);
 
-  /*
-   * LOAD MARKETPLACE DATA
-   */
   useEffect(() => {
-    async function loadMarketplace() {
-      setLoading(true);
-      setErrorMessage("");
-
-      try {
-        const [
-          listingsResult,
-          currenciesResult,
-        ] = await Promise.all([
-          supabase
-            .from("listings")
-            .select(
-              "id,title,category,subcategory,price,currency,currency_code,location,description,status,created_at"
-            )
-            .eq("status", "active")
-            .order("created_at", {
-              ascending: false,
-            }),
-
-          supabase
-            .from("currencies")
-            .select(
-              "code,name,symbol,manual_rate_from_ghs"
-            )
-            .in("code", [
-              "GHS",
-              "USD",
-              "CNY",
-              "EUR",
-              "GBP",
-            ]),
-        ]);
-
-        if (listingsResult.error) {
-          throw listingsResult.error;
-        }
-
-        if (currenciesResult.error) {
-          throw currenciesResult.error;
-        }
-
-        setListings(
-          (listingsResult.data || []) as Listing[]
-        );
-
-        setCurrencies(
-          (currenciesResult.data || []) as Currency[]
-        );
-      } catch (error: any) {
-        console.error(
-          "Marketplace loading error:",
-          error
-        );
-
-        setErrorMessage(
-          error?.message ||
-            "Unable to load marketplace listings."
-        );
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadMarketplace();
-  }, [supabase]);
-
-  /*
-   * CURRENCY HELPERS
-   */
-  function getCurrency(code: string) {
-    return currencies.find(
-      (currency) => currency.code === code
-    );
-  }
-
-  function getCurrencySymbol(code: string) {
-    const currency = getCurrency(code);
-
-    if (currency?.symbol) {
-      return currency.symbol;
-    }
-
-    if (code === "GHS") return "GH₵";
-    if (code === "USD") return "$";
-    if (code === "CNY") return "¥";
-    if (code === "EUR") return "€";
-    if (code === "GBP") return "£";
-
-    return code;
-  }
-
-  /*
-   * PRICE CONVERSION
-   *
-   * manual_rate_from_ghs means:
-   *
-   * 1 GHS = X foreign currency
-   */
-  function convertPrice(
-    amount: number,
-    fromCode: string,
-    toCode: string
-  ) {
-    if (fromCode === toCode) {
-      return amount;
-    }
-
-    if (fromCode === "GHS") {
-      const targetCurrency =
-        getCurrency(toCode);
-
-      if (
-        !targetCurrency?.manual_rate_from_ghs
-      ) {
-        return null;
-      }
-
-      return (
-        amount *
-        targetCurrency.manual_rate_from_ghs
-      );
-    }
-
-    if (toCode === "GHS") {
-      const sourceCurrency =
-        getCurrency(fromCode);
-
-      if (
-        !sourceCurrency?.manual_rate_from_ghs
-      ) {
-        return null;
-      }
-
-      return (
-        amount /
-        sourceCurrency.manual_rate_from_ghs
-      );
-    }
-
-    const sourceCurrency =
-      getCurrency(fromCode);
-
-    const targetCurrency =
-      getCurrency(toCode);
-
-    if (
-      !sourceCurrency?.manual_rate_from_ghs ||
-      !targetCurrency?.manual_rate_from_ghs
-    ) {
-      return null;
-    }
-
-    const amountInGhs =
-      amount /
-      sourceCurrency.manual_rate_from_ghs;
-
-    return (
-      amountInGhs *
-      targetCurrency.manual_rate_from_ghs
-    );
-  }
-
-  function formatPrice(
-    amount: number,
-    currencyCode: string
-  ) {
-    return `${getCurrencySymbol(
-      currencyCode
-    )} ${amount.toLocaleString("en-GH", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
-  }
-
-  /*
-   * GET CATEGORY
-   */
-  const categories = useMemo(() => {
-    const values = new Set<string>();
-
-    listings.forEach((item) => {
-      if (item.category) {
-        values.add(item.category);
-      }
-    });
-
-    return Array.from(values).sort();
-  }, [listings]);
-
-  /*
-   * GET SUBCATEGORIES
-   */
-  const subcategories = useMemo(() => {
-    const values = new Set<string>();
-
-    listings.forEach((item) => {
-      if (
-        selectedCategory === "All Categories" ||
-        item.category === selectedCategory
-      ) {
-        if (item.subcategory) {
-          values.add(item.subcategory);
-        }
-      }
-    });
-
-    return Array.from(values).sort();
-  }, [
-    listings,
-    selectedCategory,
-  ]);
-
-  /*
-   * GET REGIONS
-   */
-  const regions = useMemo(() => {
-    return Object.keys(
-      GHANA_LOCATION_GROUPS
-    );
+    loadData();
   }, []);
 
-  /*
-   * GET SPECIFIC LOCATIONS
-   */
-  const locations = useMemo(() => {
-    const values = new Set<string>();
+  async function loadData() {
+    setLoading(true);
 
-    listings.forEach((item) => {
-      if (item.location) {
-        values.add(item.location);
+    try {
+      const [
+        { data: listingsData, error: listingsError },
+        { data: currenciesData, error: currenciesError },
+      ] = await Promise.all([
+        supabaseBrowser
+          .from("listings")
+          .select(
+            `
+              id,
+              title,
+              category,
+              subcategory,
+              price,
+              currency,
+              currency_code,
+              location,
+              description,
+              status,
+              created_at
+            `
+          )
+          .eq("status", "active")
+          .order("created_at", {
+            ascending: false,
+          }),
+
+        supabaseBrowser
+          .from("currencies")
+          .select(
+            `
+              code,
+              name,
+              symbol,
+              rate_to_ghs,
+              manual_rate_from_ghs
+            `
+          ),
+      ]);
+
+      if (listingsError) {
+        console.error(
+          "Listings loading error:",
+          listingsError
+        );
       }
-    });
 
-    Object.values(
-      GHANA_LOCATION_GROUPS
-    ).forEach((areas) => {
-      areas.forEach((area) => {
-        values.add(area);
-      });
-    });
+      if (currenciesError) {
+        console.error(
+          "Currency loading error:",
+          currenciesError
+        );
+      }
 
-    return Array.from(values).sort();
-  }, [listings]);
-
-  /*
-   * LOCATION MATCHING
-   *
-   * This allows:
-   *
-   * Region → all locations in that region
-   *
-   * City/Area → exact/specific location
-   */
-  function locationMatches(
-    listingLocation: string | null
-  ) {
-    if (!listingLocation) {
-      return false;
-    }
-
-    if (
-      selectedLocation === "All Ghana" &&
-      selectedRegion === "All Regions"
-    ) {
-      return true;
-    }
-
-    const normalized =
-      listingLocation
-        .trim()
-        .toLowerCase();
-
-    /*
-     * Specific location
-     */
-    if (
-      selectedLocation !== "All Ghana"
-    ) {
-      return (
-        normalized ===
-          selectedLocation
-            .trim()
-            .toLowerCase() ||
-        normalized.includes(
-          selectedLocation
-            .trim()
-            .toLowerCase()
-        )
+      setListings(
+        (listingsData as Listing[]) || []
       );
-    }
 
-    /*
-     * Region search
-     */
-    if (
-      selectedRegion !== "All Regions"
-    ) {
-      const areas =
-        GHANA_LOCATION_GROUPS[
-          selectedRegion
-        ] || [];
-
-      return areas.some((area) =>
-        normalized.includes(
-          area.toLowerCase()
-        )
+      setCurrencies(
+        (currenciesData as Currency[]) || []
       );
+    } catch (error) {
+      console.error(
+        "Marketplace search loading error:",
+        error
+      );
+    } finally {
+      setLoading(false);
     }
-
-    return true;
   }
 
-  /*
-   * CENTRAL SEARCH FILTER
-   */
   const filteredListings = useMemo(() => {
-    const searchText =
+    const normalizedSearch =
       search.trim().toLowerCase();
 
-    return listings.filter((item) => {
+    const normalizedLocation =
+      location.trim().toLowerCase();
+
+    return listings.filter((listing) => {
+      const title =
+        listing.title?.toLowerCase() || "";
+
+      const description =
+        listing.description?.toLowerCase() || "";
+
+      const listingCategory =
+        listing.category?.toLowerCase() || "";
+
+      const listingSubcategory =
+        listing.subcategory?.toLowerCase() || "";
+
+      const listingLocation =
+        listing.location?.toLowerCase() || "";
+
       const matchesSearch =
-        !searchText ||
-        item.title
-          ?.toLowerCase()
-          .includes(searchText) ||
-        item.description
-          ?.toLowerCase()
-          .includes(searchText) ||
-        item.category
-          ?.toLowerCase()
-          .includes(searchText) ||
-        item.subcategory
-          ?.toLowerCase()
-          .includes(searchText) ||
-        item.location
-          ?.toLowerCase()
-          .includes(searchText);
+        !normalizedSearch ||
+        title.includes(normalizedSearch) ||
+        description.includes(normalizedSearch) ||
+        listingCategory.includes(normalizedSearch) ||
+        listingSubcategory.includes(
+          normalizedSearch
+        ) ||
+        listingLocation.includes(
+          normalizedSearch
+        );
 
       const matchesCategory =
-        selectedCategory ===
-          "All Categories" ||
-        item.category ===
-          selectedCategory ||
-        item.subcategory ===
-          selectedCategory;
+        !category ||
+        listingCategory ===
+          category.toLowerCase() ||
+        listingCategory.includes(
+          category.toLowerCase()
+        ) ||
+        category
+          .toLowerCase()
+          .includes(listingCategory);
 
       const matchesSubcategory =
-        selectedSubcategory ===
-          "All Subcategories" ||
-        item.subcategory ===
-          selectedSubcategory;
+        !subcategory ||
+        listingSubcategory ===
+          subcategory.toLowerCase() ||
+        listingSubcategory.includes(
+          subcategory.toLowerCase()
+        ) ||
+        subcategory
+          .toLowerCase()
+          .includes(listingSubcategory);
+
+      const matchesRegion =
+        !region ||
+        listingLocation.includes(
+          region.toLowerCase()
+        );
 
       const matchesLocation =
-        locationMatches(item.location);
+        !normalizedLocation ||
+        listingLocation.includes(
+          normalizedLocation
+        );
 
       return (
         matchesSearch &&
         matchesCategory &&
         matchesSubcategory &&
+        matchesRegion &&
         matchesLocation
       );
     });
   }, [
     listings,
     search,
-    selectedCategory,
-    selectedSubcategory,
-    selectedRegion,
-    selectedLocation,
+    category,
+    subcategory,
+    region,
+    location,
   ]);
 
-  /*
-   * LISTING HELPERS
-   */
-  function getListingCurrency(
-    item: Listing
-  ) {
-    return (
-      item.currency_code ||
-      item.currency ||
-      "GHS"
-    ).toUpperCase();
-  }
+  const currentSubcategories = useMemo(() => {
+    if (!category) {
+      return [];
+    }
 
-  function getListingIcon(
-    item: Listing
-  ) {
     return (
-      categoryIcons[
-        item.category || ""
-      ] ||
-      categoryIcons[
-        item.subcategory || ""
-      ] ||
-      fallbackIcon
+      SUBCATEGORY_OPTIONS[category] || []
+    );
+  }, [category]);
+
+  const availableLocations = useMemo(() => {
+    if (!region) {
+      return [];
+    }
+
+    return [
+      ...(GHANA_LOCATION_GROUPS[region]?.cities ||
+        []),
+      ...(GHANA_LOCATION_GROUPS[region]?.areas ||
+        []),
+    ];
+  }, [region]);
+
+  function getCurrency(code: string | null) {
+    if (!code) {
+      return null;
+    }
+
+    return (
+      currencies.find(
+        (currency) =>
+          currency.code.toUpperCase() ===
+          code.toUpperCase()
+      ) || null
     );
   }
 
-  /*
-   * CLEAR FILTERS
-   */
+  function formatPrice(listing: Listing) {
+    if (
+      listing.price === null ||
+      listing.price === undefined
+    ) {
+      return "Price on request";
+    }
+
+    const code =
+      listing.currency_code ||
+      listing.currency ||
+      "GHS";
+
+    const currency = getCurrency(code);
+
+    const symbol =
+      currency?.symbol ||
+      (code === "GHS"
+        ? "GH₵"
+        : code === "USD"
+          ? "$"
+          : code === "EUR"
+            ? "€"
+            : code === "GBP"
+              ? "£"
+              : code === "CNY"
+                ? "¥"
+                : `${code} `);
+
+    return `${symbol}${Number(
+      listing.price
+    ).toLocaleString("en-GH", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+  }
+
   function clearFilters() {
     setSearch("");
-    setSelectedCategory(
-      "All Categories"
-    );
-    setSelectedSubcategory(
-      "All Subcategories"
-    );
-    setSelectedRegion(
-      "All Regions"
-    );
-    setSelectedLocation(
-      "All Ghana"
-    );
-  }
-
-  /*
-   * CHANGE CATEGORY
-   */
-  function handleCategoryChange(
-    value: string
-  ) {
-    setSelectedCategory(value);
-
-    setSelectedSubcategory(
-      "All Subcategories"
-    );
-  }
-
-  /*
-   * CHANGE REGION
-   */
-  function handleRegionChange(
-    value: string
-  ) {
-    setSelectedRegion(value);
-
-    setSelectedLocation(
-      "All Ghana"
-    );
+    setCategory("");
+    setSubcategory("");
+    setRegion("");
+    setLocation("");
   }
 
   return (
-    <main className="min-h-screen bg-slate-50">
-
+    <main className="min-h-screen bg-white text-gray-900">
       {/* HEADER */}
-      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-
-          <Link
-            href="/"
-            className="flex items-center gap-3"
-          >
-            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-700 text-2xl text-white shadow-md">
-              ⭐
-            </div>
-
+      <header className="border-b bg-white">
+        <div className="mx-auto max-w-7xl px-4 py-5">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <div className="text-lg font-black text-slate-900">
+              <Link
+                href="/"
+                className="text-2xl font-extrabold tracking-tight text-blue-700"
+              >
                 BEST SALES GHANA
-              </div>
+              </Link>
 
-              <div className="text-xs text-slate-500">
-                Buy • Sell • Advertise • Connect
-              </div>
+              <p className="mt-1 text-sm text-gray-500">
+                Search products, vehicles, property,
+                machinery, agriculture and services.
+              </p>
             </div>
-          </Link>
 
-          <nav className="hidden items-center gap-6 md:flex">
+            <div className="flex gap-2">
+              <Link
+                href="/post-ad"
+                className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800"
+              >
+                Post an Ad
+              </Link>
 
-            <Link
-              href="/"
-              className="font-semibold text-slate-700 hover:text-blue-700"
-            >
-              Home
-            </Link>
-
-            <Link
-              href="/categories"
-              className="font-semibold text-slate-700 hover:text-blue-700"
-            >
-              Categories
-            </Link>
-
-            <Link
-              href="/listings"
-              className="font-semibold text-blue-700"
-            >
-              Listings
-            </Link>
-
-            <Link
-              href="/sell"
-              className="rounded-xl bg-blue-700 px-5 py-3 font-bold text-white hover:bg-blue-800"
-            >
-              Post an Ad
-            </Link>
-
-          </nav>
+              <Link
+                href="/account"
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                Account
+              </Link>
+            </div>
+          </div>
         </div>
       </header>
 
-      {/* HERO */}
-      <section className="bg-gradient-to-br from-blue-800 via-blue-700 to-cyan-400 text-white">
+      {/* SEARCH AREA */}
+      <section className="border-b bg-gray-50">
+        <div className="mx-auto max-w-7xl px-4 py-6">
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
 
-        <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+              const params =
+                new URLSearchParams();
 
-          <p className="text-sm font-black uppercase tracking-[0.2em] text-cyan-100">
-            BEST SALES GHANA Marketplace
-          </p>
-
-          <h1 className="mt-3 text-4xl font-black sm:text-5xl lg:text-6xl">
-            Browse Listings
-          </h1>
-
-          <p className="mt-4 max-w-2xl text-lg leading-8 text-white/90">
-            Search vehicles, property, electronics,
-            machinery, agriculture, services and more
-            across Ghana.
-          </p>
-
-        </div>
-      </section>
-
-      {/* CENTRAL SEARCH */}
-      <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-
-          <div className="mb-5">
-            <h2 className="text-xl font-black text-slate-900">
-              Search BEST SALES GHANA
-            </h2>
-
-            <p className="mt-1 text-sm text-slate-500">
-              Search by item, category, subcategory,
-              region or specific location.
-            </p>
-          </div>
-
-          {/* SEARCH ROW */}
-          <div className="grid gap-3 lg:grid-cols-[1fr_190px_190px_190px_150px]">
-
-            <input
-              type="search"
-              value={search}
-              onChange={(event) =>
-                setSearch(
-                  event.target.value
-                )
+              if (search.trim()) {
+                params.set("q", search.trim());
               }
-              placeholder="Search products, vehicles, property, machinery..."
-              className="rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-600"
-            />
 
-            {/* CATEGORY */}
-            <select
-              value={selectedCategory}
-              onChange={(event) =>
-                handleCategoryChange(
-                  event.target.value
-                )
+              if (category) {
+                params.set("category", category);
               }
-              className="rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none"
-            >
-              <option>
-                All Categories
-              </option>
 
-              {categories.map(
-                (category) => (
-                  <option
-                    key={category}
-                    value={category}
-                  >
-                    {category}
-                  </option>
-                )
-              )}
-            </select>
-
-            {/* SUBCATEGORY */}
-            <select
-              value={selectedSubcategory}
-              onChange={(event) =>
-                setSelectedSubcategory(
-                  event.target.value
-                )
+              if (subcategory) {
+                params.set(
+                  "subcategory",
+                  subcategory
+                );
               }
-              className="rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none"
-            >
-              <option>
-                All Subcategories
-              </option>
 
-              {subcategories.map(
-                (subcategory) => (
-                  <option
-                    key={subcategory}
-                    value={subcategory}
-                  >
-                    {subcategory}
-                  </option>
-                )
-              )}
-            </select>
-
-            {/* REGION */}
-            <select
-              value={selectedRegion}
-              onChange={(event) =>
-                handleRegionChange(
-                  event.target.value
-                )
+              if (region) {
+                params.set("region", region);
               }
-              className="rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none"
-            >
-              <option>
-                All Regions
-              </option>
 
-              {regions.map(
-                (region) => (
-                  <option
-                    key={region}
-                    value={region}
-                  >
-                    {region}
-                  </option>
-                )
-              )}
-            </select>
-
-            {/* CURRENCY */}
-            <select
-              value={displayCurrency}
-              onChange={(event) =>
-                setDisplayCurrency(
-                  event.target.value
-                )
+              if (location) {
+                params.set(
+                  "location",
+                  location
+                );
               }
-              className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 font-bold text-blue-800 outline-none"
-            >
-              <option value="GHS">
-                🇬🇭 GHS
-              </option>
 
-              <option value="USD">
-                🇺🇸 USD
-              </option>
-
-              <option value="CNY">
-                🇨🇳 RMB
-              </option>
-
-              <option value="EUR">
-                🇪🇺 EUR
-              </option>
-
-              <option value="GBP">
-                🇬🇧 GBP
-              </option>
-            </select>
-
-          </div>
-
-          {/* SPECIFIC LOCATION */}
-          <div className="mt-3 grid gap-3 md:grid-cols-[1fr_auto]">
-
-            <select
-              value={selectedLocation}
-              onChange={(event) =>
-                setSelectedLocation(
-                  event.target.value
-                )
-              }
-              className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 outline-none"
-            >
-              <option value="All Ghana">
-                📍 All Ghana / Any Location
-              </option>
-
-              {locations.map(
-                (location) => (
-                  <option
-                    key={location}
-                    value={location}
-                  >
-                    📍 {location}
-                  </option>
-                )
-              )}
-            </select>
-
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="rounded-xl border border-slate-300 bg-white px-6 py-3 font-bold text-slate-700 hover:bg-slate-50"
-            >
-              Clear Filters
-            </button>
-
-          </div>
-
-          {/* LOCATION INFORMATION */}
-          <div className="mt-4 rounded-xl bg-blue-50 p-4">
-
-            <p className="font-black text-slate-900">
-              📍 Item / Seller Location
-            </p>
-
-            <p className="mt-1 text-sm text-slate-600">
-              Select the location where the item,
-              vehicle, property or service is located.
-              Buyer GPS will be handled separately for
-              delivery and nearby searches.
-            </p>
-
-          </div>
-
-        </div>
-      </section>
-
-      {/* RESULTS */}
-      <section className="mx-auto max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
-
-        <div className="mb-8 flex items-end justify-between">
-
-          <div>
-
-            <p className="text-sm font-black uppercase tracking-widest text-blue-700">
-              Marketplace
-            </p>
-
-            <h2 className="mt-2 text-3xl font-black text-slate-900">
-              Search Results
-            </h2>
-
-            <p className="mt-2 text-slate-500">
-
-              {loading
-                ? "Loading marketplace listings..."
-                : `${filteredListings.length} listings found`}
-
-            </p>
-
-          </div>
-
-          <Link
-            href="/sell"
-            className="hidden rounded-xl bg-blue-700 px-5 py-3 font-bold text-white hover:bg-blue-800 sm:inline-flex"
+              window.location.href =
+                `/listings?${params.toString()}`;
+            }}
+            className="grid gap-3 md:grid-cols-2 lg:grid-cols-6"
           >
-            + Post an Ad
-          </Link>
+            <div className="lg:col-span-2">
+              <label className="mb-1 block text-xs font-semibold text-gray-600">
+                What are you looking for?
+              </label>
 
-        </div>
+              <input
+                value={search}
+                onChange={(event) =>
+                  setSearch(event.target.value)
+                }
+                placeholder="Search products, cars, land, machines..."
+                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
 
-        {/* ERROR */}
-        {errorMessage && (
-          <div className="mb-8 rounded-2xl border border-red-200 bg-red-50 p-5 text-red-800">
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-gray-600">
+                Category
+              </label>
 
-            <p className="font-black">
-              Unable to load listings
-            </p>
-
-            <p className="mt-1 text-sm">
-              {errorMessage}
-            </p>
-
-          </div>
-        )}
-
-        {/* LOADING */}
-        {loading && (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-
-            {Array.from({
-              length: 8,
-            }).map((_, index) => (
-
-              <div
-                key={index}
-                className="animate-pulse overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+              <select
+                value={category}
+                onChange={(event) => {
+                  setCategory(event.target.value);
+                  setSubcategory("");
+                }}
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-3 text-sm outline-none focus:border-blue-600"
               >
+                <option value="">
+                  All categories
+                </option>
 
-                <div className="h-48 bg-slate-200" />
+                {CATEGORY_OPTIONS.map(
+                  (item) => (
+                    <option
+                      key={item}
+                      value={item}
+                    >
+                      {item}
+                    </option>
+                  )
+                )}
+              </select>
+            </div>
 
-                <div className="space-y-3 p-5">
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-gray-600">
+                Subcategory
+              </label>
 
-                  <div className="h-3 w-20 rounded bg-slate-200" />
+              <select
+                value={subcategory}
+                onChange={(event) =>
+                  setSubcategory(
+                    event.target.value
+                  )
+                }
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-3 text-sm outline-none focus:border-blue-600"
+              >
+                <option value="">
+                  All subcategories
+                </option>
 
-                  <div className="h-5 w-3/4 rounded bg-slate-200" />
+                {currentSubcategories.map(
+                  (item) => (
+                    <option
+                      key={item}
+                      value={item}
+                    >
+                      {item}
+                    </option>
+                  )
+                )}
+              </select>
+            </div>
 
-                  <div className="h-4 w-full rounded bg-slate-200" />
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-gray-600">
+                Region
+              </label>
 
-                  <div className="h-6 w-1/2 rounded bg-slate-200" />
+              <select
+                value={region}
+                onChange={(event) => {
+                  setRegion(event.target.value);
+                  setLocation("");
+                }}
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-3 text-sm outline-none focus:border-blue-600"
+              >
+                <option value="">
+                  All Ghana
+                </option>
 
-                </div>
+                {Object.keys(
+                  GHANA_LOCATION_GROUPS
+                ).map((item) => (
+                  <option
+                    key={item}
+                    value={item}
+                  >
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-              </div>
-            ))}
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-gray-600">
+                City / Area
+              </label>
 
-          </div>
-        )}
+              <select
+                value={location}
+                onChange={(event) =>
+                  setLocation(
+                    event.target.value
+                  )
+                }
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-3 text-sm outline-none focus:border-blue-600"
+              >
+                <option value="">
+                  Any location
+                </option>
 
-        {/* EMPTY */}
-        {!loading &&
-          !errorMessage &&
-          filteredListings.length === 0 && (
+                {availableLocations.map(
+                  (item) => (
+                    <option
+                      key={item}
+                      value={item}
+                    >
+                      {item}
+                    </option>
+                  )
+                )}
+              </select>
+            </div>
 
-            <div className="rounded-3xl border border-slate-200 bg-white p-12 text-center shadow-sm">
-
-              <div className="text-5xl">
-                🔎
-              </div>
-
-              <h3 className="mt-4 text-2xl font-black">
-                No listings found
-              </h3>
-
-              <p className="mt-2 text-slate-500">
-                Try another keyword, category,
-                subcategory or location.
-              </p>
+            <div className="flex items-end gap-2 md:col-span-2 lg:col-span-6">
+              <button
+                type="submit"
+                className="rounded-lg bg-blue-700 px-6 py-3 text-sm font-bold text-white hover:bg-blue-800"
+              >
+                Search
+              </button>
 
               <button
                 type="button"
                 onClick={clearFilters}
-                className="mt-6 rounded-xl bg-blue-700 px-5 py-3 font-bold text-white hover:bg-blue-800"
+                className="rounded-lg border border-gray-300 bg-white px-6 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-100"
               >
-                Clear Filters
+                Clear
               </button>
 
-            </div>
-          )}
-
-        {/* LISTINGS */}
-        {!loading &&
-          filteredListings.length > 0 && (
-
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-
-              {filteredListings.map(
-                (item) => {
-
-                  const originalCurrency =
-                    getListingCurrency(item);
-
-                  const originalPrice =
-                    Number(item.price || 0);
-
-                  const convertedPrice =
-                    item.price != null
-                      ? convertPrice(
-                          originalPrice,
-                          originalCurrency,
-                          displayCurrency
-                        )
-                      : null;
-
-                  const hasConversion =
-                    convertedPrice !== null;
-
-                  return (
-                    <article
-                      key={item.id}
-                      className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
-                    >
-
-                      <div className="flex h-48 items-center justify-center bg-gradient-to-br from-blue-50 to-slate-100 text-7xl">
-                        {getListingIcon(item)}
-                      </div>
-
-                      <div className="p-5">
-
-                        <div className="text-xs font-black uppercase tracking-wider text-blue-700">
-                          {item.category ||
-                            item.subcategory ||
-                            "Marketplace"}
-                        </div>
-
-                        {item.subcategory && (
-                          <div className="mt-1 text-xs font-bold text-slate-400">
-                            {item.subcategory}
-                          </div>
-                        )}
-
-                        <h3 className="mt-2 text-lg font-black text-slate-900">
-                          {item.title}
-                        </h3>
-
-                        <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-500">
-                          {item.description ||
-                            "Contact the seller for more information."}
-                        </p>
-
-                        {item.price != null ? (
-
-                          <div className="mt-4">
-
-                            <div className="text-lg font-black text-blue-700">
-                              {formatPrice(
-                                originalPrice,
-                                originalCurrency
-                              )}
-                            </div>
-
-                            {displayCurrency !==
-                              originalCurrency && (
-
-                              <div className="mt-1 text-sm font-bold text-slate-500">
-
-                                {hasConversion
-                                  ? `≈ ${formatPrice(
-                                      convertedPrice!,
-                                      displayCurrency
-                                    )}`
-                                  : `Rate not set for ${displayCurrency}`}
-
-                              </div>
-                            )}
-
-                          </div>
-
-                        ) : (
-
-                          <div className="mt-4 text-lg font-black text-blue-700">
-                            Contact Seller
-                          </div>
-
-                        )}
-
-                        <div className="mt-2 text-sm text-slate-500">
-                          📍{" "}
-                          {item.location ||
-                            "Ghana"}
-                        </div>
-
-                        <Link
-                          href={`/chat?listing=${item.id}`}
-                          className="mt-5 block rounded-xl border border-blue-700 px-4 py-3 text-center font-bold text-blue-700 hover:bg-blue-50"
-                        >
-                          Contact Seller
-                        </Link>
-
-                        <Link
-                          href={`/listings/${item.id}`}
-                          className="mt-2 block rounded-xl bg-blue-700 px-4 py-3 text-center font-bold text-white hover:bg-blue-800"
-                        >
-                          View Listing
-                        </Link>
-
-                      </div>
-
-                    </article>
+              <button
+                type="button"
+                onClick={() => {
+                  alert(
+                    "Location detection will be connected to the Ghana location and delivery system."
                   );
-                }
-              )}
-
+                }}
+                className="rounded-lg border border-blue-200 bg-blue-50 px-5 py-3 text-sm font-semibold text-blue-700 hover:bg-blue-100"
+              >
+                Detect Location
+              </button>
             </div>
-          )}
+          </form>
 
+          <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-blue-800">
+            <strong>Location:</strong>{" "}
+            Marketplace search uses the seller/item
+            location. Buyer GPS and GhanaPost GPS will
+            be used separately for delivery and nearby
+            services.
+          </div>
+        </div>
       </section>
 
-      {/* DELIVERY */}
-      <section className="mx-auto max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
+      {/* RESULTS */}
+      <section className="mx-auto max-w-7xl px-4 py-8">
+        <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">
+              Marketplace Search
+            </h1>
 
-        <div className="rounded-3xl bg-slate-950 p-8 text-white sm:p-10">
+            <p className="mt-1 text-sm text-gray-500">
+              {loading
+                ? "Loading listings..."
+                : `${filteredListings.length} listing${
+                    filteredListings.length === 1
+                      ? ""
+                      : "s"
+                  } found`}
+            </p>
+          </div>
 
-          <div className="grid gap-8 md:grid-cols-3">
+          {(search ||
+            category ||
+            subcategory ||
+            region ||
+            location) && (
+            <div className="flex flex-wrap gap-2">
+              {search && (
+                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">
+                  Search: {search}
+                </span>
+              )}
 
-            <div>
-              <div className="text-3xl">
-                🚚
+              {category && (
+                <span className="rounded-full bg-blue-50 px-3 py-1 text-xs text-blue-700">
+                  {category}
+                </span>
+              )}
+
+              {subcategory && (
+                <span className="rounded-full bg-blue-50 px-3 py-1 text-xs text-blue-700">
+                  {subcategory}
+                </span>
+              )}
+
+              {region && (
+                <span className="rounded-full bg-blue-50 px-3 py-1 text-xs text-blue-700">
+                  {region}
+                </span>
+              )}
+
+              {location && (
+                <span className="rounded-full bg-blue-50 px-3 py-1 text-xs text-blue-700">
+                  {location}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {loading ? (
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {Array.from({
+              length: 8,
+            }).map((_, index) => (
+              <div
+                key={index}
+                className="overflow-hidden rounded-xl border border-gray-200 bg-white"
+              >
+                <div className="h-48 animate-pulse bg-gray-200" />
+
+                <div className="space-y-3 p-4">
+                  <div className="h-4 animate-pulse rounded bg-gray-200" />
+                  <div className="h-4 w-2/3 animate-pulse rounded bg-gray-200" />
+                  <div className="h-6 w-1/2 animate-pulse rounded bg-gray-200" />
+                </div>
               </div>
-
-              <h3 className="mt-3 text-xl font-black">
-                Optional Delivery
-              </h3>
-
-              <p className="mt-2 text-sm leading-6 text-slate-400">
-                Individual sellers can choose whether
-                to offer BEST SALES GHANA delivery.
-              </p>
+            ))}
+          </div>
+        ) : filteredListings.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-6 py-16 text-center">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-white text-2xl shadow-sm">
+              🔎
             </div>
 
-            <div>
-              <div className="text-3xl">
+            <h2 className="text-xl font-bold text-gray-800">
+              No listings found
+            </h2>
+
+            <p className="mx-auto mt-2 max-w-lg text-sm text-gray-500">
+              Try another search term, category,
+              region or location.
+            </p>
+
+            <button
+              onClick={clearFilters}
+              className="mt-5 rounded-lg bg-blue-700 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-800"
+            >
+              Clear Search
+            </button>
+          </div>
+        ) : (
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {filteredListings.map(
+              (listing) => (
+                <article
+                  key={listing.id}
+                  className="group overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
+                >
+                  <Link
+                    href={`/listings/${listing.id}`}
+                    className="block"
+                  >
+                    <div className="flex h-48 items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 text-5xl">
+                      🛍️
+                    </div>
+
+                    <div className="p-4">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-bold uppercase text-blue-700">
+                          {listing.category ||
+                            "Marketplace"}
+                        </span>
+
+                        <span className="text-[10px] text-gray-400">
+                          {new Date(
+                            listing.created_at
+                          ).toLocaleDateString(
+                            "en-GH"
+                          )}
+                        </span>
+                      </div>
+
+                      <h2 className="line-clamp-2 min-h-[48px] text-base font-bold text-gray-900 group-hover:text-blue-700">
+                        {listing.title}
+                      </h2>
+
+                      <p className="mt-2 line-clamp-2 min-h-[40px] text-xs text-gray-500">
+                        {listing.description ||
+                          "View this listing for more details."}
+                      </p>
+
+                      <div className="mt-4 text-lg font-extrabold text-blue-700">
+                        {formatPrice(listing)}
+                      </div>
+
+                      <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
+                        <span>📍</span>
+
+                        <span className="line-clamp-1">
+                          {listing.location ||
+                            "Location not specified"}
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
+
+                  <div className="grid grid-cols-2 gap-2 border-t border-gray-100 p-3">
+                    <Link
+                      href={`/listings/${listing.id}`}
+                      className="rounded-lg bg-gray-100 px-3 py-2 text-center text-xs font-semibold text-gray-700 hover:bg-gray-200"
+                    >
+                      View
+                    </Link>
+
+                    <Link
+                      href={`/chat?listing=${listing.id}`}
+                      className="rounded-lg bg-blue-700 px-3 py-2 text-center text-xs font-semibold text-white hover:bg-blue-800"
+                    >
+                      Chat Seller
+                    </Link>
+                  </div>
+                </article>
+              )
+            )}
+          </div>
+        )}
+      </section>
+
+      {/* DELIVERY INFORMATION */}
+      <section className="border-t bg-gray-50">
+        <div className="mx-auto max-w-7xl px-4 py-10">
+          <div className="grid gap-5 md:grid-cols-3">
+            <div className="rounded-xl border bg-white p-5">
+              <div className="mb-3 text-2xl">
                 📍
               </div>
 
-              <h3 className="mt-3 text-xl font-black">
+              <h3 className="font-bold">
+                Seller / Item Location
+              </h3>
+
+              <p className="mt-2 text-sm leading-6 text-gray-500">
+                Search listings by the physical
+                location of the item or seller.
+              </p>
+            </div>
+
+            <div className="rounded-xl border bg-white p-5">
+              <div className="mb-3 text-2xl">
+                🛰️
+              </div>
+
+              <h3 className="font-bold">
                 GhanaPost GPS
               </h3>
 
-              <p className="mt-2 text-sm leading-6 text-slate-400">
-                Buyer and seller locations can later
-                be captured for delivery.
+              <p className="mt-2 text-sm leading-6 text-gray-500">
+                Buyer delivery addresses will support
+                GhanaPost GPS digital addresses for
+                accurate delivery.
               </p>
             </div>
 
-            <div>
-              <div className="text-3xl">
-                📦
+            <div className="rounded-xl border bg-white p-5">
+              <div className="mb-3 text-2xl">
+                🚚
               </div>
 
-              <h3 className="mt-3 text-xl font-black">
-                Track Your Item
+              <h3 className="font-bold">
+                Delivery & Tracking
               </h3>
 
-              <p className="mt-2 text-sm leading-6 text-slate-400">
-                Marketplace deliveries can receive a
-                tracking number.
+              <p className="mt-2 text-sm leading-6 text-gray-500">
+                Delivery tracking will be connected to
+                the marketplace order and delivery
+                system.
               </p>
             </div>
-
           </div>
-
         </div>
-
       </section>
-
-      {/* FOOTER */}
-      <footer className="bg-slate-950 py-10 text-white">
-
-        <div className="mx-auto max-w-7xl px-4 text-center">
-
-          <div className="text-xl font-black">
-            BEST SALES GHANA
-          </div>
-
-          <p className="mt-2 text-sm text-slate-400">
-            Buy • Sell • Advertise • Connect
-          </p>
-
-          <p className="mt-6 text-sm text-slate-500">
-            © 2026 All Prominent Ghana Limited.
-            All rights reserved.
-          </p>
-
-        </div>
-
-      </footer>
-
     </main>
+  );
+}
+
+export default function ListingsPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="flex min-h-screen items-center justify-center bg-white">
+          <div className="text-center">
+            <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-blue-700" />
+
+            <p className="text-sm font-medium text-gray-600">
+              Loading marketplace...
+            </p>
+          </div>
+        </main>
+      }
+    >
+      <ListingsContent />
+    </Suspense>
   );
 }
