@@ -1,7 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import {
+  Suspense,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { useSearchParams } from "next/navigation";
 import { supabaseBrowser } from "@/supabase-browser";
 
@@ -63,7 +68,7 @@ const GHANA_LOCATION_GROUPS: Record<
     ],
   },
 
-  "Ashanti": {
+  Ashanti: {
     cities: [
       "Kumasi",
       "Obuasi",
@@ -84,7 +89,7 @@ const GHANA_LOCATION_GROUPS: Record<
     ],
   },
 
-  "Western": {
+  Western: {
     cities: [
       "Takoradi",
       "Sekondi",
@@ -101,7 +106,7 @@ const GHANA_LOCATION_GROUPS: Record<
     ],
   },
 
-  "Central": {
+  Central: {
     cities: [
       "Cape Coast",
       "Kasoa",
@@ -118,7 +123,7 @@ const GHANA_LOCATION_GROUPS: Record<
     ],
   },
 
-  "Eastern": {
+  Eastern: {
     cities: [
       "Koforidua",
       "Nkawkaw",
@@ -135,7 +140,7 @@ const GHANA_LOCATION_GROUPS: Record<
     ],
   },
 
-  "Volta": {
+  Volta: {
     cities: [
       "Ho",
       "Hohoe",
@@ -151,7 +156,7 @@ const GHANA_LOCATION_GROUPS: Record<
     ],
   },
 
-  "Northern": {
+  Northern: {
     cities: [
       "Tamale",
       "Yendi",
@@ -167,7 +172,7 @@ const GHANA_LOCATION_GROUPS: Record<
     ],
   },
 
-  "Bono": {
+  Bono: {
     cities: [
       "Sunyani",
       "Berekum",
@@ -193,7 +198,7 @@ const GHANA_LOCATION_GROUPS: Record<
     ],
   },
 
-  "Ahafo": {
+  Ahafo: {
     cities: [
       "Goaso",
       "Bechem",
@@ -243,7 +248,7 @@ const GHANA_LOCATION_GROUPS: Record<
     ],
   },
 
-  "Oti": {
+  Oti: {
     cities: [
       "Dambai",
       "Kete Krachi",
@@ -255,7 +260,7 @@ const GHANA_LOCATION_GROUPS: Record<
     ],
   },
 
-  "Savannah": {
+  Savannah: {
     cities: [
       "Damongo",
       "Bole",
@@ -294,7 +299,10 @@ const CATEGORY_OPTIONS = [
   "Home & Garden",
 ];
 
-const SUBCATEGORY_OPTIONS: Record<string, string[]> = {
+const SUBCATEGORY_OPTIONS: Record<
+  string,
+  string[]
+> = {
   Property: [
     "Houses",
     "Apartments",
@@ -397,8 +405,14 @@ const SUBCATEGORY_OPTIONS: Record<string, string[]> = {
 function ListingsContent() {
   const searchParams = useSearchParams();
 
-  const [listings, setListings] = useState<Listing[]>([]);
-  const [currencies, setCurrencies] = useState<Currency[]>([]);
+  const [listings, setListings] = useState<Listing[]>(
+    []
+  );
+
+  const [currencies, setCurrencies] = useState<
+    Currency[]
+  >([]);
+
   const [loading, setLoading] = useState(true);
 
   const [search, setSearch] = useState("");
@@ -441,11 +455,21 @@ function ListingsContent() {
     setLoading(true);
 
     try {
+      /*
+       * The project's Supabase client currently has a
+       * TypeScript typing issue with .from().
+       *
+       * Casting the local client here does NOT change the
+       * actual Supabase connection or database.
+       */
+      const supabase =
+        supabaseBrowser as any;
+
       const [
-        { data: listingsData, error: listingsError },
-        { data: currenciesData, error: currenciesError },
+        listingsResult,
+        currenciesResult,
       ] = await Promise.all([
-        supabaseBrowser
+        supabase
           .from("listings")
           .select(
             `
@@ -467,7 +491,7 @@ function ListingsContent() {
             ascending: false,
           }),
 
-        supabaseBrowser
+        supabase
           .from("currencies")
           .select(
             `
@@ -479,6 +503,16 @@ function ListingsContent() {
             `
           ),
       ]);
+
+      const {
+        data: listingsData,
+        error: listingsError,
+      } = listingsResult;
+
+      const {
+        data: currenciesData,
+        error: currenciesError,
+      } = currenciesResult;
 
       if (listingsError) {
         console.error(
@@ -538,7 +572,9 @@ function ListingsContent() {
         !normalizedSearch ||
         title.includes(normalizedSearch) ||
         description.includes(normalizedSearch) ||
-        listingCategory.includes(normalizedSearch) ||
+        listingCategory.includes(
+          normalizedSearch
+        ) ||
         listingSubcategory.includes(
           normalizedSearch
         ) ||
@@ -620,7 +656,9 @@ function ListingsContent() {
     ];
   }, [region]);
 
-  function getCurrency(code: string | null) {
+  function getCurrency(
+    code: string | null
+  ) {
     if (!code) {
       return null;
     }
@@ -634,7 +672,9 @@ function ListingsContent() {
     );
   }
 
-  function formatPrice(listing: Listing) {
+  function formatPrice(
+    listing: Listing
+  ) {
     if (
       listing.price === null ||
       listing.price === undefined
@@ -679,6 +719,44 @@ function ListingsContent() {
     setLocation("");
   }
 
+  function performSearch() {
+    const params =
+      new URLSearchParams();
+
+    if (search.trim()) {
+      params.set("q", search.trim());
+    }
+
+    if (category) {
+      params.set("category", category);
+    }
+
+    if (subcategory) {
+      params.set(
+        "subcategory",
+        subcategory
+      );
+    }
+
+    if (region) {
+      params.set("region", region);
+    }
+
+    if (location) {
+      params.set(
+        "location",
+        location
+      );
+    }
+
+    const query =
+      params.toString();
+
+    window.location.href = query
+      ? `/listings?${query}`
+      : "/listings";
+  }
+
   return (
     <main className="min-h-screen bg-white text-gray-900">
       {/* HEADER */}
@@ -694,8 +772,9 @@ function ListingsContent() {
               </Link>
 
               <p className="mt-1 text-sm text-gray-500">
-                Search products, vehicles, property,
-                machinery, agriculture and services.
+                Search products, vehicles,
+                property, machinery,
+                agriculture and services.
               </p>
             </div>
 
@@ -718,47 +797,17 @@ function ListingsContent() {
         </div>
       </header>
 
-      {/* SEARCH AREA */}
+      {/* SEARCH */}
       <section className="border-b bg-gray-50">
         <div className="mx-auto max-w-7xl px-4 py-6">
           <form
             onSubmit={(event) => {
               event.preventDefault();
-
-              const params =
-                new URLSearchParams();
-
-              if (search.trim()) {
-                params.set("q", search.trim());
-              }
-
-              if (category) {
-                params.set("category", category);
-              }
-
-              if (subcategory) {
-                params.set(
-                  "subcategory",
-                  subcategory
-                );
-              }
-
-              if (region) {
-                params.set("region", region);
-              }
-
-              if (location) {
-                params.set(
-                  "location",
-                  location
-                );
-              }
-
-              window.location.href =
-                `/listings?${params.toString()}`;
+              performSearch();
             }}
             className="grid gap-3 md:grid-cols-2 lg:grid-cols-6"
           >
+            {/* SEARCH INPUT */}
             <div className="lg:col-span-2">
               <label className="mb-1 block text-xs font-semibold text-gray-600">
                 What are you looking for?
@@ -767,13 +816,16 @@ function ListingsContent() {
               <input
                 value={search}
                 onChange={(event) =>
-                  setSearch(event.target.value)
+                  setSearch(
+                    event.target.value
+                  )
                 }
                 placeholder="Search products, cars, land, machines..."
                 className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
               />
             </div>
 
+            {/* CATEGORY */}
             <div>
               <label className="mb-1 block text-xs font-semibold text-gray-600">
                 Category
@@ -782,7 +834,9 @@ function ListingsContent() {
               <select
                 value={category}
                 onChange={(event) => {
-                  setCategory(event.target.value);
+                  setCategory(
+                    event.target.value
+                  );
                   setSubcategory("");
                 }}
                 className="w-full rounded-lg border border-gray-300 bg-white px-3 py-3 text-sm outline-none focus:border-blue-600"
@@ -804,6 +858,7 @@ function ListingsContent() {
               </select>
             </div>
 
+            {/* SUBCATEGORY */}
             <div>
               <label className="mb-1 block text-xs font-semibold text-gray-600">
                 Subcategory
@@ -835,6 +890,7 @@ function ListingsContent() {
               </select>
             </div>
 
+            {/* REGION */}
             <div>
               <label className="mb-1 block text-xs font-semibold text-gray-600">
                 Region
@@ -843,7 +899,9 @@ function ListingsContent() {
               <select
                 value={region}
                 onChange={(event) => {
-                  setRegion(event.target.value);
+                  setRegion(
+                    event.target.value
+                  );
                   setLocation("");
                 }}
                 className="w-full rounded-lg border border-gray-300 bg-white px-3 py-3 text-sm outline-none focus:border-blue-600"
@@ -865,6 +923,7 @@ function ListingsContent() {
               </select>
             </div>
 
+            {/* CITY / AREA */}
             <div>
               <label className="mb-1 block text-xs font-semibold text-gray-600">
                 City / Area
@@ -896,7 +955,8 @@ function ListingsContent() {
               </select>
             </div>
 
-            <div className="flex items-end gap-2 md:col-span-2 lg:col-span-6">
+            {/* BUTTONS */}
+            <div className="flex flex-wrap items-end gap-2 md:col-span-2 lg:col-span-6">
               <button
                 type="submit"
                 className="rounded-lg bg-blue-700 px-6 py-3 text-sm font-bold text-white hover:bg-blue-800"
@@ -926,12 +986,16 @@ function ListingsContent() {
             </div>
           </form>
 
+          {/* LOCATION NOTE */}
           <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-blue-800">
-            <strong>Location:</strong>{" "}
-            Marketplace search uses the seller/item
-            location. Buyer GPS and GhanaPost GPS will
-            be used separately for delivery and nearby
-            services.
+            <strong>
+              Item / Seller Location:
+            </strong>{" "}
+            Marketplace search uses the physical
+            location of the item or seller.
+            Buyer GPS and GhanaPost GPS will be
+            handled separately for delivery and
+            nearby services.
           </div>
         </div>
       </section>
@@ -948,7 +1012,8 @@ function ListingsContent() {
               {loading
                 ? "Loading listings..."
                 : `${filteredListings.length} listing${
-                    filteredListings.length === 1
+                    filteredListings.length ===
+                    1
                       ? ""
                       : "s"
                   } found`}
@@ -994,6 +1059,7 @@ function ListingsContent() {
           )}
         </div>
 
+        {/* LOADING */}
         {loading ? (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {Array.from({
@@ -1007,13 +1073,17 @@ function ListingsContent() {
 
                 <div className="space-y-3 p-4">
                   <div className="h-4 animate-pulse rounded bg-gray-200" />
+
                   <div className="h-4 w-2/3 animate-pulse rounded bg-gray-200" />
+
                   <div className="h-6 w-1/2 animate-pulse rounded bg-gray-200" />
                 </div>
               </div>
             ))}
           </div>
-        ) : filteredListings.length === 0 ? (
+        ) : filteredListings.length ===
+          0 ? (
+          /* EMPTY */
           <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-6 py-16 text-center">
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-white text-2xl shadow-sm">
               🔎
@@ -1024,8 +1094,8 @@ function ListingsContent() {
             </h2>
 
             <p className="mx-auto mt-2 max-w-lg text-sm text-gray-500">
-              Try another search term, category,
-              region or location.
+              Try another search term,
+              category, region or location.
             </p>
 
             <button
@@ -1036,6 +1106,7 @@ function ListingsContent() {
             </button>
           </div>
         ) : (
+          /* LISTINGS */
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {filteredListings.map(
               (listing) => (
@@ -1047,6 +1118,7 @@ function ListingsContent() {
                     href={`/listings/${listing.id}`}
                     className="block"
                   >
+                    {/* IMAGE PLACEHOLDER */}
                     <div className="flex h-48 items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 text-5xl">
                       🛍️
                     </div>
@@ -1077,7 +1149,9 @@ function ListingsContent() {
                       </p>
 
                       <div className="mt-4 text-lg font-extrabold text-blue-700">
-                        {formatPrice(listing)}
+                        {formatPrice(
+                          listing
+                        )}
                       </div>
 
                       <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
@@ -1142,9 +1216,9 @@ function ListingsContent() {
               </h3>
 
               <p className="mt-2 text-sm leading-6 text-gray-500">
-                Buyer delivery addresses will support
-                GhanaPost GPS digital addresses for
-                accurate delivery.
+                Buyer delivery addresses will
+                support GhanaPost GPS digital
+                addresses for accurate delivery.
               </p>
             </div>
 
@@ -1158,9 +1232,9 @@ function ListingsContent() {
               </h3>
 
               <p className="mt-2 text-sm leading-6 text-gray-500">
-                Delivery tracking will be connected to
-                the marketplace order and delivery
-                system.
+                Delivery tracking will be connected
+                to the marketplace order and
+                delivery system.
               </p>
             </div>
           </div>
