@@ -1,11 +1,14 @@
+
 "use client";
 
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "@/supabase-browser";
 
 type Listing = {
   id: string;
+  seller_id: string;
   title: string;
   description: string | null;
   price: number | null;
@@ -17,27 +20,29 @@ type Listing = {
   category: string | null;
   subcategory: string | null;
   created_at: string | null;
+  image_url?: string;
 };
 
-type ListingImage = {
-  listing_id: string;
-  image_url: string;
-};
+type Filter = "all" | "active" | "pending" | "rejected" | "expired";
+
+const filters: { label: string; value: Filter }[] = [
+  { label: "All Listings", value: "all" },
+  { label: "Active", value: "active" },
+  { label: "Pending", value: "pending" },
+  { label: "Rejected", value: "rejected" },
+  { label: "Expired", value: "expired" },
+];
 
 export default function MyListingsPage() {
+  const router = useRouter();
   const supabase = supabaseBrowser();
 
   const [listings, setListings] = useState<Listing[]>([]);
-  const [images, setImages] = useState<ListingImage[]>([]);
+  const [filter, setFilter] = useState<Filter>("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [filter, setFilter] = useState("all");
 
-  useEffect(() => {
-    loadListings();
-  }, []);
-
-  async function loadListings() {
+  const loadListings = useCallback(async () => {
     setLoading(true);
     setError("");
 
@@ -47,32 +52,15 @@ export default function MyListingsPage() {
         error: userError,
       } = await supabase.auth.getUser();
 
-      if (userError) {
-        throw userError;
-      }
-
-      if (!user) {
-        window.location.href = "/login";
+      if (userError || !user) {
+        router.push("/login");
         return;
       }
 
       const { data, error: listingsError } = await supabase
         .from("listings")
         .select(
-          `
-            id,
-            title,
-            description,
-            price,
-            currency_code,
-            currency,
-            location,
-            status,
-            featured,
-            category,
-            subcategory,
-            created_at
-          `
+          "id, seller_id, title, description, price, currency_code, currency, location, status, featured, category, subcategory, created_at"
         )
         .eq("seller_id", user.id)
         .order("created_at", { ascending: false });
@@ -81,305 +69,290 @@ export default function MyListingsPage() {
         throw listingsError;
       }
 
-      const listingData = data || [];
+      const rows = (data || []) as Listing[];
 
-      setListings(listingData);
-
-      if (listingData.length > 0) {
-        const ids = listingData.map((listing) => listing.id);
-
-        const { data: imageData, error: imageError } = await supabase
-          .from("listing_images")
-          .select("listing_id, image_url")
-          .in("listing_id", ids);
-
-        if (!imageError) {
-          setImages(imageData || []);
-        }
-      } else {
-        setImages([]);
+      if (rows.length === 0) {
+        setListings([]);
+        return;
       }
-    } catch (err: any) {
-      console.error(err);
-      setError(err?.message || "Unable to load your listings.");
+
+      const listingIds = rows.map((listing) => listing.id);
+
+      const { data: imageRows, error: imagesError } = await supabase
+        .from("listing_images")
+        .select("listing_id, image_url")
+        .in("listing_id", listingIds);
+
+      if (imagesError) {
+        console.warn("Could not load listing images:", imagesError.message);
+      }
+
+      const imageMap = new Map<string, string>();
+
+      (imageRows || []).forEach((image) => {
+        if (image.listing_id && image.image_url) {
+          if (!imageMap.has(image.listing_id)) {
+            imageMap.set(image.listing_id, image.image_url);
+          }
+        }
+      });
+
+      setListings(
+        rows.map((listing) => ({
+          ...listing,
+          image_url: imageMap.get(listing.id),
+        }))
+      );
+    } catch (err) {
+      console.error("My Listings error:", err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to load your listings. Please try again."
+      );
     } finally {
       setLoading(false);
     }
-  }
+  }, [router, supabase]);
 
-  function getImage(listingId: string) {
-    return images.find((image) => image.listing_id === listingId)?.image_url;
-  }
+  useEffect(() => {
+    loadListings();
+  }, [loadListings]);
 
-  function formatPrice(listing: Listing) {
-    const currency = listing.currency_code || listing.currency || "GHS";
+  const filteredListings = useMemo(() => {
+    if (filter === "all") return listings;
 
-    if (listing.price === null || listing.price === undefined) {
-      return "Price not set";
-    }
-
-    try {
-      return new Intl.NumberFormat("en-GH", {
-        style: "currency",
-        currency,
-        maximumFractionDigits: 2,
-      }).format(Number(listing.price));
-    } catch {
-      return `${currency} ${Number(listing.price).toLocaleString()}`;
-    }
-  }
-
-  const filteredListings = listings.filter((listing) => {
-    if (filter === "all") return true;
-
-    return (listing.status || "").toLowerCase() === filter;
-  });
+    return listings.filter(
+      (listing) => (listing.status || "").toLowerCase() === filter
+    );
+  }, [filter, listings]);
 
   const activeCount = listings.filter(
     (listing) => (listing.status || "").toLowerCase() === "active"
   ).length;
 
-  const pendingCount = listings.filter(
-    (listing) => (listing.status || "").toLowerCase() === "pending"
-  ).length;
+  const totalCount = listings.length;
 
-  const featuredCount = listings.filter(
-    (listing) => listing.featured === true
-  ).length;
+  function formatPrice(listing: Listing) {
+    const currency = listing.currency_code || listing.currency || "GHS";
+    const amount = Number(listing.price || 0);
+
+    return `${currency} ${amount.toLocaleString("en-GH", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+  }
+
+  function formatDate(date: string | null) {
+    if (!date) return "Date unavailable";
+
+    return new Date(date).toLocaleDateString("en-GH", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  }
+
+  function statusStyle(status: string | null) {
+    switch ((status || "").toLowerCase()) {
+      case "active":
+        return "bg-green-100 text-green-800";
+      case "pending":
+        return "bg-yellow-100 text-yellow-800";
+      case "rejected":
+        return "bg-red-100 text-red-800";
+      case "expired":
+        return "bg-gray-200 text-gray-700";
+      default:
+        return "bg-blue-100 text-blue-800";
+    }
+  }
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      {/* HEADER */}
-      <header className="border-b bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
+    <main className="min-h-screen bg-gray-50 px-4 py-6 text-gray-900 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-6xl">
+        <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
-            <Link
-              href="/dashboard"
-              className="text-sm font-medium text-gray-500 hover:text-blue-600"
-            >
-              ← Dashboard
-            </Link>
-
-            <h1 className="mt-1 text-2xl font-bold text-gray-900">
+            <h1 className="text-2xl font-bold sm:text-3xl">
               My Listings
             </h1>
-
-            <p className="text-sm text-gray-500">
-              Manage and monitor your advertisements.
+            <p className="mt-1 text-sm text-gray-600">
+              Manage your advertisements and view their performance.
             </p>
           </div>
 
           <Link
             href="/sell"
-            className="rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700"
+            className="inline-flex items-center justify-center rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white transition hover:bg-blue-800"
           >
             + Post an Ad
           </Link>
         </div>
-      </header>
 
-      <div className="mx-auto max-w-7xl px-4 py-6">
-        {/* SUMMARY CARDS */}
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          <div className="rounded-xl bg-white p-5 shadow-sm">
+        <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="rounded-xl border bg-white p-4 shadow-sm">
             <p className="text-sm text-gray-500">Total Listings</p>
-            <p className="mt-2 text-3xl font-bold text-gray-900">
-              {listings.length}
-            </p>
+            <p className="mt-1 text-2xl font-bold">{totalCount}</p>
           </div>
 
-          <div className="rounded-xl bg-white p-5 shadow-sm">
-            <p className="text-sm text-gray-500">Active</p>
-            <p className="mt-2 text-3xl font-bold text-green-600">
+          <div className="rounded-xl border bg-white p-4 shadow-sm">
+            <p className="text-sm text-gray-500">Active Listings</p>
+            <p className="mt-1 text-2xl font-bold text-green-700">
               {activeCount}
             </p>
           </div>
 
-          <div className="rounded-xl bg-white p-5 shadow-sm">
-            <p className="text-sm text-gray-500">Pending</p>
-            <p className="mt-2 text-3xl font-bold text-orange-500">
-              {pendingCount}
-            </p>
-          </div>
-
-          <div className="rounded-xl bg-white p-5 shadow-sm">
-            <p className="text-sm text-gray-500">Top Priority</p>
-            <p className="mt-2 text-3xl font-bold text-purple-600">
-              {featuredCount}
+          <div className="col-span-2 rounded-xl border bg-white p-4 shadow-sm sm:col-span-1">
+            <p className="text-sm text-gray-500">Top Priority Ads</p>
+            <p className="mt-1 text-2xl font-bold text-amber-600">
+              {listings.filter((listing) => listing.featured).length}
             </p>
           </div>
         </div>
 
-        {/* FILTERS */}
-        <div className="mt-6 flex flex-wrap gap-2">
-          {[
-            ["all", "All Listings"],
-            ["active", "Active"],
-            ["pending", "Pending"],
-            ["rejected", "Rejected"],
-            ["expired", "Expired"],
-          ].map(([value, label]) => (
+        <div className="mb-5 flex gap-2 overflow-x-auto pb-2">
+          {filters.map((item) => (
             <button
-              key={value}
-              onClick={() => setFilter(value)}
-              className={`rounded-lg px-4 py-2 text-sm font-medium ${
-                filter === value
-                  ? "bg-blue-600 text-white"
-                  : "bg-white text-gray-700 shadow-sm hover:bg-gray-100"
+              key={item.value}
+              type="button"
+              onClick={() => setFilter(item.value)}
+              className={`shrink-0 rounded-full border px-4 py-2 text-sm font-medium transition ${
+                filter === item.value
+                  ? "border-blue-700 bg-blue-700 text-white"
+                  : "border-gray-300 bg-white text-gray-700 hover:border-blue-500"
               }`}
             >
-              {label}
+              {item.label}
             </button>
           ))}
         </div>
 
-        {/* ERROR */}
-        {error && (
-          <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            {error}
-          </div>
-        )}
-
-        {/* LOADING */}
-        {loading && (
-          <div className="py-16 text-center text-gray-500">
+        {loading ? (
+          <div className="rounded-xl border bg-white p-10 text-center text-gray-500">
             Loading your listings...
           </div>
-        )}
-
-        {/* EMPTY */}
-        {!loading && !error && filteredListings.length === 0 && (
-          <div className="mt-8 rounded-2xl bg-white px-6 py-16 text-center shadow-sm">
-            <div className="text-5xl">📦</div>
-
-            <h2 className="mt-4 text-xl font-bold text-gray-900">
+        ) : error ? (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+            <p className="font-medium text-red-700">{error}</p>
+            <button
+              type="button"
+              onClick={loadListings}
+              className="mt-4 rounded-lg bg-red-700 px-4 py-2 text-white"
+            >
+              Try Again
+            </button>
+          </div>
+        ) : filteredListings.length === 0 ? (
+          <div className="rounded-xl border bg-white px-6 py-14 text-center shadow-sm">
+            <div className="mb-3 text-4xl">📦</div>
+            <h2 className="text-lg font-semibold">
               {listings.length === 0
-                ? "No listings yet"
-                : "No listings match this filter"}
+                ? "You haven't posted any ads yet"
+                : "No listings in this category"}
             </h2>
-
             <p className="mx-auto mt-2 max-w-md text-sm text-gray-500">
               {listings.length === 0
-                ? "Post your first advertisement and it will appear here."
-                : "Try selecting another listing status."}
+                ? "Your advertisements will appear here after you publish them."
+                : "Try selecting another filter to see your advertisements."}
             </p>
 
             {listings.length === 0 && (
               <Link
                 href="/sell"
-                className="mt-6 inline-block rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white hover:bg-blue-700"
+                className="mt-5 inline-flex rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white hover:bg-blue-800"
               >
                 Post Your First Ad
               </Link>
             )}
           </div>
-        )}
+        ) : (
+          <div className="space-y-4">
+            {filteredListings.map((listing) => (
+              <Link
+                key={listing.id}
+                href={`/dashboard/listings/${listing.id}`}
+                className="group flex flex-col gap-4 rounded-xl border bg-white p-4 shadow-sm transition hover:border-blue-400 hover:shadow-md sm:flex-row"
+              >
+                <div className="h-48 w-full shrink-0 overflow-hidden rounded-lg bg-gray-100 sm:h-36 sm:w-44">
+                  {listing.image_url ? (
+                    <img
+                      src={listing.image_url}
+                      alt={listing.title}
+                      className="h-full w-full object-cover transition group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-4xl text-gray-400">
+                      📷
+                    </div>
+                  )}
+                </div>
 
-        {/* LISTINGS */}
-        {!loading && filteredListings.length > 0 && (
-          <div className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-            {filteredListings.map((listing) => {
-              const image = getImage(listing.id);
+                <div className="flex min-w-0 flex-1 flex-col justify-between gap-3">
+                  <div>
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <h2 className="text-lg font-semibold group-hover:text-blue-700">
+                        {listing.title}
+                      </h2>
 
-              return (
-                <Link
-                  key={listing.id}
-                  href={`/dashboard/listings/${listing.id}`}
-                  className="group overflow-hidden rounded-2xl bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
-                >
-                  {/* IMAGE */}
-                  <div className="relative h-52 bg-gray-100">
-                    {image ? (
-                      <img
-                        src={image}
-                        alt={listing.title}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full items-center justify-center text-5xl">
-                        📦
-                      </div>
-                    )}
-
-                    {/* STATUS */}
-                    <div className="absolute left-3 top-3">
                       <span
-                        className={`rounded-full px-3 py-1 text-xs font-bold ${
-                          listing.status === "active"
-                            ? "bg-green-100 text-green-700"
-                            : listing.status === "pending"
-                              ? "bg-orange-100 text-orange-700"
-                              : listing.status === "rejected"
-                                ? "bg-red-100 text-red-700"
-                                : "bg-gray-100 text-gray-700"
-                        }`}
+                        className={`rounded-full px-3 py-1 text-xs font-semibold capitalize ${statusStyle(
+                          listing.status
+                        )}`}
                       >
-                        {listing.status || "unknown"}
+                        {listing.status || "Unknown"}
                       </span>
                     </div>
 
-                    {/* TOP PRIORITY */}
-                    {listing.featured && (
-                      <div className="absolute right-3 top-3">
-                        <span className="rounded-full bg-purple-600 px-3 py-1 text-xs font-bold text-white">
-                          ⭐ Top Priority
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* DETAILS */}
-                  <div className="p-5">
-                    <h2 className="line-clamp-2 text-lg font-bold text-gray-900 group-hover:text-blue-600">
-                      {listing.title}
-                    </h2>
-
-                    <p className="mt-2 text-xl font-bold text-blue-600">
+                    <p className="mt-2 text-xl font-bold text-blue-800">
                       {formatPrice(listing)}
                     </p>
 
-                    <div className="mt-3 space-y-1 text-sm text-gray-500">
-                      {listing.category && (
-                        <p>
-                          <span className="font-medium text-gray-700">
-                            Category:
-                          </span>{" "}
-                          {listing.category}
-                        </p>
-                      )}
-
-                      {listing.subcategory && (
-                        <p>
-                          <span className="font-medium text-gray-700">
-                            Subcategory:
-                          </span>{" "}
-                          {listing.subcategory}
-                        </p>
-                      )}
-
-                      {listing.location && (
-                        <p>
-                          <span className="font-medium text-gray-700">
-                            Location:
-                          </span>{" "}
-                          {listing.location}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="mt-5 flex items-center justify-between border-t pt-4">
-                      <span className="text-sm font-medium text-gray-500">
-                        View Ad Details
-                      </span>
-
-                      <span className="text-blue-600">→</span>
-                    </div>
+                    <p className="mt-2 line-clamp-2 text-sm text-gray-600">
+                      {listing.description || "No description provided."}
+                    </p>
                   </div>
-                </Link>
-              );
-            })}
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
+                    <span>
+                      {listing.category || "Uncategorised"}
+                      {listing.subcategory
+                        ? ` · ${listing.subcategory}`
+                        : ""}
+                    </span>
+                    <span>{listing.location || "Location unavailable"}</span>
+                    <span>Posted {formatDate(listing.created_at)}</span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    {listing.featured ? (
+                      <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+                        ⭐ Top Priority
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-400">
+                        Standard listing
+                      </span>
+                    )}
+
+                    <span className="text-sm font-semibold text-blue-700">
+                      View Details →
+                    </span>
+                  </div>
+                </div>
+              </Link>
+            ))}
           </div>
         )}
+
+        <div className="mt-6 text-center">
+          <button
+            type="button"
+            onClick={loadListings}
+            className="rounded-lg border border-gray-300 bg-white px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+          >
+            Refresh Listings
+          </button>
+        </div>
       </div>
     </main>
   );
