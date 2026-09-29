@@ -1,18 +1,15 @@
+
 import { NextRequest, NextResponse } from "next/server";
+import { createHmac, timingSafeEqual } from "crypto";
 
 const ADMIN_EMAIL = "admin@bestsalesgh.com";
-
-/*
-  IMPORTANT:
-  For production, the password should be stored in Vercel Environment
-  Variables instead of inside this file.
-
-  Vercel:
-  ADMIN_PASSWORD = your-admin-password
-*/
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
-
 const COOKIE_NAME = "bsg_admin_session";
+
+function signSession(payload: string, secret: string) {
+  return createHmac("sha256", secret)
+    .update(payload)
+    .digest("base64url");
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,6 +27,21 @@ export async function POST(request: NextRequest) {
 
     const rememberMe = body.rememberMe === true;
 
+    const adminPassword = process.env.ADMIN_PASSWORD;
+    const sessionSecret = process.env.ADMIN_SESSION_SECRET;
+
+    if (!adminPassword || !sessionSecret) {
+      console.error("Admin authentication environment variables are missing.");
+
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Administrator login is not configured.",
+        },
+        { status: 500 }
+      );
+    }
+
     if (!email || !password) {
       return NextResponse.json(
         {
@@ -40,13 +52,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    /*
-      Check administrator credentials.
-    */
     if (
       email !== ADMIN_EMAIL ||
-      !ADMIN_PASSWORD ||
-      password !== ADMIN_PASSWORD
+      password !== adminPassword
     ) {
       return NextResponse.json(
         {
@@ -57,13 +65,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    /*
-      Create a simple signed-in session marker.
+    const expiresAt =
+      Date.now() +
+      (rememberMe
+        ? 30 * 24 * 60 * 60 * 1000
+        : 8 * 60 * 60 * 1000);
 
-      The admin area will use this cookie to determine whether
-      the administrator has successfully logged in.
-    */
-    const sessionValue = `admin-${Date.now()}-${crypto.randomUUID()}`;
+    const payload = Buffer.from(
+      JSON.stringify({
+        email: ADMIN_EMAIL,
+        expiresAt,
+      })
+    ).toString("base64url");
+
+    const signature = signSession(payload, sessionSecret);
+
+    const sessionValue = `${payload}.${signature}`;
 
     const response = NextResponse.json({
       success: true,
