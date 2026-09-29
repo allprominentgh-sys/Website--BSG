@@ -15,6 +15,11 @@ type Category = {
   subcategories: string[];
 };
 
+type GPSCoordinates = {
+  latitude: number;
+  longitude: number;
+};
+
 const categories: Category[] = [
   {
     name: "Vehicles",
@@ -205,6 +210,7 @@ const ALLOWED_TYPES = [
 
 function getFileExtension(file: File) {
   const parts = file.name.split(".");
+
   return parts.length > 1
     ? parts[parts.length - 1].toLowerCase()
     : "bin";
@@ -231,8 +237,14 @@ export default function SellPage() {
   const [publishing, setPublishing] = useState(false);
 
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
-
   const [mediaError, setMediaError] = useState("");
+
+  // GPS location state
+  const [gpsCoordinates, setGpsCoordinates] =
+    useState<GPSCoordinates | null>(null);
+
+  const [gettingLocation, setGettingLocation] =
+    useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -249,15 +261,90 @@ export default function SellPage() {
     setSubcategory("");
   }
 
+  // --------------------------------------------------
+  // GET PHONE GPS LOCATION
+  // --------------------------------------------------
+
+  function handleGetLocation() {
+    if (!navigator.geolocation) {
+      alert(
+        "Your browser does not support GPS location."
+      );
+      return;
+    }
+
+    setGettingLocation(true);
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const latitude =
+          position.coords.latitude;
+
+        const longitude =
+          position.coords.longitude;
+
+        setGpsCoordinates({
+          latitude,
+          longitude,
+        });
+
+        setGettingLocation(false);
+
+        alert(
+          `Location captured successfully!\nLatitude: ${latitude}\nLongitude: ${longitude}`
+        );
+      },
+      (error) => {
+        setGettingLocation(false);
+
+        let message =
+          "Unable to get your location.";
+
+        if (
+          error.code === error.PERMISSION_DENIED
+        ) {
+          message =
+            "Location permission was denied. Please allow location access in your browser settings.";
+        } else if (
+          error.code === error.POSITION_UNAVAILABLE
+        ) {
+          message =
+            "Your current location is unavailable. Please try again.";
+        } else if (
+          error.code === error.TIMEOUT
+        ) {
+          message =
+            "Location request timed out. Please try again.";
+        }
+
+        alert(message);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,
+      }
+    );
+  }
+
+  // --------------------------------------------------
+  // GENERATE DELIVERY TRACKING NUMBER
+  // --------------------------------------------------
+
   function generateTrackingNumber() {
     const random = Math.floor(
       100000 + Math.random() * 900000
     );
 
-    const generated = `BSG-${new Date().getFullYear()}-${random}`;
+    const generated =
+      `BSG-${new Date().getFullYear()}-${random}`;
 
     setTrackingNumber(generated);
   }
+
+  // --------------------------------------------------
+  // HANDLE MEDIA SELECTION
+  // --------------------------------------------------
 
   function handleMediaChange(
     event: ChangeEvent<HTMLInputElement>
@@ -314,11 +401,17 @@ export default function SellPage() {
 
   function removeMedia(index: number) {
     setMediaFiles((current) =>
-      current.filter((_, fileIndex) => fileIndex !== index)
+      current.filter(
+        (_, fileIndex) => fileIndex !== index
+      )
     );
 
     setMediaError("");
   }
+
+  // --------------------------------------------------
+  // PUBLISH LISTING
+  // --------------------------------------------------
 
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>
@@ -337,9 +430,7 @@ export default function SellPage() {
 
       const supabase = supabaseBrowser();
 
-      // --------------------------------------------------
       // CHECK LOGIN
-      // --------------------------------------------------
 
       const {
         data: { user },
@@ -355,9 +446,7 @@ export default function SellPage() {
         return;
       }
 
-      // --------------------------------------------------
       // GET FORM VALUES
-      // --------------------------------------------------
 
       const title = String(
         formData.get("title") || ""
@@ -393,9 +482,7 @@ export default function SellPage() {
         formData.get("locationDetails") || ""
       ).trim();
 
-      // --------------------------------------------------
       // VALIDATION
-      // --------------------------------------------------
 
       if (!title) {
         alert(
@@ -407,9 +494,7 @@ export default function SellPage() {
       }
 
       if (!description) {
-        alert(
-          "Please enter a description."
-        );
+        alert("Please enter a description.");
 
         setPublishing(false);
         return;
@@ -434,18 +519,14 @@ export default function SellPage() {
       }
 
       if (!priceValue || price <= 0) {
-        alert(
-          "Please enter a valid price."
-        );
+        alert("Please enter a valid price.");
 
         setPublishing(false);
         return;
       }
 
       if (!region) {
-        alert(
-          "Please select a region."
-        );
+        alert("Please select a region.");
 
         setPublishing(false);
         return;
@@ -469,22 +550,23 @@ export default function SellPage() {
         return;
       }
 
-      // --------------------------------------------------
-      // LOCATION
-      // --------------------------------------------------
+      // LOCATION WITH GPS COORDINATES
+
+      const gpsLocation = gpsCoordinates
+        ? `GPS: ${gpsCoordinates.latitude}, ${gpsCoordinates.longitude}`
+        : "";
 
       const location = [
         region,
         city,
         ghanaPostGps,
         locationDetails,
+        gpsLocation,
       ]
         .filter(Boolean)
         .join(", ");
 
-      // --------------------------------------------------
       // CREATE LISTING
-      // --------------------------------------------------
 
       const {
         data: listing,
@@ -530,9 +612,7 @@ export default function SellPage() {
         return;
       }
 
-      // --------------------------------------------------
       // UPLOAD MEDIA
-      // --------------------------------------------------
 
       if (mediaFiles.length > 0) {
         for (
@@ -563,15 +643,11 @@ export default function SellPage() {
             error: uploadError,
           } = await supabase.storage
             .from("listing-images")
-            .upload(
-              filePath,
-              file,
-              {
-                cacheControl: "3600",
-                upsert: false,
-                contentType: file.type,
-              }
-            );
+            .upload(filePath, file, {
+              cacheControl: "3600",
+              upsert: false,
+              contentType: file.type,
+            });
 
           if (uploadError) {
             console.error(
@@ -579,8 +655,6 @@ export default function SellPage() {
               uploadError
             );
 
-            // Try to remove the listing because
-            // media upload failed.
             await supabase
               .from("listings")
               .delete()
@@ -594,9 +668,7 @@ export default function SellPage() {
             return;
           }
 
-          // ------------------------------------------------
           // GET PUBLIC URL
-          // ------------------------------------------------
 
           const {
             data: publicUrlData,
@@ -625,9 +697,7 @@ export default function SellPage() {
             return;
           }
 
-          // ------------------------------------------------
           // SAVE MEDIA URL
-          // ------------------------------------------------
 
           const {
             error: imageInsertError,
@@ -654,9 +724,7 @@ export default function SellPage() {
         }
       }
 
-      // --------------------------------------------------
       // SUCCESS
-      // --------------------------------------------------
 
       console.log(
         "LISTING CREATED:",
@@ -692,6 +760,7 @@ export default function SellPage() {
     <main className="min-h-screen bg-slate-50 text-slate-900">
 
       {/* HEADER */}
+
       <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
 
@@ -745,13 +814,12 @@ export default function SellPage() {
             </Link>
 
           </nav>
-
         </div>
       </header>
 
       {/* HERO */}
-      <section className="bg-gradient-to-br from-blue-800 via-blue-700 to-cyan-400 text-white">
 
+      <section className="bg-gradient-to-br from-blue-800 via-blue-700 to-cyan-400 text-white">
         <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
 
           <Link
@@ -779,6 +847,7 @@ export default function SellPage() {
       </section>
 
       {/* FORM */}
+
       <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
 
         <form
@@ -786,7 +855,8 @@ export default function SellPage() {
           className="space-y-8"
         >
 
-          {/* STEP 1 */}
+          {/* STEP 1: SELLER INFORMATION */}
+
           <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
 
             <div className="mb-6">
@@ -882,7 +952,8 @@ export default function SellPage() {
 
           </section>
 
-          {/* STEP 2 */}
+          {/* STEP 2: PRODUCT DETAILS */}
+
           <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
 
             <div className="mb-6">
@@ -1071,7 +1142,8 @@ export default function SellPage() {
 
           </section>
 
-          {/* STEP 3 MEDIA */}
+          {/* STEP 3: PHOTOS AND VIDEO */}
+
           <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
 
             <div className="mb-6">
@@ -1207,7 +1279,8 @@ export default function SellPage() {
 
           </section>
 
-          {/* STEP 4 LOCATION */}
+          {/* STEP 4: LOCATION */}
+
           <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
 
             <div className="mb-6">
@@ -1295,22 +1368,50 @@ export default function SellPage() {
 
                 <button
                   type="button"
-                  className="shrink-0 rounded-xl border border-blue-700 px-5 py-3 font-bold text-blue-700 hover:bg-blue-50"
-                  onClick={() =>
-                    alert(
-                      "GhanaPost GPS/map integration will be connected in the maps and delivery step."
-                    )
-                  }
+                  disabled={gettingLocation}
+                  className="shrink-0 rounded-xl border border-blue-700 px-5 py-3 font-bold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={handleGetLocation}
                 >
-                  📍 Use My Location
+                  {gettingLocation
+                    ? "Getting Location..."
+                    : "📍 Use My Location"}
                 </button>
 
               </div>
 
               <p className="mt-2 text-xs text-slate-500">
-                This address will help the delivery system
-                locate the seller accurately.
+                Your phone will request permission to access
+                your location. GPS coordinates will be saved
+                with your advertisement.
               </p>
+
+              {gpsCoordinates && (
+                <div className="mt-4 rounded-xl border border-green-200 bg-green-50 p-4">
+
+                  <p className="font-bold text-green-800">
+                    ✓ GPS Location Captured
+                  </p>
+
+                  <p className="mt-2 text-sm text-green-700">
+                    Latitude: {gpsCoordinates.latitude}
+                  </p>
+
+                  <p className="text-sm text-green-700">
+                    Longitude: {gpsCoordinates.longitude}
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setGpsCoordinates(null)
+                    }
+                    className="mt-3 text-sm font-bold text-red-600 hover:text-red-800"
+                  >
+                    Remove GPS Location
+                  </button>
+
+                </div>
+              )}
 
             </div>
 
@@ -1331,7 +1432,8 @@ export default function SellPage() {
 
           </section>
 
-          {/* STEP 5 DELIVERY */}
+          {/* STEP 5: DELIVERY */}
+
           <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
 
             <div className="mb-6">
@@ -1356,13 +1458,10 @@ export default function SellPage() {
               <button
                 type="button"
                 onClick={() =>
-                  setDeliveryOption(
-                    "our-delivery"
-                  )
+                  setDeliveryOption("our-delivery")
                 }
                 className={`w-full rounded-2xl border-2 p-5 text-left transition ${
-                  deliveryOption ===
-                  "our-delivery"
+                  deliveryOption === "our-delivery"
                     ? "border-blue-700 bg-blue-50"
                     : "border-slate-200 hover:border-blue-300"
                 }`}
@@ -1398,13 +1497,10 @@ export default function SellPage() {
               <button
                 type="button"
                 onClick={() =>
-                  setDeliveryOption(
-                    "seller-delivery"
-                  )
+                  setDeliveryOption("seller-delivery")
                 }
                 className={`w-full rounded-2xl border-2 p-5 text-left transition ${
-                  deliveryOption ===
-                  "seller-delivery"
+                  deliveryOption === "seller-delivery"
                     ? "border-blue-700 bg-blue-50"
                     : "border-slate-200 hover:border-blue-300"
                 }`}
@@ -1470,8 +1566,7 @@ export default function SellPage() {
 
             </div>
 
-            {deliveryOption ===
-              "our-delivery" && (
+            {deliveryOption === "our-delivery" && (
               <div className="mt-6 rounded-2xl border border-blue-200 bg-blue-50 p-5">
 
                 <div className="flex items-start gap-3">
@@ -1518,9 +1613,7 @@ export default function SellPage() {
 
                     <button
                       type="button"
-                      onClick={
-                        generateTrackingNumber
-                      }
+                      onClick={generateTrackingNumber}
                       className="rounded-xl bg-blue-700 px-5 py-3 font-bold text-white hover:bg-blue-800"
                     >
                       Generate
@@ -1535,7 +1628,8 @@ export default function SellPage() {
 
           </section>
 
-          {/* STEP 6 CONTACT */}
+          {/* STEP 6: SELLER CONTACT */}
+
           <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
 
             <div className="mb-6">
@@ -1603,7 +1697,8 @@ export default function SellPage() {
 
           </section>
 
-          {/* FINAL */}
+          {/* FINAL: PUBLISH */}
+
           <section className="rounded-3xl bg-slate-950 p-6 text-white shadow-xl sm:p-8">
 
             <div className="flex flex-col justify-between gap-6 md:flex-row md:items-center">
@@ -1644,6 +1739,7 @@ export default function SellPage() {
       </section>
 
       {/* FOOTER */}
+
       <footer className="bg-slate-950 py-10 text-center text-white">
 
         <div className="text-xl font-black">
