@@ -660,9 +660,34 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-900">
+    <main className="admin-dashboard min-h-screen text-slate-900">
+      <div className="admin-shell">
+        <aside className="admin-sidebar">
+          <Link href="/" className="admin-brand">
+            <span className="admin-brand-mark">★</span>
+            <span><strong>BEST SALES</strong><small>GHANA · ADMIN</small></span>
+          </Link>
+          <div className="admin-nav-label">WORKSPACE</div>
+          <nav className="admin-nav" aria-label="Admin navigation">
+            <a className="admin-nav-link active" href="#dashboard"><span>▦</span> Overview</a>
+            <Link className="admin-nav-link" href="/admin/direct-sales"><span>🛒</span> Direct Sales</Link>
+            <Link className="admin-nav-link" href="/listings"><span>📋</span> Marketplace Listings</Link>
+            <a className="admin-nav-link" href="#management"><span>👥</span> Sellers & Customers</a>
+            <a className="admin-nav-link" href="#management"><span>📦</span> Orders</a>
+            <a className="admin-nav-link" href="#management"><span>🚚</span> Delivery & Tracking</a>
+            <a className="admin-nav-link" href="#management"><span>💳</span> Payments</a>
+            <Link className="admin-nav-link" href="/admin/revenue"><span>💰</span> Revenue & Settlements</Link>
+            <a className="admin-nav-link" href="#management"><span>📢</span> Advertising</a>
+            <a className="admin-nav-link" href="#currency-management"><span>⚙</span> Currency Settings</a>
+          </nav>
+          <div className="admin-sidebar-bottom">
+            <div className="admin-secure"><span>🔐</span><div><strong>Secure workspace</strong><small>Administrator access</small></div></div>
+            <Link href="/" className="admin-website-link">↗ View public website</Link>
+          </div>
+        </aside>
+        <div className="admin-main" id="dashboard">
       {/* HEADER */}
-      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white">
+      <header className="admin-topbar sticky top-0 z-40 border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-700 text-2xl shadow-md">
@@ -692,7 +717,7 @@ export default function AdminDashboardPage() {
         </div>
       </header>
 
-      <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <section className="admin-content mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {/* TITLE */}
         <div className="mb-8">
           <p className="text-sm font-black uppercase tracking-widest text-blue-700">
@@ -1506,6 +1531,8 @@ export default function AdminDashboardPage() {
           </p>
         </div>
       </footer>
+        </div>
+      </div>
     </main>
   );
 }
