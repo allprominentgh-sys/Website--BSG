@@ -1,49 +1,86 @@
-import { NextRequest, NextResponse } from "next/server";
 
-const ADMIN_SESSION_COOKIE = "bsg_admin_session";
+import { NextRequest, NextResponse } from "next/server";
+import { createHmac, timingSafeEqual } from "crypto";
+
+const COOKIE_NAME = "bsg_admin_session";
+
+function verifySession(value: string): boolean {
+  const secret = process.env.ADMIN_SESSION_SECRET;
+
+  if (!secret) {
+    return false;
+  }
+
+  const parts = value.split(".");
+
+  if (parts.length !== 2) {
+    return false;
+  }
+
+  const [payload, signature] = parts;
+
+  if (!payload || !signature) {
+    return false;
+  }
+
+  const expectedSignature = createHmac("sha256", secret)
+    .update(payload)
+    .digest("base64url");
+
+  const providedBuffer = Buffer.from(signature);
+  const expectedBuffer = Buffer.from(expectedSignature);
+
+  if (
+    providedBuffer.length !== expectedBuffer.length ||
+    !timingSafeEqual(providedBuffer, expectedBuffer)
+  ) {
+    return false;
+  }
+
+  try {
+    const decoded = JSON.parse(
+      Buffer.from(payload, "base64url").toString("utf8")
+    );
+
+    return (
+      decoded.email === "admin@bestsalesgh.com" &&
+      typeof decoded.expiresAt === "number" &&
+      decoded.expiresAt > Date.now()
+    );
+  } catch {
+    return false;
+  }
+}
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  /*
-    Allow the admin login page without authentication.
-  */
   if (pathname === "/admin/login") {
     return NextResponse.next();
   }
 
-  /*
-    Only protect pages inside /admin.
-  */
   if (pathname.startsWith("/admin")) {
-    const session = request.cookies.get(
-      ADMIN_SESSION_COOKIE
-    )?.value;
+    const session = request.cookies.get(COOKIE_NAME)?.value;
 
-    /*
-      No admin session = send user to login.
-    */
-    if (!session) {
+    if (!session || !verifySession(session)) {
       const loginUrl = new URL(
         "/admin/login",
         request.url
       );
 
-      loginUrl.searchParams.set(
-        "redirect",
-        pathname
-      );
+      loginUrl.searchParams.set("redirect", pathname);
 
-      return NextResponse.redirect(loginUrl);
+      const response = NextResponse.redirect(loginUrl);
+
+      response.cookies.delete(COOKIE_NAME);
+
+      return response;
     }
   }
 
   return NextResponse.next();
 }
 
-/*
-  Run middleware only on admin pages.
-*/
 export const config = {
   matcher: ["/admin/:path*"],
 };
