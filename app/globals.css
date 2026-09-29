@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -9,17 +10,13 @@
 ========================================================= */
 
 :root {
-  /* Brand Palette */
   --primary-royal-blue: #4169e1;
   --royal-blue: #4169e1;
-
   --accent-cyan: #00ffff;
   --sky-blue: #25a9e8;
-
   --secondary-sea-blue: #006994;
   --dark-blue: #071b3a;
 
-  /* UI */
   --bg-dark: #071527;
   --bg-card: #0d223a;
 
@@ -31,21 +28,18 @@
 
   --light: #f5f8fc;
   --border: #dce6f2;
-
   --white: #ffffff;
 
-  /* Functional */
   --btn-bg: var(--primary-royal-blue);
   --btn-hover: var(--accent-cyan);
-
   --header-bg: var(--secondary-sea-blue);
 
   --accent-glow: rgba(0, 255, 255, 0.2);
 
   --success: #159447;
   --warning: #f5b700;
+  --danger: #dc2626;
 
-  /* Shadows */
   --shadow-sm: 0 4px 16px rgba(16, 55, 105, 0.06);
   --shadow: 0 12px 35px rgba(16, 55, 105, 0.09);
   --shadow-lg: 0 20px 50px rgba(16, 55, 105, 0.14);
@@ -75,7 +69,6 @@ body {
 body {
   background: var(--light);
   color: var(--text);
-
   font-family:
     Inter,
     ui-sans-serif,
@@ -87,9 +80,7 @@ body {
     Helvetica,
     Arial,
     sans-serif;
-
   line-height: 1.5;
-
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -108,6 +99,11 @@ textarea {
 
 button {
   cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 img {
@@ -139,6 +135,15 @@ input:focus,
 select:focus,
 textarea:focus {
   outline: none;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--sky-blue);
+  outline-offset: 3px;
 }
 
 /* =========================================================
@@ -173,28 +178,24 @@ textarea:focus {
 }
 
 /* =========================================================
-   BEST SALES GHANA HEADER
+   MARKETPLACE HEADER
 ========================================================= */
 
 .marketplace-page header,
-.header,
-.site-header {
+.marketplace-page .header,
+.marketplace-page .site-header {
   background: rgba(255, 255, 255, 0.97);
-
   color: var(--text);
-
   border-bottom: 2px solid var(--primary-royal-blue);
-
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-
   position: relative;
   z-index: 50;
 }
 
 .marketplace-page header a,
-.header a,
-.site-header a {
+.marketplace-page .header a,
+.marketplace-page .site-header a {
   transition:
     color 0.2s ease,
     background 0.2s ease,
@@ -202,8 +203,8 @@ textarea:focus {
 }
 
 .marketplace-page header a:hover,
-.header a:hover,
-.site-header a:hover {
+.marketplace-page .header a:hover,
+.marketplace-page .site-header a:hover {
   color: var(--primary-royal-blue);
 }
 
@@ -215,10 +216,8 @@ textarea:focus {
   width: 100%;
   max-width: 1240px;
   margin: 0 auto;
-
   display: flex;
   flex-direction: column;
-
   gap: 1rem;
 }
 
@@ -238,57 +237,40 @@ textarea:focus {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-
   font-weight: 900;
   font-size: 1.3rem;
-
   color: var(--primary-royal-blue);
-
   text-decoration: none;
 }
 
 /* =========================================================
-   ANIMATED ALL PROMINENT LOGO
+   ANIMATED LOGO
 ========================================================= */
 
 .animated-logo {
   position: relative;
-
   display: inline-flex;
-
   align-items: center;
   justify-content: center;
-
   width: 170px;
   height: 170px;
-
   overflow: visible;
-
   transform-origin: center;
-
   animation:
     logo-entrance 1.2s cubic-bezier(0.22, 1, 0.36, 1) forwards,
     logo-float 4s ease-in-out 1.2s infinite;
-
   will-change: transform, opacity;
 }
 
 .animated-logo img {
   position: relative;
-
   z-index: 2;
-
   display: block;
-
   width: 100%;
   height: 100%;
-
   object-fit: contain;
-
   mix-blend-mode: multiply;
-
   animation: logo-image-reveal 1.4s ease-out forwards;
-
   transition:
     transform 0.35s ease,
     filter 0.35s ease;
@@ -296,17 +278,12 @@ textarea:focus {
 
 .animated-logo::before {
   content: "";
-
   position: absolute;
-
   width: 78%;
   height: 78%;
-
   left: 11%;
   top: 11%;
-
   border-radius: 50%;
-
   background:
     radial-gradient(
       circle,
@@ -314,13 +291,9 @@ textarea:focus {
       rgba(0, 255, 255, 0.12) 35%,
       transparent 72%
     );
-
   filter: blur(18px);
-
   opacity: 0;
-
   z-index: 0;
-
   animation:
     logo-glow-in 1.4s ease-out 0.4s forwards,
     logo-glow-pulse 3.5s ease-in-out 1.8s infinite;
@@ -328,17 +301,12 @@ textarea:focus {
 
 .animated-logo::after {
   content: "";
-
   position: absolute;
-
   width: 108%;
   height: 108%;
-
   left: -4%;
   top: -4%;
-
   border-radius: 50%;
-
   background:
     conic-gradient(
       from 0deg,
@@ -350,25 +318,20 @@ textarea:focus {
       transparent 345deg,
       transparent 360deg
     );
-
   -webkit-mask:
     radial-gradient(
       farthest-side,
       transparent calc(100% - 3px),
       #000 calc(100% - 2px)
     );
-
   mask:
     radial-gradient(
       farthest-side,
       transparent calc(100% - 3px),
       #000 calc(100% - 2px)
     );
-
   opacity: 0;
-
   z-index: 1;
-
   animation:
     ring-appear 1s ease-out 0.8s forwards,
     logo-ring-spin 7s linear 1.8s infinite;
@@ -376,7 +339,6 @@ textarea:focus {
 
 .animated-logo:hover img {
   transform: scale(1.06);
-
   filter:
     drop-shadow(0 0 8px rgba(65, 105, 225, 0.35))
     drop-shadow(0 0 18px rgba(0, 255, 255, 0.18));
@@ -413,36 +375,21 @@ textarea:focus {
 @keyframes logo-entrance {
   0% {
     opacity: 0;
-
-    transform:
-      translateY(25px)
-      scale(0.65)
-      rotate(-8deg);
+    transform: translateY(25px) scale(0.65) rotate(-8deg);
   }
 
   55% {
     opacity: 1;
-
-    transform:
-      translateY(-4px)
-      scale(1.04)
-      rotate(2deg);
+    transform: translateY(-4px) scale(1.04) rotate(2deg);
   }
 
   75% {
-    transform:
-      translateY(2px)
-      scale(0.98)
-      rotate(-1deg);
+    transform: translateY(2px) scale(0.98) rotate(-1deg);
   }
 
   100% {
     opacity: 1;
-
-    transform:
-      translateY(0)
-      scale(1)
-      rotate(0deg);
+    transform: translateY(0) scale(1) rotate(0deg);
   }
 }
 
@@ -463,26 +410,17 @@ textarea:focus {
 @keyframes logo-image-reveal {
   0% {
     opacity: 0;
-
-    filter:
-      blur(8px)
-      grayscale(1);
+    filter: blur(8px) grayscale(1);
   }
 
   50% {
     opacity: 0.75;
-
-    filter:
-      blur(2px)
-      grayscale(0.25);
+    filter: blur(2px) grayscale(0.25);
   }
 
   100% {
     opacity: 1;
-
-    filter:
-      blur(0)
-      grayscale(0);
+    filter: blur(0) grayscale(0);
   }
 }
 
@@ -548,19 +486,14 @@ textarea:focus {
 
 .nav-links {
   display: flex;
-
   flex-wrap: wrap;
-
   align-items: center;
-
   gap: 1rem;
 }
 
 .nav-links a {
   color: var(--text);
-
   font-size: 0.95rem;
-
   font-weight: 600;
 }
 
@@ -574,11 +507,8 @@ textarea:focus {
 
 .main-content {
   width: 100%;
-
   max-width: 1240px;
-
   margin: 0 auto;
-
   padding: 2rem 1.5rem;
 }
 
@@ -587,11 +517,10 @@ textarea:focus {
 ========================================================= */
 
 .marketplace-page section:first-of-type,
+.marketplace-page .hero,
 .hero {
   position: relative;
-
   overflow: hidden;
-
   background:
     radial-gradient(
       circle at 85% 15%,
@@ -607,40 +536,30 @@ textarea:focus {
 }
 
 .marketplace-page section:first-of-type::before,
+.marketplace-page .hero::before,
 .hero::before {
   content: "";
-
   position: absolute;
-
   width: 520px;
   height: 520px;
-
   right: -250px;
   top: -180px;
-
   border-radius: 50%;
-
   background: rgba(255, 255, 255, 0.08);
-
   pointer-events: none;
 }
 
 .marketplace-page section:first-of-type::after,
+.marketplace-page .hero::after,
 .hero::after {
   content: "";
-
   position: absolute;
-
   width: 340px;
   height: 340px;
-
   left: -190px;
   bottom: -220px;
-
   border-radius: 50%;
-
   background: rgba(255, 255, 255, 0.06);
-
   pointer-events: none;
 }
 
@@ -649,21 +568,13 @@ textarea:focus {
 ========================================================= */
 
 .marketplace-page section:first-of-type h1,
+.marketplace-page .hero h1,
 .hero h1 {
   color: #ffffff;
-
-  font-size: clamp(
-    2.25rem,
-    6vw,
-    4.5rem
-  );
-
+  font-size: clamp(2.25rem, 6vw, 4.5rem);
   font-weight: 900;
-
   line-height: 1.05;
-
   letter-spacing: -0.055em;
-
   margin-bottom: 1rem;
 }
 
@@ -674,11 +585,8 @@ textarea:focus {
 .hero-subtext,
 .marketplace-page section:first-of-type p.mt-6.max-w-3xl {
   color: rgba(255, 255, 255, 0.92);
-
   font-size: 1rem;
-
   max-width: 700px;
-
   margin-bottom: 1.5rem;
 }
 
@@ -689,35 +597,22 @@ textarea:focus {
 .hero-search-bar,
 .marketplace-page section:first-of-type div.mt-8.rounded-2xl {
   position: relative;
-
   z-index: 5;
-
   display: flex;
-
   flex-direction: column;
-
   gap: 0.75rem;
-
   padding: 0.75rem;
-
   border-radius: 14px;
-
   border: 1px solid rgba(255, 255, 255, 0.3);
-
   background: rgba(255, 255, 255, 0.15);
-
-  box-shadow:
-    0 18px 45px rgba(0, 37, 92, 0.18);
-
+  box-shadow: 0 18px 45px rgba(0, 37, 92, 0.18);
   backdrop-filter: blur(14px);
-
   -webkit-backdrop-filter: blur(14px);
 }
 
 @media (min-width: 640px) {
   .hero-search-bar {
     flex-direction: row;
-
     align-items: center;
   }
 }
@@ -725,33 +620,23 @@ textarea:focus {
 .marketplace-page section:first-of-type input,
 .marketplace-page section:first-of-type select {
   background: #ffffff;
-
   border-color: transparent;
 }
 
 .input-group {
   display: flex;
-
   align-items: center;
-
   flex: 1;
-
   background: #ffffff;
-
   padding: 0.5rem 0.75rem;
-
   border-radius: 8px;
 }
 
 .input-group input {
   width: 100%;
-
   border: none;
-
   outline: none;
-
   background: transparent;
-
   margin-left: 0.5rem;
 }
 
@@ -762,21 +647,13 @@ textarea:focus {
 .btn-primary,
 .marketplace-page section:first-of-type button {
   background: var(--primary-royal-blue);
-
   color: #ffffff;
-
   border: none;
-
   padding: 0.7rem 1.35rem;
-
   border-radius: 8px;
-
   font-weight: 700;
-
   cursor: pointer;
-
   white-space: nowrap;
-
   transition:
     transform 0.25s ease,
     background 0.25s ease,
@@ -786,13 +663,9 @@ textarea:focus {
 .btn-primary:hover,
 .marketplace-page section:first-of-type button:hover {
   background: var(--accent-cyan);
-
   color: #000000;
-
   transform: translateY(-2px);
-
-  box-shadow:
-    0 0 16px var(--accent-glow);
+  box-shadow: 0 0 16px var(--accent-glow);
 }
 
 /* =========================================================
@@ -802,31 +675,22 @@ textarea:focus {
 .filter-section,
 #latest-listings aside {
   background: #ffffff;
-
   padding: 1.5rem;
-
   border-radius: var(--radius);
-
   border: 1px solid var(--border);
-
   margin-bottom: 2.5rem;
-
   box-shadow: var(--shadow-sm);
 }
 
 .filter-section h2 {
   font-size: 1.25rem;
-
   margin-bottom: 1rem;
-
   color: var(--dark-blue);
 }
 
 .filters-grid {
   display: grid;
-
   grid-template-columns: 1fr;
-
   gap: 1rem;
 }
 
@@ -844,17 +708,13 @@ textarea:focus {
 
 .filter-group {
   display: flex;
-
   flex-direction: column;
-
   gap: 0.35rem;
 }
 
 .filter-group label {
   font-size: 0.85rem;
-
   font-weight: 700;
-
   color: var(--text);
 }
 
@@ -872,27 +732,20 @@ textarea:focus {
 
 .listings-section .badge {
   font-size: 0.75rem;
-
   letter-spacing: 0.08em;
-
   color: var(--primary-royal-blue);
-
   font-weight: 800;
 }
 
 .listings-section h2 {
   font-size: 1.75rem;
-
   color: var(--dark-blue);
-
   font-weight: 900;
 }
 
 .listings-section .meta {
   color: var(--muted);
-
   font-size: 0.9rem;
-
   margin-top: 0.25rem;
 }
 
@@ -902,9 +755,7 @@ textarea:focus {
 
 #latest-listings a.group {
   border-color: var(--border);
-
   box-shadow: var(--shadow-sm);
-
   transition:
     transform 0.22s ease,
     box-shadow 0.22s ease,
@@ -913,9 +764,7 @@ textarea:focus {
 
 #latest-listings a.group:hover {
   border-color: #b9d2ef;
-
   box-shadow: var(--shadow-lg);
-
   transform: translateY(-3px);
 }
 
@@ -930,11 +779,7 @@ textarea:focus {
       rgba(37, 169, 232, 0.12),
       transparent 55%
     ),
-    linear-gradient(
-      145deg,
-      #eaf4ff,
-      #f8fbff
-    );
+    linear-gradient(145deg, #eaf4ff, #f8fbff);
 }
 
 #latest-listings a.group:hover > div:first-child {
@@ -944,38 +789,24 @@ textarea:focus {
       rgba(37, 169, 232, 0.2),
       transparent 55%
     ),
-    linear-gradient(
-      145deg,
-      #e5f2ff,
-      #f8fcff
-    );
+    linear-gradient(145deg, #e5f2ff, #f8fcff);
 }
 
 /* =========================================================
    TOP ADS
 ========================================================= */
 
-#latest-listings
-  div.mb-8.overflow-hidden.rounded-2xl {
+#latest-listings div.mb-8.overflow-hidden.rounded-2xl {
   position: relative;
-
   overflow: hidden;
-
   background:
     radial-gradient(
       circle at 90% 10%,
       rgba(37, 169, 232, 0.45),
       transparent 30%
     ),
-    linear-gradient(
-      120deg,
-      #063f9e,
-      #1557c0 50%,
-      #1e94df
-    );
-
-  box-shadow:
-    0 18px 40px rgba(21, 87, 192, 0.2);
+    linear-gradient(120deg, #063f9e, #1557c0 50%, #1e94df);
+  box-shadow: 0 18px 40px rgba(21, 87, 192, 0.2);
 }
 
 /* =========================================================
@@ -983,18 +814,11 @@ textarea:focus {
 ========================================================= */
 
 .marketplace-page section.border-y {
-  background:
-    linear-gradient(
-      180deg,
-      #ffffff 0%,
-      #f5f9ff 100%
-    );
+  background: linear-gradient(180deg, #ffffff 0%, #f5f9ff 100%);
 }
 
 .marketplace-page section.border-y a {
-  box-shadow:
-    0 10px 25px rgba(21, 87, 192, 0.18);
-
+  box-shadow: 0 10px 25px rgba(21, 87, 192, 0.18);
   transition:
     transform 0.25s ease,
     box-shadow 0.25s ease;
@@ -1002,48 +826,38 @@ textarea:focus {
 
 .marketplace-page section.border-y a:hover {
   transform: translateY(-2px);
-
-  box-shadow:
-    0 14px 30px rgba(21, 87, 192, 0.25);
+  box-shadow: 0 14px 30px rgba(21, 87, 192, 0.25);
 }
 
 /* =========================================================
    FEATURE CARDS
+   Scoped to marketplace to avoid admin conflicts.
 ========================================================= */
 
-.card {
+.marketplace-page .card {
   background-color: var(--bg-card);
-
   border: 1px solid var(--secondary-sea-blue);
-
   border-radius: var(--radius);
-
   padding: 20px;
-
   box-shadow: var(--shadow);
-
   transition:
     transform 0.25s ease,
     box-shadow 0.25s ease,
     border-color 0.25s ease;
 }
 
-.card:hover {
+.marketplace-page .card:hover {
   transform: translateY(-4px);
-
   border-color: var(--accent-cyan);
-
-  box-shadow:
-    0 15px 40px var(--accent-glow);
+  box-shadow: 0 15px 40px var(--accent-glow);
 }
 
-.card-title {
+.marketplace-page .card-title {
   color: var(--primary-royal-blue);
-
   font-weight: 800;
 }
 
-.card-highlight {
+.marketplace-page .card-highlight {
   color: var(--accent-cyan);
 }
 
@@ -1059,13 +873,11 @@ textarea:focus {
       transparent 30%
     ),
     #061426;
-
   color: #ffffff;
 }
 
 .marketplace-page footer a {
-  transition:
-    color 0.2s ease;
+  transition: color 0.2s ease;
 }
 
 .marketplace-page footer a:hover {
@@ -1073,11 +885,386 @@ textarea:focus {
 }
 
 /* =========================================================
+   ADMIN DASHBOARD
+   Dedicated styling for the admin area.
+========================================================= */
+
+.admin-dashboard {
+  min-height: 100vh;
+  width: 100%;
+  background: #f4f7fb;
+  color: #172b4d;
+}
+
+/* Admin layout */
+
+.admin-dashboard .admin-layout {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+}
+
+.admin-dashboard .admin-sidebar {
+  width: 260px;
+  min-width: 260px;
+  min-height: 100vh;
+  background: #071b3a;
+  color: #ffffff;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.admin-dashboard .admin-main {
+  flex: 1;
+  min-width: 0;
+  background: #f4f7fb;
+}
+
+/* Admin header */
+
+.admin-dashboard .admin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 72px;
+  padding: 16px 24px;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  position: relative;
+  z-index: 10;
+}
+
+/* Admin content */
+
+.admin-dashboard .admin-content {
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+/* Admin cards */
+
+.admin-dashboard .card,
+.admin-dashboard .admin-card {
+  background: #ffffff;
+  color: #172b4d;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+  transition:
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.admin-dashboard .card:hover,
+.admin-dashboard .admin-card:hover {
+  transform: none;
+  border-color: #cbd5e1;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.07);
+}
+
+/* Admin statistics */
+
+.admin-dashboard .stat-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+}
+
+.admin-dashboard .stat-card h3 {
+  color: #64748b;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.admin-dashboard .stat-card .stat-value {
+  color: #0f172a;
+  font-size: 1.8rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+/* Admin headings */
+
+.admin-dashboard h1,
+.admin-dashboard h2,
+.admin-dashboard h3,
+.admin-dashboard h4 {
+  color: #0f172a;
+}
+
+.admin-dashboard .page-title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+}
+
+.admin-dashboard .section-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #172b4d;
+}
+
+/* Admin buttons */
+
+.admin-dashboard button,
+.admin-dashboard .admin-button {
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.admin-dashboard .btn-primary,
+.admin-dashboard button.btn-primary {
+  background: var(--primary-royal-blue);
+  color: #ffffff;
+  border: 1px solid var(--primary-royal-blue);
+  border-radius: 9px;
+  padding: 10px 16px;
+  font-weight: 700;
+}
+
+.admin-dashboard .btn-primary:hover,
+.admin-dashboard button.btn-primary:hover {
+  background: #3156c7;
+  border-color: #3156c7;
+  color: #ffffff;
+  transform: none;
+  box-shadow: 0 4px 12px rgba(65, 105, 225, 0.2);
+}
+
+.admin-dashboard .btn-secondary {
+  background: #ffffff;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  padding: 10px 16px;
+  font-weight: 600;
+}
+
+.admin-dashboard .btn-secondary:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+/* Admin form fields */
+
+.admin-dashboard input,
+.admin-dashboard select,
+.admin-dashboard textarea {
+  width: 100%;
+  min-width: 0;
+  background: #ffffff;
+  color: #172b4d;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  padding: 10px 12px;
+  font-size: 0.925rem;
+}
+
+.admin-dashboard input:focus,
+.admin-dashboard select:focus,
+.admin-dashboard textarea:focus {
+  border-color: var(--primary-royal-blue);
+  box-shadow: 0 0 0 3px rgba(65, 105, 225, 0.12);
+  outline: none;
+}
+
+.admin-dashboard input::placeholder,
+.admin-dashboard textarea::placeholder {
+  color: #94a3b8;
+}
+
+/* Admin tables */
+
+.admin-dashboard table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.admin-dashboard th {
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 13px 16px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.admin-dashboard td {
+  color: #334155;
+  font-size: 0.9rem;
+  padding: 14px 16px;
+  border-bottom: 1px solid #edf2f7;
+}
+
+.admin-dashboard tbody tr:hover {
+  background: #f8fbff;
+}
+
+/* Admin badges */
+
+.admin-dashboard .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.admin-dashboard .badge-success {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.admin-dashboard .badge-warning {
+  color: #92400e;
+  background: #fef3c7;
+}
+
+.admin-dashboard .badge-danger {
+  color: #991b1b;
+  background: #fee2e2;
+}
+
+.admin-dashboard .badge-info {
+  color: #1e40af;
+  background: #dbeafe;
+}
+
+/* Admin navigation */
+
+.admin-dashboard .admin-nav a,
+.admin-dashboard .admin-nav button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 14px;
+  border-radius: 9px;
+  color: #cbd5e1;
+  text-align: left;
+  font-size: 0.925rem;
+  font-weight: 600;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.admin-dashboard .admin-nav a:hover,
+.admin-dashboard .admin-nav button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.admin-dashboard .admin-nav a.active,
+.admin-dashboard .admin-nav button.active {
+  background: var(--primary-royal-blue);
+  color: #ffffff;
+}
+
+/* Admin links */
+
+.admin-dashboard a {
+  cursor: pointer;
+}
+
+.admin-dashboard a:hover {
+  color: var(--primary-royal-blue);
+}
+
+/* Admin loading state */
+
+.admin-dashboard .loading-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+  color: #64748b;
+}
+
+/* Admin empty state */
+
+.admin-dashboard .empty-state {
+  padding: 40px 20px;
+  text-align: center;
+  color: #64748b;
+  background: #ffffff;
+  border: 1px dashed #cbd5e1;
+  border-radius: 14px;
+}
+
+/* Admin alerts */
+
+.admin-dashboard .alert {
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 0.9rem;
+}
+
+.admin-dashboard .alert-success {
+  color: #166534;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+}
+
+.admin-dashboard .alert-error {
+  color: #991b1b;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
+.admin-dashboard .alert-info {
+  color: #1e40af;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+}
+
+/* =========================================================
+   CLICK AND LAYER SAFETY
+========================================================= */
+
+/* Decorative pseudo-elements must never block interaction. */
+
+.marketplace-page section:first-of-type::before,
+.marketplace-page section:first-of-type::after,
+.hero::before,
+.hero::after,
+.animated-logo::before,
+.animated-logo::after {
+  pointer-events: none;
+}
+
+/* Keep interactive elements above decorative backgrounds. */
+
+.marketplace-page button,
+.marketplace-page a,
+.marketplace-page input,
+.marketplace-page select,
+.marketplace-page textarea {
+  position: relative;
+}
+
+/* Do not globally disable pointer events on buttons or links. */
+
+/* =========================================================
    MOBILE
 ========================================================= */
 
 @media (max-width: 640px) {
-
   .animated-logo {
     width: 130px;
     height: 130px;
@@ -1120,27 +1307,18 @@ textarea:focus {
 
   .marketplace-page section:first-of-type h1,
   .hero h1 {
-    font-size: clamp(
-      46px,
-      15vw,
-      68px
-    );
-
+    font-size: clamp(46px, 15vw, 68px);
     line-height: 0.98;
-
     letter-spacing: -0.06em;
   }
 
   .marketplace-page section:first-of-type p.mt-6.max-w-3xl {
     font-size: 16px;
-
     line-height: 1.6;
   }
 
-  .marketplace-page section:first-of-type
-    div.mt-8.rounded-2xl {
+  .marketplace-page section:first-of-type div.mt-8.rounded-2xl {
     padding: 8px;
-
     border-radius: 16px;
   }
 
@@ -1148,14 +1326,48 @@ textarea:focus {
     padding-top: 38px;
   }
 
-  #latest-listings
-    a.group
-    > div:first-child {
+  #latest-listings a.group > div:first-child {
     height: 210px;
   }
 
   .marketplace-page footer {
     text-align: left;
+  }
+
+  .admin-dashboard .admin-sidebar {
+    width: 100%;
+    min-width: 0;
+    min-height: auto;
+  }
+
+  .admin-dashboard .admin-header {
+    padding: 14px 16px;
+    flex-wrap: wrap;
+  }
+
+  .admin-dashboard .admin-content {
+    padding: 16px;
+  }
+
+  .admin-dashboard .page-title {
+    font-size: 1.4rem;
+  }
+
+  .admin-dashboard .stat-card {
+    padding: 16px;
+  }
+
+  .admin-dashboard .stat-card .stat-value {
+    font-size: 1.5rem;
+  }
+
+  .admin-dashboard table {
+    min-width: 600px;
+  }
+
+  .admin-dashboard .table-wrapper {
+    overflow-x: auto;
+    width: 100%;
   }
 }
 
@@ -1164,6 +1376,30 @@ textarea:focus {
 ========================================================= */
 
 @media (max-width: 390px) {
+  .animated-logo {
+    width: 115px;
+    height: 115px;
+  }
+
+  .logo-large {
+    width: 145px;
+    height: 145px;
+  }
+
+  .logo-medium {
+    width: 120px;
+    height: 120px;
+  }
+
+  .logo-header {
+    width: 58px;
+    height: 58px;
+  }
+
+  .logo-small {
+    width: 48px;
+    height: 48px;
+  }
 
   .marketplace-page section:first-of-type h1,
   .hero h1 {
@@ -1176,8 +1412,11 @@ textarea:focus {
 
   #latest-listings {
     padding-left: 14px;
-
     padding-right: 14px;
+  }
+
+  .admin-dashboard .admin-content {
+    padding: 12px;
   }
 }
 
@@ -1186,26 +1425,21 @@ textarea:focus {
 ========================================================= */
 
 @media (prefers-reduced-motion: reduce) {
-
   *,
   *::before,
   *::after {
     scroll-behavior: auto !important;
-
     transition: none !important;
-
     animation: none !important;
   }
 
   .animated-logo {
     opacity: 1;
-
     transform: none;
   }
 
   .animated-logo img {
     opacity: 1;
-
     filter: none;
   }
 
