@@ -1,4 +1,6 @@
+
 import Link from "next/link";
+import LatestListings from "@/components/LatestListings";
 
 const categories = [
   { icon: "🚗", name: "Vehicles", href: "/categories/vehicles" },
@@ -7,45 +9,6 @@ const categories = [
   { icon: "⚙️", name: "Machinery", href: "/categories/machinery" },
   { icon: "🌾", name: "Agriculture", href: "/categories/agriculture" },
   { icon: "🛠️", name: "Services", href: "/categories/services" },
-];
-
-const listings = [
-  {
-    icon: "🏭",
-    title: "Industrial Machinery",
-    category: "Machinery & Equipment",
-    href: "/categories/machinery",
-  },
-  {
-    icon: "🚙",
-    title: "Vehicles & Auto",
-    category: "Vehicles",
-    href: "/categories/vehicles",
-  },
-  {
-    icon: "🏡",
-    title: "Property & Real Estate",
-    category: "Property",
-    href: "/categories/property",
-  },
-  {
-    icon: "🖨️",
-    title: "Printing Equipment",
-    category: "Business Equipment",
-    href: "/categories/machinery",
-  },
-  {
-    icon: "📱",
-    title: "Phones & Electronics",
-    category: "Electronics",
-    href: "/categories/electronics",
-  },
-  {
-    icon: "🌱",
-    title: "Agriculture Equipment",
-    category: "Agriculture",
-    href: "/categories/agriculture",
-  },
 ];
 
 export default function HomePage() {
@@ -118,6 +81,7 @@ export default function HomePage() {
 
           </nav>
 
+          {/* MOBILE NAVIGATION */}
           <div className="flex items-center gap-2 md:hidden">
 
             <Link
@@ -327,44 +291,8 @@ export default function HomePage() {
 
           </div>
 
-          {/* LISTING CARDS */}
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-
-            {listings.map((item) => (
-              <Link
-                key={item.title}
-                href={item.href}
-                className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl"
-              >
-
-                <div className="flex h-52 items-center justify-center bg-gradient-to-br from-blue-50 to-slate-50 text-7xl">
-                  {item.icon}
-                </div>
-
-                <div className="p-5">
-
-                  <p className="text-xs font-bold uppercase tracking-wider text-blue-700">
-                    {item.category}
-                  </p>
-
-                  <h3 className="mt-2 text-xl font-black text-slate-900">
-                    {item.title}
-                  </h3>
-
-                  <p className="mt-2 text-sm text-slate-500">
-                    Browse available listings and connect with sellers.
-                  </p>
-
-                  <div className="mt-5 font-bold text-blue-700">
-                    Explore →
-                  </div>
-
-                </div>
-
-              </Link>
-            ))}
-
-          </div>
+          {/* REAL PRODUCTS FROM SUPABASE */}
+          <LatestListings />
 
         </div>
       </section>
