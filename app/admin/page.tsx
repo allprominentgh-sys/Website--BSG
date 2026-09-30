@@ -90,6 +90,22 @@ const adminSections = [
     action: "Manage Advertising",
   },
   {
+    title: "Refund Policy",
+    description:
+      "Manage refund conditions, review customer refund requests, approve or reject claims, and track refund status.",
+    icon: "↩️",
+    href: "/admin/refund-policy",
+    action: "Manage Refunds",
+  },
+  {
+    title: "Customer Service",
+    description:
+      "View customer enquiries, respond to complaints, manage support tickets, and track resolutions.",
+    icon: "🎧",
+    href: "/admin/support",
+    action: "Open Customer Service",
+  },
+  {
     title: "Settings",
     description: "Configure marketplace and administrator settings.",
     icon: "⚙️",
@@ -730,6 +746,20 @@ export default function AdminDashboardPage() {
               <span>📢</span> Advertising
             </a>
 
+            <Link
+              className="admin-nav-link"
+              href="/admin/support"
+            >
+              <span>🎧</span> Customer Service
+            </Link>
+
+            <Link
+              className="admin-nav-link"
+              href="/admin/refund-policy"
+            >
+              <span>↩️</span> Refund Policy
+            </Link>
+
             <a className="admin-nav-link" href="#currency-management">
               <span>⚙</span> Currency Settings
             </a>
@@ -809,7 +839,8 @@ export default function AdminDashboardPage() {
               <p className="mt-3 max-w-3xl text-slate-500">
                 Manage Best Sales Ghana, direct-sales products,
                 marketplace sellers, customers, orders, deliveries,
-                payments, revenue, advertising and currency exchange rates.
+                payments, revenue, advertising, refunds, customer service
+                and currency exchange rates.
               </p>
             </div>
 
