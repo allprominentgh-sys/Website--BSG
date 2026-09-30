@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -121,8 +122,6 @@ export default function PostAdPage() {
 
   /*
    * Load the seller's current marketplace ad status.
-   *
-   * This calls the database function created in Step 2A.
    */
   useEffect(() => {
     let mounted = true;
@@ -445,7 +444,6 @@ export default function PostAdPage() {
       const supabase = supabaseBrowser();
 
       /*
-       * SECURITY:
        * Only authenticated users can create marketplace listings.
        */
       const {
@@ -488,7 +486,7 @@ export default function PostAdPage() {
       /*
        * Create listing.
        *
-       * Step 2A database trigger checks the seller's
+       * The database trigger checks the seller's
        * publication count before allowing this INSERT.
        */
       const {
@@ -524,10 +522,6 @@ export default function PostAdPage() {
         .single();
 
       if (listingError) {
-        /*
-         * Special handling for the Step 2A
-         * database verification restriction.
-         */
         if (
           listingError.message.includes(
             "SELLER_VERIFICATION_REQUIRED"
@@ -666,9 +660,6 @@ export default function PostAdPage() {
           ? error.message
           : "Something went wrong while publishing your listing.";
 
-      /*
-       * Friendly verification message.
-       */
       if (
         rawMessage ===
         "SELLER_VERIFICATION_REQUIRED"
@@ -680,10 +671,6 @@ export default function PostAdPage() {
         return;
       }
 
-      /*
-       * If the listing was created but something failed afterward,
-       * don't pretend everything succeeded.
-       */
       if (createdListingId) {
         setErrorMessage(
           `${rawMessage} Your listing #${createdListingId} may have been created. Please check My Listings before trying again.`
