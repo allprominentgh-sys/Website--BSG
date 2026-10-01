@@ -1,7 +1,9 @@
+
 "use client";
 
 import Link from "next/link";
 import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "@/supabase-browser";
 
 type AccountType = "buyer" | "seller" | "business" | "";
@@ -13,49 +15,37 @@ type DeliveryOption =
   | "";
 
 export default function RegisterPage() {
+  const router = useRouter();
   const supabase = supabaseBrowser();
+
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   const [accountType, setAccountType] = useState<AccountType>("");
   const [deliveryOption, setDeliveryOption] =
     useState<DeliveryOption>("");
 
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-
   const [agreeTerms, setAgreeTerms] = useState(false);
-
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  const [appleLoading, setAppleLoading] = useState(false);
-
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
 
-    setMessage("");
     setError("");
+    setMessage("");
 
-    if (!fullName.trim()) {
-      setError("Please enter your full name.");
-      return;
-    }
+    const cleanName = fullName.trim();
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPhone = phone.trim();
 
-    if (!email.trim()) {
-      setError("Please enter your email address.");
-      return;
-    }
-
-    if (!phone.trim()) {
-      setError("Please enter your phone number.");
+    if (!cleanName || !cleanEmail || !cleanPhone) {
+      setError("Please complete all required fields.");
       return;
     }
 
@@ -65,41 +55,37 @@ export default function RegisterPage() {
     }
 
     if (!deliveryOption) {
-      setError("Please select your preferred delivery option.");
+      setError("Please select a delivery option.");
       return;
     }
 
     if (password.length < 8) {
-      setError("Password must contain at least 8 characters.");
+      setError("Your password must contain at least 8 characters.");
       return;
     }
 
     if (password !== confirmPassword) {
-      setError("Passwords do not match.");
+      setError("Your passwords do not match.");
       return;
     }
 
     if (!agreeTerms) {
-      setError(
-        "You must agree to the Terms & Conditions and Privacy Policy."
-      );
+      setError("You must agree to the Terms and Conditions.");
       return;
     }
 
-    try {
-      setLoading(true);
+    setLoading(true);
 
+    try {
       const { data, error: signUpError } =
         await supabase.auth.signUp({
-          email: email.trim(),
+          email: cleanEmail,
           password,
           options: {
-            emailRedirectTo:
-              `${window.location.origin}/auth/callback`,
-
+            emailRedirectTo: `${window.location.origin}/auth/callback`,
             data: {
-              full_name: fullName.trim(),
-              phone: phone.trim(),
+              full_name: cleanName,
+              phone: cleanPhone,
               account_type: accountType,
               delivery_option: deliveryOption,
             },
@@ -107,598 +93,437 @@ export default function RegisterPage() {
         });
 
       if (signUpError) {
-        throw signUpError;
+        setError(signUpError.message);
+        return;
       }
 
-      if (data.user && !data.session) {
-        setMessage(
-          "Account created successfully. Please check your email to confirm your account."
+      if (data.session) {
+        router.replace("/dashboard");
+        return;
+      }
+
+      if (data.user) {
+        router.push(
+          `/verify-email?email=${encodeURIComponent(cleanEmail)}`
         );
-      } else if (data.session) {
-        window.location.href = "/dashboard";
+        return;
       }
-    } catch (err: unknown) {
-      const errorMessage =
-        err instanceof Error
-          ? err.message
-          : "Unable to create your account.";
 
-      setError(errorMessage);
+      setError(
+        "We could not complete your registration. Please try again."
+      );
+    } catch {
+      setError(
+        "Something went wrong. Please check your connection and try again."
+      );
     } finally {
       setLoading(false);
     }
   }
 
-  async function signInWithGoogle() {
+  async function handleGoogleSignIn() {
     setError("");
     setMessage("");
     setGoogleLoading(true);
 
     try {
-      const { error } =
+      const { error: oauthError } =
         await supabase.auth.signInWithOAuth({
           provider: "google",
           options: {
-            redirectTo:
-              `${window.location.origin}/auth/callback`,
+            redirectTo: `${window.location.origin}/auth/callback`,
           },
         });
 
-      if (error) {
-        throw error;
+      if (oauthError) {
+        setError(oauthError.message);
+        setGoogleLoading(false);
       }
-    } catch (err: unknown) {
-      const errorMessage =
-        err instanceof Error
-          ? err.message
-          : "Google sign-in could not be started.";
-
-      setError(errorMessage);
+    } catch {
+      setError("Google sign-in could not be started.");
       setGoogleLoading(false);
     }
   }
 
-  async function signInWithApple() {
-    setError("");
-    setMessage("");
-    setAppleLoading(true);
-
-    try {
-      const { error } =
-        await supabase.auth.signInWithOAuth({
-          provider: "apple",
-          options: {
-            redirectTo:
-              `${window.location.origin}/auth/callback`,
-          },
-        });
-
-      if (error) {
-        throw error;
-      }
-    } catch (err: unknown) {
-      const errorMessage =
-        err instanceof Error
-          ? err.message
-          : "Apple sign-in could not be started.";
-
-      setError(errorMessage);
-      setAppleLoading(false);
-    }
-  }
-
-  function getDeliveryName() {
-    if (deliveryOption === "best-sales-delivery") {
-      return "🚚 BEST SALES GHANA Delivery";
-    }
-
-    if (deliveryOption === "seller-delivery") {
-      return "🏪 Seller Handles Delivery";
-    }
-
-    if (deliveryOption === "buyer-pickup") {
-      return "🤝 Buyer Pickup";
-    }
-
-    return "";
-  }
-
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-800">
-
-      {/* HEADER */}
-      <header className="border-b bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
-
+    <main className="min-h-screen bg-slate-50 px-4 py-10">
+      <div className="mx-auto w-full max-w-2xl">
+        <div className="mb-8 text-center">
           <Link
             href="/"
-            className="text-2xl font-extrabold tracking-tight text-blue-700"
+            className="text-3xl font-extrabold tracking-tight text-blue-800"
           >
-            BEST SALES GHANA
+            BESTSALESGH
           </Link>
 
-          <Link
-            href="/login"
-            className="rounded-lg border border-blue-600 px-4 py-2 text-sm font-semibold text-blue-600 hover:bg-blue-50"
-          >
-            Login
-          </Link>
-
-        </div>
-      </header>
-
-      {/* HERO */}
-      <section className="bg-gradient-to-r from-blue-700 to-sky-500 px-4 py-12 text-white">
-        <div className="mx-auto max-w-4xl text-center">
-
-          <h1 className="text-3xl font-extrabold md:text-5xl">
-            Create Your BEST SALES GHANA Account
-          </h1>
-
-          <p className="mx-auto mt-4 max-w-2xl text-base text-blue-50 md:text-lg">
-            Join Ghana's marketplace to buy products, sell products,
-            advertise your business and connect with customers.
+          <p className="mt-2 text-sm text-slate-600">
+            Create your account and start shopping or selling.
           </p>
-
         </div>
-      </section>
 
-      {/* REGISTRATION */}
-      <section className="px-4 py-10">
-        <div className="mx-auto max-w-3xl">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
+          <div className="mb-7">
+            <h1 className="text-2xl font-bold text-slate-900">
+              Create your account
+            </h1>
 
-          <div className="rounded-2xl bg-white p-6 shadow-lg md:p-10">
+            <p className="mt-2 text-sm text-slate-500">
+              Join BestSalesGH as a buyer, seller, or business.
+            </p>
+          </div>
 
-            <div className="mb-8">
-              <h2 className="text-2xl font-bold text-slate-900">
-                Create Account
-              </h2>
+          {error && (
+            <div
+              role="alert"
+              className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+            >
+              {error}
+            </div>
+          )}
 
-              <p className="mt-2 text-sm text-slate-500">
-                Complete the form below to create your account.
-              </p>
+          {message && (
+            <div
+              role="status"
+              className="mb-5 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700"
+            >
+              {message}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <label className="mb-3 block text-sm font-semibold text-slate-800">
+                Choose your account type
+              </label>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                {(
+                  [
+                    {
+                      value: "buyer",
+                      title: "Buyer",
+                      description: "Shop products and services.",
+                    },
+                    {
+                      value: "seller",
+                      title: "Seller",
+                      description: "List products for sale.",
+                    },
+                    {
+                      value: "business",
+                      title: "Business",
+                      description: "Grow your business online.",
+                    },
+                  ] as const
+                ).map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setAccountType(option.value)}
+                    aria-pressed={accountType === option.value}
+                    className={`rounded-xl border p-4 text-left transition ${
+                      accountType === option.value
+                        ? "border-blue-700 bg-blue-50 ring-2 ring-blue-100"
+                        : "border-slate-200 hover:border-blue-300"
+                    }`}
+                  >
+                    <span className="block font-semibold text-slate-900">
+                      {option.title}
+                    </span>
+
+                    <span className="mt-1 block text-xs leading-5 text-slate-500">
+                      {option.description}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
 
-            {/* SUCCESS */}
-            {message && (
-              <div className="mb-6 rounded-lg border border-green-200 bg-green-50 p-4 text-sm font-medium text-green-700">
-                {message}
-              </div>
-            )}
-
-            {/* ERROR */}
-            {error && (
-              <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
-                {error}
-              </div>
-            )}
-
-            <form
-              onSubmit={handleSubmit}
-              className="space-y-6"
-            >
-
-              {/* FULL NAME */}
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-700">
-                  Full Name *
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <label
+                  htmlFor="fullName"
+                  className="mb-2 block text-sm font-medium text-slate-700"
+                >
+                  Full name
                 </label>
 
                 <input
+                  id="fullName"
                   type="text"
+                  autoComplete="name"
+                  required
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="Enter your full name"
-                  autoComplete="name"
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                  className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
                 />
               </div>
 
-              {/* EMAIL */}
               <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-700">
-                  Email Address *
+                <label
+                  htmlFor="email"
+                  className="mb-2 block text-sm font-medium text-slate-700"
+                >
+                  Email address
                 </label>
 
                 <input
+                  id="email"
                   type="email"
+                  autoComplete="email"
+                  required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
-                  autoComplete="email"
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                  className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
                 />
               </div>
 
-              {/* PHONE */}
               <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-700">
-                  Phone Number *
+                <label
+                  htmlFor="phone"
+                  className="mb-2 block text-sm font-medium text-slate-700"
+                >
+                  Phone number
                 </label>
 
                 <input
+                  id="phone"
                   type="tel"
+                  autoComplete="tel"
+                  required
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="e.g. 024 123 4567"
-                  autoComplete="tel"
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                  placeholder="e.g. 024 000 0000"
+                  className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
                 />
               </div>
 
-              {/* ACCOUNT TYPE */}
               <div>
-                <label className="mb-3 block text-sm font-semibold text-slate-700">
-                  Account Type *
+                <label
+                  htmlFor="password"
+                  className="mb-2 block text-sm font-medium text-slate-700"
+                >
+                  Password
                 </label>
 
-                <div className="grid gap-3 md:grid-cols-3">
-
-                  <button
-                    type="button"
-                    onClick={() => setAccountType("buyer")}
-                    className={`rounded-xl border p-4 text-left transition ${
-                      accountType === "buyer"
-                        ? "border-blue-600 bg-blue-50 ring-2 ring-blue-100"
-                        : "border-slate-300 hover:border-blue-400"
-                    }`}
-                  >
-                    <div className="text-lg">🛒</div>
-
-                    <div className="mt-1 font-bold">
-                      Buyer
-                    </div>
-
-                    <div className="mt-1 text-xs text-slate-500">
-                      Buy products and contact sellers.
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setAccountType("seller")}
-                    className={`rounded-xl border p-4 text-left transition ${
-                      accountType === "seller"
-                        ? "border-blue-600 bg-blue-50 ring-2 ring-blue-100"
-                        : "border-slate-300 hover:border-blue-400"
-                    }`}
-                  >
-                    <div className="text-lg">🏪</div>
-
-                    <div className="mt-1 font-bold">
-                      Seller
-                    </div>
-
-                    <div className="mt-1 text-xs text-slate-500">
-                      Sell products as an individual.
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setAccountType("business")}
-                    className={`rounded-xl border p-4 text-left transition ${
-                      accountType === "business"
-                        ? "border-blue-600 bg-blue-50 ring-2 ring-blue-100"
-                        : "border-slate-300 hover:border-blue-400"
-                    }`}
-                  >
-                    <div className="text-lg">🏢</div>
-
-                    <div className="mt-1 font-bold">
-                      Business / Company
-                    </div>
-
-                    <div className="mt-1 text-xs text-slate-500">
-                      Sell products as a registered business.
-                    </div>
-                  </button>
-
-                </div>
+                <input
+                  id="password"
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                  minLength={8}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="At least 8 characters"
+                  className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                />
               </div>
 
-              {/* DELIVERY */}
               <div>
-                <label className="mb-3 block text-sm font-semibold text-slate-700">
-                  Preferred Delivery Option *
+                <label
+                  htmlFor="confirmPassword"
+                  className="mb-2 block text-sm font-medium text-slate-700"
+                >
+                  Confirm password
                 </label>
 
-                <div className="space-y-3">
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setDeliveryOption("best-sales-delivery")
-                    }
-                    className={`w-full rounded-xl border p-4 text-left transition ${
-                      deliveryOption === "best-sales-delivery"
-                        ? "border-blue-600 bg-blue-50 ring-2 ring-blue-100"
-                        : "border-slate-300 hover:border-blue-400"
-                    }`}
-                  >
-                    <div className="font-bold">
-                      🚚 BEST SALES GHANA Delivery
-                    </div>
-
-                    <div className="mt-1 text-xs text-slate-500">
-                      Delivery arranged through BEST SALES GHANA.
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setDeliveryOption("seller-delivery")
-                    }
-                    className={`w-full rounded-xl border p-4 text-left transition ${
-                      deliveryOption === "seller-delivery"
-                        ? "border-blue-600 bg-blue-50 ring-2 ring-blue-100"
-                        : "border-slate-300 hover:border-blue-400"
-                    }`}
-                  >
-                    <div className="font-bold">
-                      🏪 Seller Handles Delivery
-                    </div>
-
-                    <div className="mt-1 text-xs text-slate-500">
-                      Delivery is handled directly by the seller.
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setDeliveryOption("buyer-pickup")
-                    }
-                    className={`w-full rounded-xl border p-4 text-left transition ${
-                      deliveryOption === "buyer-pickup"
-                        ? "border-blue-600 bg-blue-50 ring-2 ring-blue-100"
-                        : "border-slate-300 hover:border-blue-400"
-                    }`}
-                  >
-                    <div className="font-bold">
-                      🤝 Buyer Pickup
-                    </div>
-
-                    <div className="mt-1 text-xs text-slate-500">
-                      Buyer collects the item from the agreed location.
-                    </div>
-                  </button>
-
-                </div>
-
-                {deliveryOption && (
-                  <div className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
-                    Selected:{" "}
-                    <span className="font-semibold">
-                      {getDeliveryName()}
-                    </span>
-                  </div>
-                )}
+                <input
+                  id="confirmPassword"
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                  value={confirmPassword}
+                  onChange={(e) =>
+                    setConfirmPassword(e.target.value)
+                  }
+                  placeholder="Re-enter your password"
+                  className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                />
               </div>
-
-              {/* PASSWORD */}
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-700">
-                  Password *
-                </label>
-
-                <div className="relative">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Minimum 8 characters"
-                    autoComplete="new-password"
-                    className="w-full rounded-xl border border-slate-300 px-4 py-3 pr-20 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
-                  />
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setShowPassword(!showPassword)
-                    }
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-blue-600"
-                  >
-                    {showPassword ? "Hide" : "Show"}
-                  </button>
-                </div>
-              </div>
-
-              {/* CONFIRM PASSWORD */}
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-700">
-                  Confirm Password *
-                </label>
-
-                <div className="relative">
-                  <input
-                    type={showConfirmPassword ? "text" : "password"}
-                    value={confirmPassword}
-                    onChange={(e) =>
-                      setConfirmPassword(e.target.value)
-                    }
-                    placeholder="Re-enter your password"
-                    autoComplete="new-password"
-                    className="w-full rounded-xl border border-slate-300 px-4 py-3 pr-20 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
-                  />
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setShowConfirmPassword(
-                        !showConfirmPassword
-                      )
-                    }
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-blue-600"
-                  >
-                    {showConfirmPassword ? "Hide" : "Show"}
-                  </button>
-                </div>
-              </div>
-
-              {/* TERMS */}
-              <div className="rounded-xl bg-slate-50 p-4">
-                <label className="flex items-start gap-3 text-sm text-slate-600">
-
-                  <input
-                    type="checkbox"
-                    checked={agreeTerms}
-                    onChange={(e) =>
-                      setAgreeTerms(e.target.checked)
-                    }
-                    className="mt-1 h-4 w-4 rounded border-slate-300"
-                  />
-
-                  <span>
-                    I agree to the{" "}
-                    <Link
-                      href="/terms"
-                      className="font-semibold text-blue-600 hover:underline"
-                    >
-                      Terms & Conditions
-                    </Link>{" "}
-                    and{" "}
-                    <Link
-                      href="/privacy"
-                      className="font-semibold text-blue-600 hover:underline"
-                    >
-                      Privacy Policy
-                    </Link>
-                    .
-                  </span>
-
-                </label>
-              </div>
-
-              {/* REGISTER */}
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full rounded-xl bg-blue-600 px-6 py-4 font-bold text-white shadow-md transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {loading
-                  ? "Creating Account..."
-                  : "Create Account"}
-              </button>
-
-            </form>
-
-            {/* DIVIDER */}
-            <div className="my-8 flex items-center gap-4">
-              <div className="h-px flex-1 bg-slate-200" />
-              <span className="text-sm text-slate-400">
-                OR
-              </span>
-              <div className="h-px flex-1 bg-slate-200" />
-            </div>
-
-            {/* GOOGLE */}
-            <button
-              type="button"
-              onClick={signInWithGoogle}
-              disabled={googleLoading || appleLoading}
-              className="mb-3 flex w-full items-center justify-center gap-3 rounded-xl border border-slate-300 bg-white px-6 py-3 font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <span className="text-lg">G</span>
-
-              {googleLoading
-                ? "Connecting..."
-                : "Continue with Google"}
-            </button>
-
-            {/* APPLE */}
-            <button
-              type="button"
-              onClick={signInWithApple}
-              disabled={appleLoading || googleLoading}
-              className="flex w-full items-center justify-center gap-3 rounded-xl bg-black px-6 py-3 font-semibold text-white transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <span className="text-lg"></span>
-
-              {appleLoading
-                ? "Connecting..."
-                : "Continue with Apple"}
-            </button>
-
-            {/* LOGIN */}
-            <p className="mt-8 text-center text-sm text-slate-500">
-              Already have an account?{" "}
-              <Link
-                href="/login"
-                className="font-bold text-blue-600 hover:underline"
-              >
-                Login here
-              </Link>
-            </p>
-
-          </div>
-        </div>
-      </section>
-
-      {/* SECURITY NOTICE */}
-      <section className="px-4 pb-10">
-        <div className="mx-auto max-w-3xl rounded-2xl border border-blue-100 bg-blue-50 p-5">
-
-          <div className="flex gap-3">
-
-            <div className="text-xl">
-              🔐
             </div>
 
             <div>
-              <h3 className="font-bold text-blue-900">
-                Your account security matters
-              </h3>
+              <label className="mb-3 block text-sm font-semibold text-slate-800">
+                Preferred delivery option
+              </label>
 
-              <p className="mt-1 text-sm leading-6 text-blue-800">
-                BEST SALES GHANA uses account security and marketplace
-                controls to help protect buyers and sellers. Additional
-                seller or business verification may be required before
-                certain marketplace activities.
-              </p>
+              <div className="space-y-3">
+                <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 p-4 transition hover:border-blue-300">
+                  <input
+                    type="radio"
+                    name="deliveryOption"
+                    value="best-sales-delivery"
+                    checked={
+                      deliveryOption === "best-sales-delivery"
+                    }
+                    onChange={() =>
+                      setDeliveryOption("best-sales-delivery")
+                    }
+                    className="mt-1 accent-blue-700"
+                  />
+
+                  <span>
+                    <span className="block text-sm font-semibold text-slate-800">
+                      BestSalesGH Delivery
+                    </span>
+                    <span className="mt-1 block text-xs text-slate-500">
+                      Delivery arranged through BestSalesGH, subject
+                      to availability and applicable charges.
+                    </span>
+                  </span>
+                </label>
+
+                <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 p-4 transition hover:border-blue-300">
+                  <input
+                    type="radio"
+                    name="deliveryOption"
+                    value="seller-delivery"
+                    checked={deliveryOption === "seller-delivery"}
+                    onChange={() =>
+                      setDeliveryOption("seller-delivery")
+                    }
+                    className="mt-1 accent-blue-700"
+                  />
+
+                  <span>
+                    <span className="block text-sm font-semibold text-slate-800">
+                      Seller Delivery
+                    </span>
+                    <span className="mt-1 block text-xs text-slate-500">
+                      The seller arranges delivery directly.
+                    </span>
+                  </span>
+                </label>
+
+                <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 p-4 transition hover:border-blue-300">
+                  <input
+                    type="radio"
+                    name="deliveryOption"
+                    value="buyer-pickup"
+                    checked={deliveryOption === "buyer-pickup"}
+                    onChange={() =>
+                      setDeliveryOption("buyer-pickup")
+                    }
+                    className="mt-1 accent-blue-700"
+                  />
+
+                  <span>
+                    <span className="block text-sm font-semibold text-slate-800">
+                      Buyer Pickup
+                    </span>
+                    <span className="mt-1 block text-xs text-slate-500">
+                      Collect your order from the agreed pickup
+                      location.
+                    </span>
+                  </span>
+                </label>
+              </div>
             </div>
 
+            <div className="flex items-start gap-3">
+              <input
+                id="agreeTerms"
+                type="checkbox"
+                checked={agreeTerms}
+                onChange={(e) => setAgreeTerms(e.target.checked)}
+                className="mt-1 h-4 w-4 accent-blue-700"
+              />
+
+              <label
+                htmlFor="agreeTerms"
+                className="text-sm leading-6 text-slate-600"
+              >
+                I agree to the{" "}
+                <Link
+                  href="/terms"
+                  className="font-medium text-blue-700 hover:underline"
+                >
+                  Terms and Conditions
+                </Link>{" "}
+                and{" "}
+                <Link
+                  href="/privacy-policy"
+                  className="font-medium text-blue-700 hover:underline"
+                >
+                  Privacy Policy
+                </Link>
+                .
+              </label>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading || googleLoading}
+              className="w-full rounded-lg bg-blue-800 px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-blue-900 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loading
+                ? "Creating your account..."
+                : "Create account"}
+            </button>
+          </form>
+
+          <div className="my-6 flex items-center gap-4">
+            <div className="h-px flex-1 bg-slate-200" />
+            <span className="text-xs text-slate-400">
+              OR
+            </span>
+            <div className="h-px flex-1 bg-slate-200" />
           </div>
 
-        </div>
-      </section>
+          <button
+            type="button"
+            onClick={handleGoogleSignIn}
+            disabled={loading || googleLoading}
+            className="flex w-full items-center justify-center gap-3 rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <svg
+              viewBox="0 0 48 48"
+              className="h-5 w-5"
+              aria-hidden="true"
+            >
+              <path
+                fill="#EA4335"
+                d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5Z"
+                transform="translate(0 4)"
+              />
+              <path
+                fill="#4285F4"
+                d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.76 7.18l7.73 6C44.42 37.88 46.98 31.78 46.98 24.55Z"
+              />
+              <path
+                fill="#FBBC05"
+                d="M10.53 28.59A14.4 14.4 0 0 1 9.75 24c0-1.59.27-3.13.76-4.59l-7.98-6.19A23.9 23.9 0 0 0 0 24c0 3.87.93 7.52 2.56 10.78l7.97-6.19Z"
+                transform="translate(0 0)"
+              />
+              <path
+                fill="#34A853"
+                d="M24 48c6.48 0 11.93-2.13 15.91-5.8l-7.73-6c-2.15 1.45-4.9 2.3-8.18 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48Z"
+              />
+            </svg>
 
-      {/* FOOTER */}
-      <footer className="border-t bg-white px-4 py-8">
-        <div className="mx-auto max-w-7xl text-center text-sm text-slate-500">
+            {googleLoading
+              ? "Connecting to Google..."
+              : "Continue with Google"}
+          </button>
 
-          <p>
-            © {new Date().getFullYear()} BEST SALES GHANA.
-            All rights reserved.
+          <p className="mt-7 text-center text-sm text-slate-600">
+            Already have an account?{" "}
+            <Link
+              href="/login"
+              className="font-semibold text-blue-700 hover:underline"
+            >
+              Sign in
+            </Link>
           </p>
+        </section>
 
-          <div className="mt-3 flex justify-center gap-5">
-            <Link
-              href="/terms"
-              className="hover:text-blue-600"
-            >
-              Terms
-            </Link>
-
-            <Link
-              href="/privacy"
-              className="hover:text-blue-600"
-            >
-              Privacy
-            </Link>
-
-            <Link
-              href="/contact"
-              className="hover:text-blue-600"
-            >
-              Contact
-            </Link>
-          </div>
-
-        </div>
-      </footer>
-
+        <p className="mt-6 text-center text-xs text-slate-400">
+          © {new Date().getFullYear()} BestSalesGH. All rights
+          reserved.
+        </p>
+      </div>
     </main>
   );
 }
