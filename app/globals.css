@@ -1,51 +1,494 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Best Sales Ghana admin workspace. Existing Tailwind utility classes remain active. */
-:root { color-scheme: light; }
-.admin-dashboard { min-height:100vh; background:#f3f6fb; color:#172033; font-family:Arial,Helvetica,sans-serif; }
-.admin-shell { display:flex; min-height:100vh; }
-.admin-sidebar { width:258px; flex:0 0 258px; display:flex; flex-direction:column; position:sticky; top:0; height:100vh; overflow-y:auto; padding:24px 16px 18px; color:#dce7fb; background:#101d39; box-shadow:8px 0 30px rgba(15,23,42,.08); }
-.admin-brand { display:flex; align-items:center; gap:12px; padding:4px 10px 28px; color:#fff; text-decoration:none; }
-.admin-brand-mark { width:42px; height:42px; display:grid; place-items:center; border-radius:13px; background:#2563eb; color:white; font-size:24px; box-shadow:0 8px 20px #1d4ed855; }
-.admin-brand strong,.admin-brand small { display:block; letter-spacing:.04em; }
-.admin-brand strong { font-size:14px; font-weight:900; }
-.admin-brand small { margin-top:4px; color:#9db0d1; font-size:10px; font-weight:700; letter-spacing:.16em; }
-.admin-nav-label { padding:14px 12px 10px; color:#7f93b7; font-size:10px; font-weight:800; letter-spacing:.18em; }
-.admin-nav { display:grid; gap:5px; }
-.admin-nav-link { display:flex; align-items:center; gap:12px; min-height:44px; padding:11px 12px; border-radius:10px; color:#c3d0e7; text-decoration:none; font-size:13px; font-weight:650; transition:background .18s,color .18s,transform .18s; }
-.admin-nav-link span { width:22px; text-align:center; font-size:16px; }
-.admin-nav-link:hover { background:#203458; color:white; transform:translateX(2px); }
-.admin-nav-link.active { background:#2563eb; color:white; box-shadow:0 7px 18px #2563eb45; }
-.admin-sidebar-bottom { margin-top:auto; padding:20px 6px 0; }
-.admin-secure { display:flex; gap:10px; align-items:center; padding:13px; border:1px solid #2c3c5a; border-radius:12px; background:#172746; }
-.admin-secure>span { font-size:20px; }
-.admin-secure strong,.admin-secure small { display:block; }
-.admin-secure strong { color:#f4f7ff; font-size:11px; }
-.admin-secure small { margin-top:4px; color:#9db0d1; font-size:10px; }
-.admin-website-link { display:block; padding:16px 10px 4px; color:#a9c7ff; text-decoration:none; font-size:12px; font-weight:700; }
-.admin-main { min-width:0; flex:1; }
-.admin-topbar { background:rgba(255,255,255,.94)!important; backdrop-filter:blur(14px); }
-.admin-content { max-width:1600px!important; padding-top:32px!important; padding-bottom:48px!important; }
-.admin-dashboard h1 { letter-spacing:-.04em; }
-.admin-dashboard section { scroll-margin-top:90px; }
-.admin-dashboard .rounded-2xl,.admin-dashboard .rounded-3xl { box-shadow:0 5px 18px rgba(15,23,42,.045); }
-.admin-dashboard input,.admin-dashboard button,.admin-dashboard a { -webkit-tap-highlight-color:transparent; }
-.admin-dashboard input:focus-visible,.admin-dashboard button:focus-visible,.admin-dashboard a:focus-visible { outline:3px solid #93c5fd; outline-offset:3px; }
-.admin-dashboard button { cursor:pointer; }
-.admin-dashboard button:disabled { cursor:not-allowed; }
-.admin-dashboard footer { margin-top:24px!important; }
-@media(max-width:1050px) { .admin-sidebar { width:220px; flex-basis:220px; } }
-@media(max-width:760px) {
- .admin-shell { display:block; }
- .admin-sidebar { position:relative; width:100%; height:auto; padding:12px; overflow:visible; }
- .admin-brand { padding:4px 8px 12px; }
- .admin-nav-label,.admin-sidebar-bottom { display:none; }
- .admin-nav { display:flex; gap:6px; overflow-x:auto; padding:4px 0 8px; scrollbar-width:thin; }
- .admin-nav-link { flex:0 0 auto; min-height:38px; padding:9px 11px; font-size:12px; }
- .admin-nav-link span { width:auto; }
- .admin-topbar { position:relative!important; }
- .admin-content { padding:22px 14px 36px!important; }
- .admin-dashboard h1 { font-size:2rem!important; }
+/* =========================================================
+   BESTSALESGH — ROYAL BLUE DESIGN SYSTEM
+   Global styles and admin workspace
+   ========================================================= */
+
+:root {
+  color-scheme: light;
+
+  --brand-primary: #1746c8;
+  --brand-primary-dark: #10369e;
+  --brand-primary-light: #eaf0ff;
+  --brand-accent: #38bdf8;
+
+  --surface: #ffffff;
+  --surface-soft: #f5f8ff;
+  --surface-muted: #edf2fb;
+
+  --text-primary: #111b35;
+  --text-secondary: #586783;
+  --text-muted: #8490a6;
+
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+
+  --success: #15803d;
+  --danger: #dc2626;
+
+  --radius-card: 20px;
+  --radius-control: 12px;
+
+  --shadow-card:
+    0 8px 30px rgba(15, 35, 85, 0.06);
+
+  --shadow-card-hover:
+    0 18px 45px rgba(23, 70, 200, 0.12);
+}
+
+/* =========================================================
+   GLOBAL BASE
+   ========================================================= */
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 90px;
+}
+
+body {
+  min-height: 100vh;
+  background: var(--surface-soft);
+  color: var(--text-primary);
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: #dbeafe;
+  color: #12368f;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+a {
+  transition:
+    color 0.2s ease,
+    background-color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+img {
+  max-width: 100%;
+}
+
+:focus-visible {
+  outline: 3px solid #93c5fd;
+  outline-offset: 3px;
+}
+
+/* =========================================================
+   SHARED COMPONENT STYLES
+   ========================================================= */
+
+@layer components {
+  .bsg-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    background: var(--surface);
+    box-shadow: var(--shadow-card);
+    transition:
+      box-shadow 0.25s ease,
+      transform 0.25s ease,
+      border-color 0.25s ease;
+  }
+
+  .bsg-card:hover {
+    border-color: #c7d7ff;
+    box-shadow: var(--shadow-card-hover);
+  }
+
+  .bsg-button-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border: 1px solid var(--brand-primary);
+    border-radius: var(--radius-control);
+    background: var(--brand-primary);
+    padding: 12px 20px;
+    color: #ffffff;
+    font-weight: 700;
+    transition:
+      background-color 0.2s ease,
+      transform 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+
+  .bsg-button-primary:hover {
+    background: var(--brand-primary-dark);
+    box-shadow: 0 8px 20px rgba(23, 70, 200, 0.2);
+    transform: translateY(-1px);
+  }
+
+  .bsg-button-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border: 1px solid #c9d7f8;
+    border-radius: var(--radius-control);
+    background: #ffffff;
+    padding: 12px 20px;
+    color: var(--brand-primary);
+    font-weight: 700;
+    transition:
+      background-color 0.2s ease,
+      border-color 0.2s ease;
+  }
+
+  .bsg-button-secondary:hover {
+    border-color: var(--brand-primary);
+    background: var(--brand-primary-light);
+  }
+
+  .bsg-input {
+    width: 100%;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-control);
+    background: #ffffff;
+    padding: 12px 14px;
+    color: var(--text-primary);
+    transition:
+      border-color 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+
+  .bsg-input::placeholder {
+    color: #94a3b8;
+  }
+
+  .bsg-input:focus {
+    border-color: var(--brand-primary);
+    outline: none;
+    box-shadow: 0 0 0 4px rgba(23, 70, 200, 0.1);
+  }
+}
+
+/* =========================================================
+   ADMIN DASHBOARD
+   Existing admin class names preserved
+   ========================================================= */
+
+.admin-dashboard {
+  min-height: 100vh;
+  background: #f3f6fb;
+  color: #172033;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.admin-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.admin-sidebar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  width: 258px;
+  height: 100vh;
+  flex: 0 0 258px;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 24px 16px 18px;
+  background: #101d39;
+  color: #dce7fb;
+  box-shadow: 8px 0 30px rgba(15, 23, 42, 0.08);
+}
+
+.admin-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 10px 28px;
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.admin-brand-mark {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 13px;
+  background: var(--brand-primary);
+  color: #ffffff;
+  font-size: 24px;
+  box-shadow: 0 8px 20px rgba(29, 78, 216, 0.33);
+}
+
+.admin-brand strong,
+.admin-brand small {
+  display: block;
+  letter-spacing: 0.04em;
+}
+
+.admin-brand strong {
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.admin-brand small {
+  margin-top: 4px;
+  color: #9db0d1;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
+.admin-nav-label {
+  padding: 14px 12px 10px;
+  color: #7f93b7;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+}
+
+.admin-nav {
+  display: grid;
+  gap: 5px;
+}
+
+.admin-nav-link {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 12px;
+  border-radius: 10px;
+  padding: 11px 12px;
+  color: #c3d0e7;
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: none;
+  transition:
+    background 0.18s,
+    color 0.18s,
+    transform 0.18s;
+}
+
+.admin-nav-link span {
+  width: 22px;
+  text-align: center;
+  font-size: 16px;
+}
+
+.admin-nav-link:hover {
+  transform: translateX(2px);
+  background: #203458;
+  color: #ffffff;
+}
+
+.admin-nav-link.active {
+  background: var(--brand-primary);
+  color: #ffffff;
+  box-shadow: 0 7px 18px rgba(37, 99, 235, 0.27);
+}
+
+.admin-sidebar-bottom {
+  margin-top: auto;
+  padding: 20px 6px 0;
+}
+
+.admin-secure {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #2c3c5a;
+  border-radius: 12px;
+  background: #172746;
+  padding: 13px;
+}
+
+.admin-secure > span {
+  font-size: 20px;
+}
+
+.admin-secure strong,
+.admin-secure small {
+  display: block;
+}
+
+.admin-secure strong {
+  color: #f4f7ff;
+  font-size: 11px;
+}
+
+.admin-secure small {
+  margin-top: 4px;
+  color: #9db0d1;
+  font-size: 10px;
+}
+
+.admin-website-link {
+  display: block;
+  padding: 16px 10px 4px;
+  color: #a9c7ff;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.admin-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.admin-topbar {
+  background: rgba(255, 255, 255, 0.94) !important;
+  backdrop-filter: blur(14px);
+}
+
+.admin-content {
+  max-width: 1600px !important;
+  padding-top: 32px !important;
+  padding-bottom: 48px !important;
+}
+
+.admin-dashboard h1 {
+  letter-spacing: -0.04em;
+}
+
+.admin-dashboard section {
+  scroll-margin-top: 90px;
+}
+
+.admin-dashboard .rounded-2xl,
+.admin-dashboard .rounded-3xl {
+  box-shadow: 0 5px 18px rgba(15, 23, 42, 0.045);
+}
+
+.admin-dashboard input,
+.admin-dashboard button,
+.admin-dashboard a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.admin-dashboard input:focus-visible,
+.admin-dashboard button:focus-visible,
+.admin-dashboard a:focus-visible {
+  outline: 3px solid #93c5fd;
+  outline-offset: 3px;
+}
+
+.admin-dashboard button {
+  cursor: pointer;
+}
+
+.admin-dashboard button:disabled {
+  cursor: not-allowed;
+}
+
+.admin-dashboard footer {
+  margin-top: 24px !important;
+}
+
+/* =========================================================
+   RESPONSIVE ADMIN LAYOUT
+   ========================================================= */
+
+@media (max-width: 1050px) {
+  .admin-sidebar {
+    width: 220px;
+    flex-basis: 220px;
+  }
+}
+
+@media (max-width: 760px) {
+  .admin-shell {
+    display: block;
+  }
+
+  .admin-sidebar {
+    position: relative;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+    padding: 12px;
+  }
+
+  .admin-brand {
+    padding: 4px 8px 12px;
+  }
+
+  .admin-nav-label,
+  .admin-sidebar-bottom {
+    display: none;
+  }
+
+  .admin-nav {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 4px 0 8px;
+    scrollbar-width: thin;
+  }
+
+  .admin-nav-link {
+    min-height: 38px;
+    flex: 0 0 auto;
+    padding: 9px 11px;
+    font-size: 12px;
+  }
+
+  .admin-nav-link span {
+    width: auto;
+  }
+
+  .admin-topbar {
+    position: relative !important;
+  }
+
+  .admin-content {
+    padding: 22px 14px 36px !important;
+  }
+
+  .admin-dashboard h1 {
+    font-size: 2rem !important;
+  }
+}
+
+/* =========================================================
+   REDUCED MOTION ACCESSIBILITY
+   ========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
