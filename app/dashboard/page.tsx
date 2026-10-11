@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -35,71 +34,117 @@ export default function DashboardPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+
+    async function loadDashboard() {
+      setLoading(true);
+      setErrorMessage("");
+
+      try {
+        const supabase = supabaseBrowser();
+
+        // Allow Supabase to restore the saved browser session.
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession();
+
+        if (cancelled) return;
+
+        let user = session?.user ?? null;
+
+        // Confirm the session with Supabase.
+        if (!user || sessionError) {
+          const {
+            data: { user: verifiedUser },
+            error: userError,
+          } = await supabase.auth.getUser();
+
+          if (cancelled) return;
+
+          if (userError) {
+            console.error("DASHBOARD AUTH ERROR:", userError);
+          }
+
+          user = verifiedUser ?? null;
+        }
+
+        // No authenticated user: return to login.
+        if (!user) {
+          window.location.replace("/login");
+          return;
+        }
+
+        setUserEmail(user.email || "");
+
+        const { data, error } = await supabase
+          .from("listings")
+          .select(
+            `
+              id,
+              title,
+              price,
+              currency_code,
+              currency,
+              category,
+              subcategory,
+              status,
+              created_at,
+              location
+            `
+          )
+          .eq("seller_id", user.id)
+          .order("created_at", { ascending: false });
+
+        if (cancelled) return;
+
+        if (error) {
+          console.error("DASHBOARD LISTINGS ERROR:", error);
+          setErrorMessage(error.message);
+          return;
+        }
+
+        setListings((data || []) as Listing[]);
+      } catch (error) {
+        if (cancelled) return;
+
+        console.error("DASHBOARD ERROR:", error);
+
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "Unable to load dashboard."
+        );
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
     loadDashboard();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  async function loadDashboard() {
-    setLoading(true);
-    setErrorMessage("");
-
+  async function handleLogout() {
     try {
       const supabase = supabaseBrowser();
-
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-
-      if (userError || !user) {
-        window.location.href = "/login";
-        return;
-      }
-
-      setUserEmail(user.email || "");
-
-      const { data, error } = await supabase
-        .from("listings")
-        .select(
-          `
-            id,
-            title,
-            price,
-            currency_code,
-            currency,
-            category,
-            subcategory,
-            status,
-            created_at,
-            location
-          `
-        )
-        .eq("seller_id", user.id)
-        .order("created_at", { ascending: false });
+      const { error } = await supabase.auth.signOut();
 
       if (error) {
-        console.error("DASHBOARD LISTINGS ERROR:", error);
-        setErrorMessage(error.message);
+        console.error("LOGOUT ERROR:", error);
+        setErrorMessage("Unable to log out. Please try again.");
         return;
       }
 
-      setListings((data || []) as Listing[]);
+      window.location.replace("/login");
     } catch (error) {
-      console.error("DASHBOARD ERROR:", error);
-
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Unable to load dashboard."
-      );
-    } finally {
-      setLoading(false);
+      console.error("LOGOUT ERROR:", error);
+      setErrorMessage("Unable to log out. Please try again.");
     }
-  }
-
-  async function handleLogout() {
-    const supabase = supabaseBrowser();
-    await supabase.auth.signOut();
-    window.location.href = "/login";
   }
 
   const activeListings = listings.filter(
@@ -192,11 +237,9 @@ export default function DashboardPage() {
 
   return (
     <main className="min-h-screen bg-[#f3f7fb] text-[#15365d]">
-
       {/* HEADER */}
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-[1500px] items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
-
           <Link href="/" className="flex min-w-0 items-center gap-3">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#12345b] text-lg font-black text-white">
               AP
@@ -234,6 +277,7 @@ export default function DashboardPage() {
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="rounded-xl border border-slate-200 px-4 py-2 text-xl sm:hidden"
             aria-label="Toggle menu"
+            aria-expanded={mobileMenuOpen}
           >
             ☰
           </button>
@@ -289,7 +333,6 @@ export default function DashboardPage() {
 
       {/* PAGE CONTENT */}
       <section className="mx-auto max-w-[1500px] px-4 py-8 sm:px-6 lg:px-8">
-
         {/* WELCOME */}
         <div className="mb-8">
           <p className="text-xs font-black uppercase tracking-[0.2em] text-[#6d87a3]">
@@ -313,7 +356,10 @@ export default function DashboardPage() {
 
         {/* ERROR MESSAGE */}
         {errorMessage && (
-          <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-5 text-sm font-semibold text-red-700">
+          <div
+            role="alert"
+            className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-5 text-sm font-semibold text-red-700"
+          >
             Unable to load your listings:
             <p className="mt-1">{errorMessage}</p>
           </div>
@@ -394,7 +440,6 @@ export default function DashboardPage() {
 
         {/* RECENT LISTINGS */}
         <div className="mt-8 rounded-3xl border border-[#dce6ef] bg-white p-5 shadow-sm sm:p-7">
-
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.18em] text-[#7890a8]">
@@ -547,7 +592,6 @@ export default function DashboardPage() {
             © 2026 All Prominent Ghana Limited. All rights reserved.
           </p>
         </footer>
-
       </section>
     </main>
   );
