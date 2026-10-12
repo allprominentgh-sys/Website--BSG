@@ -9,7 +9,12 @@ export const dynamic = "force-dynamic";
 const ADMIN_EMAIL = "admin@bestsalesgh.com";
 const COOKIE_NAME = "bsg_admin_session";
 
-type PaymentStatus = "PENDING" | "CONFIRMED" | "REJECTED" | "REFUNDED";
+const PAYMENT_STATUSES = [
+  "PENDING",
+  "CONFIRMED",
+  "REJECTED",
+  "REFUNDED",
+] as const;
 
 function jsonError(message: string, status: number) {
   return NextResponse.json(
@@ -37,12 +42,12 @@ function verifyAdminSession(request: NextRequest): boolean {
     .update(payload)
     .digest("base64url");
 
-  const suppliedBuffer = Buffer.from(suppliedSignature);
-  const expectedBuffer = Buffer.from(expectedSignature);
+  const supplied = Buffer.from(suppliedSignature);
+  const expected = Buffer.from(expectedSignature);
 
   if (
-    suppliedBuffer.length !== expectedBuffer.length ||
-    !timingSafeEqual(suppliedBuffer, expectedBuffer)
+    supplied.length !== expected.length ||
+    !timingSafeEqual(supplied, expected)
   ) {
     return false;
   }
@@ -62,25 +67,15 @@ function verifyAdminSession(request: NextRequest): boolean {
   }
 }
 
-function requireAdmin(request: NextRequest) {
-  if (!verifyAdminSession(request)) {
-    return jsonError("Unauthorized. Please sign in as Admin.", 401);
-  }
-
-  return null;
-}
-
 function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!url || !serviceRoleKey) {
-    throw new Error(
-      "Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY."
-    );
+  if (!url || !key) {
+    throw new Error("Missing Supabase server environment variables.");
   }
 
-  return createClient(url, serviceRoleKey, {
+  return createClient(url, key, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
@@ -94,11 +89,31 @@ function validUuid(value: string): boolean {
   );
 }
 
-// GET /api/admin/order-payments
-// Optional query parameters: status, order_id, page, pageSize
+async function getCentralAdminId(
+  supabase: ReturnType<typeof getSupabaseAdmin>
+): Promise<string | null> {
+  const { data, error } = await supabase.auth.admin.listUsers({
+    page: 1,
+    perPage: 1000,
+  });
+
+  if (error) {
+    console.error("Admin identity lookup failed:", error.message);
+    throw new Error("Unable to verify central Admin identity.");
+  }
+
+  return (
+    data.users.find(
+      (user) => user.email?.toLowerCase() === ADMIN_EMAIL
+    )?.id ?? null
+  );
+}
+
+// GET /api/admin/order-payments?status=PENDING&page=1&pageSize=50
 export async function GET(request: NextRequest) {
-  const authError = requireAdmin(request);
-  if (authError) return authError;
+  if (!verifyAdminSession(request)) {
+    return jsonError("Unauthorized. Please sign in as Admin.", 401);
+  }
 
   try {
     const supabase = getSupabaseAdmin();
@@ -122,7 +137,7 @@ export async function GET(request: NextRequest) {
 
     if (
       status &&
-      !["PENDING", "CONFIRMED", "REJECTED", "REFUNDED"].includes(status)
+      !(PAYMENT_STATUSES as readonly string[]).includes(status)
     ) {
       return jsonError("Invalid payment status filter.", 400);
     }
@@ -136,21 +151,16 @@ export async function GET(request: NextRequest) {
       .select("*", { count: "exact" })
       .order("created_at", { ascending: false });
 
-    if (status) {
-      query = query.eq("payment_status", status);
-    }
+    if (status) query = query.eq("payment_status", status);
+    if (orderId) query = query.eq("order_id", orderId);
 
-    if (orderId) {
-      query = query.eq("order_id", orderId);
-    }
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize - 1;
 
-    const from = (page - 1) * pageSize;
-    const to = from + pageSize - 1;
-
-    const { data, error, count } = await query.range(from, to);
+    const { data, error, count } = await query.range(start, end);
 
     if (error) {
-      console.error("Admin payment list error:", error.message);
+      console.error("Payment list failed:", error.message);
       return jsonError("Unable to load payment records.", 500);
     }
 
@@ -170,22 +180,26 @@ export async function GET(request: NextRequest) {
       }
     );
   } catch (error) {
-    console.error("Admin payment GET error:", error);
+    console.error("Payment GET error:", error);
     return jsonError("Unexpected error loading payments.", 500);
   }
 }
 
 // POST /api/admin/order-payments
-// Records a payment as PENDING. Does not prove money was received.
+// Body: { order_id, amount, currency_code?, payment_method?,
+//         payment_reference?, notes? }
+// Creates a pending record; it does not verify receipt of money.
 export async function POST(request: NextRequest) {
-  const authError = requireAdmin(request);
-  if (authError) return authError;
+  if (!verifyAdminSession(request)) {
+    return jsonError("Unauthorized. Please sign in as Admin.", 401);
+  }
 
   try {
     const body = await request.json();
 
     const orderId =
       typeof body.order_id === "string" ? body.order_id.trim() : "";
+
     const amount = Number(body.amount);
 
     const currencyCode =
@@ -210,16 +224,20 @@ export async function POST(request: NextRequest) {
       return jsonError("A valid order_id is required.", 400);
     }
 
-    if (!Number.isFinite(amount) || amount <= 0 || amount > 9999999999) {
+    if (
+      !Number.isFinite(amount) ||
+      amount <= 0 ||
+      amount > 9999999999
+    ) {
       return jsonError("Enter a valid positive payment amount.", 400);
     }
 
     if (!/^[A-Z]{3}$/.test(currencyCode)) {
-      return jsonError("currency_code must be a 3-letter code.", 400);
+      return jsonError("Invalid three-letter currency code.", 400);
     }
 
     if (!/^[A-Z0-9 _-]{1,50}$/.test(paymentMethod)) {
-      return jsonError("Invalid payment_method.", 400);
+      return jsonError("Invalid payment method.", 400);
     }
 
     if (paymentReference && paymentReference.length > 200) {
@@ -239,12 +257,18 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     if (orderError) {
-      console.error("Payment order lookup error:", orderError.message);
+      console.error("Order lookup failed:", orderError.message);
       return jsonError("Unable to verify the order.", 500);
     }
 
     if (!order) {
       return jsonError("Order not found.", 404);
+    }
+
+    const adminId = await getCentralAdminId(supabase);
+
+    if (!adminId) {
+      return jsonError("Central Admin Auth account was not found.", 500);
     }
 
     const { data: payment, error } = await supabase
@@ -256,13 +280,14 @@ export async function POST(request: NextRequest) {
         payment_method: paymentMethod,
         payment_reference: paymentReference || null,
         payment_status: "PENDING",
+        recorded_by: adminId,
         notes: notes || null,
       })
       .select("*")
       .single();
 
     if (error) {
-      console.error("Payment record insert error:", error.message);
+      console.error("Payment insert failed:", error.message);
 
       if (error.code === "23505") {
         return jsonError("That payment reference already exists.", 409);
@@ -283,24 +308,36 @@ export async function POST(request: NextRequest) {
       }
     );
   } catch (error) {
-    console.error("Admin payment POST error:", error);
-    return jsonError("Invalid request or server error.", 500);
+    console.error("Payment POST error:", error);
+
+    return jsonError(
+      error instanceof Error
+        ? error.message
+        : "Invalid request or server error.",
+      500
+    );
   }
 }
 
 // PATCH /api/admin/order-payments
 // Body: { payment_id, action: "CONFIRMED" | "REJECTED", notes? }
 export async function PATCH(request: NextRequest) {
-  const authError = requireAdmin(request);
-  if (authError) return authError;
+  if (!verifyAdminSession(request)) {
+    return jsonError("Unauthorized. Please sign in as Admin.", 401);
+  }
 
   try {
     const body = await request.json();
 
     const paymentId =
-      typeof body.payment_id === "string" ? body.payment_id.trim() : "";
+      typeof body.payment_id === "string"
+        ? body.payment_id.trim()
+        : "";
+
     const action =
-      typeof body.action === "string" ? body.action.toUpperCase() : "";
+      typeof body.action === "string"
+        ? body.action.toUpperCase()
+        : "";
 
     const notes =
       typeof body.notes === "string" ? body.notes.trim() : null;
@@ -321,35 +358,10 @@ export async function PATCH(request: NextRequest) {
     }
 
     const supabase = getSupabaseAdmin();
-
-    // Resolve the central admin's Supabase Auth UUID for verification metadata.
-    const { data: adminUser, error: adminError } =
-      await supabase.auth.admin.getUserById(
-        // This ID is looked up by email below if not configured.
-        ""
-      );
-
-    // Use paginated Auth user lookup to identify the central admin.
-    // No user-provided identity is accepted for this decision.
-    let adminId = adminUser?.user?.id ?? null;
-
-    if (adminError || !adminId) {
-      const { data: usersResult, error: usersError } =
-        await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
-
-      if (usersError) {
-        console.error("Admin identity lookup error:", usersError.message);
-        return jsonError("Unable to verify central admin identity.", 500);
-      }
-
-      adminId =
-        usersResult.users.find(
-          (user) => user.email?.toLowerCase() === ADMIN_EMAIL
-        )?.id ?? null;
-    }
+    const adminId = await getCentralAdminId(supabase);
 
     if (!adminId) {
-      return jsonError("Central admin Auth user was not found.", 500);
+      return jsonError("Central Admin Auth account was not found.", 500);
     }
 
     const { data: existing, error: lookupError } = await supabase
@@ -359,7 +371,7 @@ export async function PATCH(request: NextRequest) {
       .maybeSingle();
 
     if (lookupError) {
-      console.error("Payment lookup error:", lookupError.message);
+      console.error("Payment lookup failed:", lookupError.message);
       return jsonError("Unable to find payment record.", 500);
     }
 
@@ -375,13 +387,13 @@ export async function PATCH(request: NextRequest) {
     }
 
     const updateData: {
-      payment_status: PaymentStatus;
+      payment_status: string;
       verified_by: string;
       verified_at: string;
       updated_at: string;
       notes?: string | null;
     } = {
-      payment_status: action as PaymentStatus,
+      payment_status: action,
       verified_by: adminId,
       verified_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -389,8 +401,6 @@ export async function PATCH(request: NextRequest) {
 
     if (notes !== null) updateData.notes = notes;
 
-    // Conditional update prevents two admins from changing the same pending
-    // record after one of them has already handled it.
     const { data: payment, error: updateError } = await supabase
       .from("order_payment_records")
       .update(updateData)
@@ -400,7 +410,7 @@ export async function PATCH(request: NextRequest) {
       .maybeSingle();
 
     if (updateError) {
-      console.error("Payment verification error:", updateError.message);
+      console.error("Payment update failed:", updateError.message);
       return jsonError("Unable to update payment status.", 500);
     }
 
@@ -416,8 +426,8 @@ export async function PATCH(request: NextRequest) {
         success: true,
         message:
           action === "CONFIRMED"
-            ? "Payment marked as confirmed by the central admin."
-            : "Payment rejected by the central admin.",
+            ? "Payment marked as confirmed by the central Admin."
+            : "Payment rejected by the central Admin.",
         payment,
         moneyTransferred: false,
         companyAccountDebited: false,
@@ -427,7 +437,13 @@ export async function PATCH(request: NextRequest) {
       }
     );
   } catch (error) {
-    console.error("Admin payment PATCH error:", error);
-    return jsonError("Invalid request or server error.", 500);
+    console.error("Payment PATCH error:", error);
+
+    return jsonError(
+      error instanceof Error
+        ? error.message
+        : "Unexpected payment verification error.",
+      500
+    );
   }
 }
