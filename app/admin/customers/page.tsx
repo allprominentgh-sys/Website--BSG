@@ -20,26 +20,28 @@ type Customer = {
 };
 
 type CustomerOrder = {
-  id: string;
+  id: string | number;
   created_at?: string;
   status?: string;
   total_amount?: number | string;
   total?: number | string;
-  customer_id?: string;
-  buyer_id?: string;
-  user_id?: string;
 };
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 500;
 
-function display(value: unknown) {
+// Only these account types are displayed as customers.
+// Seller, business and admin accounts are excluded.
+const CUSTOMER_TYPES = ["buyer", "customer"];
+
+function display(value: unknown): string {
   if (value === null || value === undefined || value === "") {
     return "Not provided";
   }
+
   return String(value);
 }
 
-function formatDate(value: string | null | undefined) {
+function formatDate(value: string | null | undefined): string {
   if (!value) return "Not available";
 
   const date = new Date(value);
@@ -52,7 +54,7 @@ function formatDate(value: string | null | undefined) {
   });
 }
 
-function formatMoney(value: number | string | undefined) {
+function formatMoney(value: number | string | undefined): string {
   if (value === undefined || value === "") return "Not available";
 
   const amount = Number(value);
@@ -65,24 +67,31 @@ function formatMoney(value: number | string | undefined) {
   }).format(amount);
 }
 
+function isVerified(customer: Customer): boolean {
+  return (
+    customer.verified === true ||
+    (customer.verification_status ?? "").toLowerCase() === "verified"
+  );
+}
+
 export default function AdminCustomersPage() {
   const supabase = useMemo(() => supabaseBrowser(), []);
 
-  const [isChecking, setIsChecking] = useState(true);
+  const [checking, setChecking] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [selectedCustomer, setSelectedCustomer] =
     useState<Customer | null>(null);
+  const [orders, setOrders] = useState<CustomerOrder[]>([]);
 
   const [search, setSearch] = useState("");
-  const [accountFilter, setAccountFilter] = useState("all");
   const [verificationFilter, setVerificationFilter] = useState("all");
 
   const [loading, setLoading] = useState(false);
+  const [ordersLoading, setOrdersLoading] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [ordersLoading, setOrdersLoading] = useState(false);
 
   const checkAdminSession = useCallback(async () => {
     try {
@@ -99,7 +108,7 @@ export default function AdminCustomersPage() {
       console.error("Admin session check failed:", err);
       setIsAdmin(false);
     } finally {
-      setIsChecking(false);
+      setChecking(false);
     }
   }, []);
 
@@ -113,6 +122,7 @@ export default function AdminCustomersPage() {
         .select(
           "id, full_name, phone, location, account_type, verified, verification_status, created_at, delivery_region, delivery_city, delivery_area, delivery_address, ghana_post_gps"
         )
+        .in("account_type", CUSTOMER_TYPES)
         .order("created_at", { ascending: false })
         .limit(PAGE_SIZE);
 
@@ -120,9 +130,9 @@ export default function AdminCustomersPage() {
 
       setCustomers((data ?? []) as Customer[]);
     } catch (err) {
-      console.error("Unable to load customers:", err);
+      console.error("Customer loading failed:", err);
       setError(
-        "Could not load customer records. Check the profiles table, column names, and Supabase Row Level Security policies."
+        "Unable to load customers. Check the profiles column names, account types, and Supabase access policies."
       );
     } finally {
       setLoading(false);
@@ -143,38 +153,36 @@ export default function AdminCustomersPage() {
     const term = search.trim().toLowerCase();
 
     return customers.filter((customer) => {
+      const searchableValues = [
+        customer.full_name,
+        customer.id,
+        customer.phone,
+        customer.location,
+        customer.account_type,
+        customer.verification_status,
+        customer.delivery_region,
+        customer.delivery_city,
+        customer.delivery_area,
+        customer.delivery_address,
+        customer.ghana_post_gps,
+      ];
+
       const matchesSearch =
         !term ||
-        [
-          customer.full_name,
-          customer.id,
-          customer.phone,
-          customer.location,
-          customer.delivery_region,
-          customer.delivery_city,
-          customer.delivery_area,
-          customer.delivery_address,
-          customer.ghana_post_gps,
-          customer.account_type,
-          customer.verification_status,
-        ].some((value) => String(value ?? "").toLowerCase().includes(term));
+        searchableValues.some((value) =>
+          String(value ?? "").toLowerCase().includes(term)
+        );
 
-      const matchesAccount =
-        accountFilter === "all" ||
-        (customer.account_type ?? "").toLowerCase() === accountFilter;
-
-      const verified =
-        customer.verified === true ||
-        (customer.verification_status ?? "").toLowerCase() === "verified";
+      const verified = isVerified(customer);
 
       const matchesVerification =
         verificationFilter === "all" ||
         (verificationFilter === "verified" && verified) ||
         (verificationFilter === "unverified" && !verified);
 
-      return matchesSearch && matchesAccount && matchesVerification;
+      return matchesSearch && matchesVerification;
     });
-  }, [customers, search, accountFilter, verificationFilter]);
+  }, [customers, search, verificationFilter]);
 
   async function openCustomer(customer: Customer) {
     setSelectedCustomer(customer);
@@ -183,9 +191,9 @@ export default function AdminCustomersPage() {
     setOrdersLoading(true);
 
     try {
-      // The page tries common customer ownership columns.
-      // Your actual orders table must have one of these columns.
+      // Try the common customer ID columns used by order tables.
       const ownershipColumns = ["customer_id", "buyer_id", "user_id"];
+
       let foundOrders: CustomerOrder[] | null = null;
       let lastError: unknown = null;
 
@@ -208,14 +216,16 @@ export default function AdminCustomersPage() {
       if (foundOrders !== null) {
         setOrders(foundOrders);
       } else {
-        console.warn("Customer order lookup failed:", lastError);
+        console.error("Order history lookup failed:", lastError);
         setNotice(
-          "Customer details loaded, but order history could not be retrieved. Your orders table may use a different customer ID column or have restrictive access policies."
+          "The customer profile loaded, but order history could not be retrieved. The orders table may use another customer ID column or restrict access."
         );
       }
     } catch (err) {
       console.error("Order history lookup failed:", err);
-      setNotice("Customer details loaded, but order history is unavailable.");
+      setNotice(
+        "The customer profile loaded, but order history is currently unavailable."
+      );
     } finally {
       setOrdersLoading(false);
     }
@@ -242,7 +252,7 @@ export default function AdminCustomersPage() {
       customer.full_name,
       customer.phone,
       customer.account_type,
-      customer.verified ? "Yes" : "No",
+      isVerified(customer) ? "Yes" : "No",
       customer.verification_status,
       customer.created_at,
       customer.delivery_region,
@@ -255,10 +265,7 @@ export default function AdminCustomersPage() {
     const csv = [headers, ...rows]
       .map((row) =>
         row
-          .map((value) => {
-            const text = String(value ?? "").replace(/"/g, '""');
-            return `"${text}"`;
-          })
+          .map((value) => `"${String(value ?? "").replace(/"/g, '""')}"`)
           .join(",")
       )
       .join("\r\n");
@@ -272,12 +279,14 @@ export default function AdminCustomersPage() {
 
     link.href = url;
     link.download = "bestsalesgh-customers.csv";
+    document.body.appendChild(link);
     link.click();
+    link.remove();
 
     URL.revokeObjectURL(url);
   }
 
-  if (isChecking) {
+  if (checking) {
     return (
       <main className="min-h-screen bg-slate-50 p-6 text-slate-700">
         Checking administrator session...
@@ -288,17 +297,19 @@ export default function AdminCustomersPage() {
   if (!isAdmin) {
     return (
       <main className="min-h-screen bg-slate-50 p-6">
-        <div className="mx-auto max-w-xl rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+        <div className="mx-auto max-w-xl rounded-2xl border bg-white p-8">
           <h1 className="text-xl font-bold text-slate-900">
             Administrator access required
           </h1>
+
           <p className="mt-2 text-sm text-slate-600">
-            Your administrator session is not active. Sign in using the
-            BestSalesGH central admin login, then return to this page.
+            Your administrator session is not active. Sign in to the central
+            admin account, then return to this page.
           </p>
+
           <a
             href="/login"
-            className="mt-5 inline-flex rounded-lg bg-blue-800 px-5 py-3 font-semibold text-white hover:bg-blue-900"
+            className="mt-5 inline-flex rounded-lg bg-blue-800 px-5 py-3 font-semibold text-white"
           >
             Go to login
           </a>
@@ -307,104 +318,87 @@ export default function AdminCustomersPage() {
     );
   }
 
+  const verifiedCount = customers.filter(isVerified).length;
+
   return (
     <main className="min-h-screen bg-slate-50 p-4 text-slate-800 sm:p-6">
       <div className="mx-auto max-w-7xl">
-        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
             <p className="text-sm font-semibold uppercase tracking-wider text-blue-800">
               BestSalesGH Administration
             </p>
+
             <h1 className="mt-1 text-3xl font-bold text-slate-900">
               Customer Management
             </h1>
+
             <p className="mt-2 text-sm text-slate-600">
-              Review customer accounts, registration details, verification,
-              and available delivery information.
+              View customer accounts, registration dates, verification and
+              delivery information. Seller and business accounts are excluded.
             </p>
           </div>
 
           <div className="flex flex-wrap gap-2">
             <a
               href="/admin"
-              className="rounded-lg border border-slate-300 bg-white px-4 py-2 font-medium hover:bg-slate-100"
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2 font-medium"
             >
               Admin dashboard
             </a>
+
             <button
               type="button"
               onClick={() => void loadCustomers()}
               disabled={loading}
-              className="rounded-lg bg-blue-800 px-4 py-2 font-semibold text-white hover:bg-blue-900 disabled:opacity-50"
+              className="rounded-lg bg-blue-800 px-4 py-2 font-semibold text-white disabled:opacity-50"
             >
               {loading ? "Refreshing..." : "Refresh"}
             </button>
+
             <button
               type="button"
               onClick={exportCustomers}
-              className="rounded-lg border border-slate-300 bg-white px-4 py-2 font-medium hover:bg-slate-100"
+              disabled={filteredCustomers.length === 0}
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2 font-medium disabled:opacity-50"
             >
               Export CSV
             </button>
           </div>
-        </div>
+        </header>
 
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm text-slate-500">Customers loaded</p>
+        <section className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="rounded-xl border bg-white p-5">
+            <p className="text-sm text-slate-500">Customer accounts loaded</p>
             <p className="mt-2 text-3xl font-bold text-slate-900">
               {customers.length}
             </p>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm text-slate-500">Verified accounts</p>
-            <p className="mt-2 text-3xl font-bold text-green-700">
-              {
-                customers.filter(
-                  (customer) =>
-                    customer.verified === true ||
-                    (customer.verification_status ?? "").toLowerCase() ===
-                      "verified"
-                ).length
-              }
-            </p>
-          </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm text-slate-500">Awaiting verification</p>
-            <p className="mt-2 text-3xl font-bold text-amber-600">
-              {
-                customers.filter(
-                  (customer) =>
-                    customer.verified !== true &&
-                    (customer.verification_status ?? "").toLowerCase() !==
-                      "verified"
-                ).length
-              }
-            </p>
-          </div>
-        </div>
 
-        <section className="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <div className="rounded-xl border bg-white p-5">
+            <p className="text-sm text-slate-500">Verified customers</p>
+            <p className="mt-2 text-3xl font-bold text-green-700">
+              {verifiedCount}
+            </p>
+          </div>
+
+          <div className="rounded-xl border bg-white p-5">
+            <p className="text-sm text-slate-500">Not verified</p>
+            <p className="mt-2 text-3xl font-bold text-amber-700">
+              {customers.length - verifiedCount}
+            </p>
+          </div>
+        </section>
+
+        <section className="mt-6 rounded-xl border bg-white p-4 shadow-sm sm:p-5">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <input
               type="search"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search name, customer ID, phone, address or GPS..."
-              className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-100"
+              className="w-full rounded-lg border border-slate-300 px-4 py-3"
             />
-
-            <select
-              value={accountFilter}
-              onChange={(event) => setAccountFilter(event.target.value)}
-              className="rounded-lg border border-slate-300 bg-white px-4 py-3"
-            >
-              <option value="all">All account types</option>
-              <option value="customer">Customers</option>
-              <option value="buyer">Buyers</option>
-              <option value="seller">Sellers</option>
-              <option value="business">Businesses</option>
-            </select>
 
             <select
               value={verificationFilter}
@@ -425,58 +419,49 @@ export default function AdminCustomersPage() {
             </div>
           )}
 
-          <div className="mt-4 flex items-center justify-between gap-3">
-            <p className="text-sm text-slate-600">
-              Showing {filteredCustomers.length} of {customers.length} loaded
-              accounts
-            </p>
-            <p className="text-xs text-slate-500">
-              Maximum 50 accounts loaded per refresh
-            </p>
-          </div>
+          <p className="mt-4 text-sm text-slate-600">
+            Showing {filteredCustomers.length} of {customers.length} loaded
+            customer accounts.
+          </p>
 
           <div className="mt-3 overflow-x-auto">
             <table className="w-full min-w-[850px] border-collapse text-left text-sm">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
-                  <th className="px-3 py-3 font-semibold">Customer</th>
-                  <th className="px-3 py-3 font-semibold">Contact</th>
-                  <th className="px-3 py-3 font-semibold">Account type</th>
-                  <th className="px-3 py-3 font-semibold">Verification</th>
-                  <th className="px-3 py-3 font-semibold">Registered</th>
-                  <th className="px-3 py-3 font-semibold">Details</th>
+                <tr className="border-b bg-slate-50 text-slate-600">
+                  <th className="p-3">Customer</th>
+                  <th className="p-3">Contact</th>
+                  <th className="p-3">Account type</th>
+                  <th className="p-3">Verification</th>
+                  <th className="p-3">Registered</th>
+                  <th className="p-3">Details</th>
                 </tr>
               </thead>
+
               <tbody>
                 {filteredCustomers.map((customer) => {
-                  const verified =
-                    customer.verified === true ||
-                    (customer.verification_status ?? "").toLowerCase() ===
-                      "verified";
+                  const verified = isVerified(customer);
 
                   return (
-                    <tr
-                      key={customer.id}
-                      className="border-b border-slate-100 hover:bg-slate-50"
-                    >
-                      <td className="px-3 py-4">
+                    <tr key={customer.id} className="border-b hover:bg-slate-50">
+                      <td className="p-3">
                         <p className="font-semibold text-slate-900">
                           {display(customer.full_name)}
                         </p>
-                        <p className="mt-1 text-xs text-slate-500">
+                        <p className="mt-1 break-all text-xs text-slate-500">
                           ID: {customer.id}
                         </p>
                       </td>
-                      <td className="px-3 py-4">
+
+                      <td className="p-3">
                         <p>{display(customer.phone)}</p>
                         <p className="mt-1 text-xs text-slate-500">
                           {display(customer.location)}
                         </p>
                       </td>
-                      <td className="px-3 py-4">
-                        {display(customer.account_type)}
-                      </td>
-                      <td className="px-3 py-4">
+
+                      <td className="p-3">{display(customer.account_type)}</td>
+
+                      <td className="p-3">
                         <span
                           className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
                             verified
@@ -484,22 +469,17 @@ export default function AdminCustomersPage() {
                               : "bg-amber-100 text-amber-800"
                           }`}
                         >
-                          {verified
-                            ? "Verified"
-                            : display(customer.verification_status) ===
-                                "Not provided"
-                              ? "Not verified"
-                              : display(customer.verification_status)}
+                          {verified ? "Verified" : "Not verified"}
                         </span>
                       </td>
-                      <td className="px-3 py-4">
-                        {formatDate(customer.created_at)}
-                      </td>
-                      <td className="px-3 py-4">
+
+                      <td className="p-3">{formatDate(customer.created_at)}</td>
+
+                      <td className="p-3">
                         <button
                           type="button"
                           onClick={() => void openCustomer(customer)}
-                          className="rounded-lg bg-blue-800 px-3 py-2 font-semibold text-white hover:bg-blue-900"
+                          className="rounded-lg bg-blue-800 px-3 py-2 font-semibold text-white"
                         >
                           View details
                         </button>
@@ -508,24 +488,19 @@ export default function AdminCustomersPage() {
                   );
                 })}
 
-                {!loading && filteredCustomers.length === 0 && (
+                {loading && (
                   <tr>
-                    <td
-                      colSpan={6}
-                      className="px-4 py-10 text-center text-slate-500"
-                    >
-                      No matching accounts found.
+                    <td colSpan={6} className="p-8 text-center text-slate-500">
+                      Loading customer accounts...
                     </td>
                   </tr>
                 )}
 
-                {loading && (
+                {!loading && !error && filteredCustomers.length === 0 && (
                   <tr>
-                    <td
-                      colSpan={6}
-                      className="px-4 py-10 text-center text-slate-500"
-                    >
-                      Loading customer records...
+                    <td colSpan={6} className="p-8 text-center text-slate-500">
+                      No customer accounts found. If you expected customers to
+                      appear, check the actual account_type values in Supabase.
                     </td>
                   </tr>
                 )}
@@ -536,7 +511,7 @@ export default function AdminCustomersPage() {
 
         {selectedCustomer && (
           <div
-            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-3 py-8 sm:p-6"
+            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-3 py-8 sm:p-6"
             role="dialog"
             aria-modal="true"
             aria-label="Customer details"
@@ -547,17 +522,24 @@ export default function AdminCustomersPage() {
                   <p className="text-sm font-semibold text-blue-800">
                     Customer profile
                   </p>
+
                   <h2 className="mt-1 text-2xl font-bold text-slate-900">
                     {display(selectedCustomer.full_name)}
                   </h2>
+
                   <p className="mt-1 break-all text-xs text-slate-500">
                     Customer ID: {selectedCustomer.id}
                   </p>
                 </div>
+
                 <button
                   type="button"
-                  onClick={() => setSelectedCustomer(null)}
-                  className="rounded-lg border border-slate-300 px-3 py-2 hover:bg-slate-100"
+                  onClick={() => {
+                    setSelectedCustomer(null);
+                    setOrders([]);
+                    setNotice("");
+                  }}
+                  className="rounded-lg border border-slate-300 px-3 py-2"
                 >
                   Close
                 </button>
@@ -576,25 +558,20 @@ export default function AdminCustomersPage() {
                   ["Account type", selectedCustomer.account_type],
                   [
                     "Verification status",
-                    selectedCustomer.verification_status ??
-                      (selectedCustomer.verified ? "Verified" : "Not verified"),
+                    isVerified(selectedCustomer)
+                      ? "Verified"
+                      : selectedCustomer.verification_status ??
+                        "Not verified",
                   ],
-                  ["Registered on", formatDate(selectedCustomer.created_at)],
+                  ["Registration date", formatDate(selectedCustomer.created_at)],
                   ["Location", selectedCustomer.location],
                   ["Delivery region", selectedCustomer.delivery_region],
                   ["Delivery city", selectedCustomer.delivery_city],
                   ["Delivery area", selectedCustomer.delivery_area],
-                  ["GhanaPost GPS", selectedCustomer.ghana_post_gps],
                   ["Delivery address", selectedCustomer.delivery_address],
-                  [
-                    "Verified flag",
-                    selectedCustomer.verified ? "Yes" : "No",
-                  ],
+                  ["GhanaPost GPS", selectedCustomer.ghana_post_gps],
                 ].map(([label, value]) => (
-                  <div
-                    key={label}
-                    className="rounded-lg border border-slate-200 p-4"
-                  >
+                  <div key={label} className="rounded-lg border p-4">
                     <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
                       {label}
                     </p>
@@ -605,18 +582,20 @@ export default function AdminCustomersPage() {
                 ))}
               </div>
 
-              <div className="mt-7">
+              <section className="mt-7">
                 <h3 className="text-lg font-bold text-slate-900">
                   Order history
                 </h3>
+
                 {ordersLoading ? (
                   <p className="mt-3 text-sm text-slate-500">
-                    Loading orders...
+                    Loading order history...
                   </p>
                 ) : orders.length === 0 ? (
                   <p className="mt-3 rounded-lg bg-slate-50 p-4 text-sm text-slate-600">
-                    No orders were found for this customer, or order history
-                    is not accessible using the current table configuration.
+                    No orders were returned. This can mean the customer has no
+                    orders, or the orders table uses a different customer ID
+                    column or access policy.
                   </p>
                 ) : (
                   <div className="mt-3 overflow-x-auto">
@@ -629,19 +608,15 @@ export default function AdminCustomersPage() {
                           <th className="p-3">Total</th>
                         </tr>
                       </thead>
+
                       <tbody>
                         {orders.map((order) => (
-                          <tr
-                            key={order.id}
-                            className="border-b border-slate-100"
-                          >
+                          <tr key={String(order.id)} className="border-b">
                             <td className="p-3">{order.id}</td>
                             <td className="p-3">
                               {formatDate(order.created_at)}
                             </td>
-                            <td className="p-3">
-                              {display(order.status)}
-                            </td>
+                            <td className="p-3">{display(order.status)}</td>
                             <td className="p-3">
                               {formatMoney(
                                 order.total_amount ?? order.total
@@ -653,14 +628,13 @@ export default function AdminCustomersPage() {
                     </table>
                   </div>
                 )}
-              </div>
+              </section>
             </section>
           </div>
         )}
 
         <footer className="py-6 text-center text-xs text-slate-500">
-          BestSalesGH Admin · Customer records are restricted to authorized
-          administrators.
+          BestSalesGH Administration
         </footer>
       </div>
     </main>
