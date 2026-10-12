@@ -1,16 +1,14 @@
-
 "use client";
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { supabaseBrowser } from "@/supabase-browser";
 
 export default function CMSLoginPage() {
   const router = useRouter();
 
   const [companyId, setCompanyId] = useState("");
-  const [email, setEmail] = useState("");
+  const [staffId, setStaffId] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -19,81 +17,41 @@ export default function CMSLoginPage() {
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    if (loading) return;
+
     setLoading(true);
     setError("");
 
-    const supabase = supabaseBrowser();
-
     try {
-      const normalizedCompanyId = companyId.trim().toUpperCase();
-      const normalizedEmail = email.trim().toLowerCase();
-
-      if (!normalizedCompanyId || !normalizedEmail || !password) {
-        setError("Enter your company ID, email and password.");
-        return;
-      }
-
-      // Authenticate the staff member with Supabase Auth.
-      const { data, error: loginError } =
-        await supabase.auth.signInWithPassword({
-          email: normalizedEmail,
+      const response = await fetch("/api/cms/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          company_id: companyId.trim().toUpperCase(),
+          staff_id: staffId.trim(),
           password,
-        });
+        }),
+      });
 
-      if (loginError) {
-        setError("Invalid email or password.");
-        return;
-      }
+      const result = await response.json();
 
-      if (!data.user) {
-        setError("Unable to verify your staff account.");
-        return;
-      }
-
-      // Confirm that the administrator has registered this
-      // authenticated user as an active CMS staff member.
-      const { data: staff, error: staffError } = await supabase
-        .from("cms_staff")
-        .select("user_id, company_id, role, is_active")
-        .eq("user_id", data.user.id)
-        .eq("company_id", normalizedCompanyId)
-        .maybeSingle();
-
-      if (staffError) {
-        await supabase.auth.signOut();
+      if (!response.ok || result.success !== true) {
         setError(
-          "Unable to verify your staff access. Please contact the administrator."
+          result.error || "Login failed. Check your staff details."
         );
         return;
       }
 
-      if (!staff || !staff.is_active) {
-        await supabase.auth.signOut();
-        setError(
-          "Your company ID is invalid or your CMS account is inactive."
-        );
-        return;
-      }
-
-      const allowedRoles = [
-        "admin",
-        "support_manager",
-        "support_agent",
-      ];
-
-      if (!allowedRoles.includes(staff.role)) {
-        await supabase.auth.signOut();
-        setError("Your account does not have CMS access.");
-        return;
-      }
-
-      // Store authentication in Supabase, not in a custom
-      // client-side role or company-ID flag.
       router.replace("/cms");
       router.refresh();
     } catch (err) {
-      console.error("CMS login error:", err);
-      setError("Login failed. Please try again.");
+      console.error("CMS login request failed:", err);
+      setError(
+        "Unable to connect to the login service. Please try again."
+      );
     } finally {
       setLoading(false);
     }
@@ -117,14 +75,11 @@ export default function CMSLoginPage() {
         </div>
 
         <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-          <h2 className="text-2xl font-black">
-            Staff Sign In
-          </h2>
+          <h2 className="text-2xl font-black">Staff Sign In</h2>
 
           <p className="mt-2 text-sm leading-6 text-slate-500">
-            Use the company ID issued by your administrator
-            and the email and password registered to your
-            staff account.
+            Enter the Company ID and Staff ID issued by your
+            administrator, together with your staff password.
           </p>
 
           {error && (
@@ -136,10 +91,7 @@ export default function CMSLoginPage() {
             </div>
           )}
 
-          <form
-            onSubmit={handleLogin}
-            className="mt-6 space-y-5"
-          >
+          <form onSubmit={handleLogin} className="mt-6 space-y-5">
             <div>
               <label
                 htmlFor="companyId"
@@ -158,26 +110,28 @@ export default function CMSLoginPage() {
                 }
                 placeholder="e.g. BSGH-CS-0001"
                 required
+                disabled={loading}
                 className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
               />
             </div>
 
             <div>
               <label
-                htmlFor="email"
+                htmlFor="staffId"
                 className="mb-2 block text-sm font-bold"
               >
-                Staff Email
+                Staff ID
               </label>
 
               <input
-                id="email"
-                type="email"
+                id="staffId"
+                type="text"
                 autoComplete="username"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="staff@company.com"
+                value={staffId}
+                onChange={(event) => setStaffId(event.target.value)}
+                placeholder="Enter your Staff ID"
                 required
+                disabled={loading}
                 className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
               />
             </div>
@@ -196,17 +150,17 @@ export default function CMSLoginPage() {
                   type={showPassword ? "text" : "password"}
                   autoComplete="current-password"
                   value={password}
-                  onChange={(event) =>
-                    setPassword(event.target.value)
-                  }
+                  onChange={(event) => setPassword(event.target.value)}
                   placeholder="Enter your password"
                   required
+                  disabled={loading}
                   className="min-w-0 flex-1 px-4 py-3 outline-none"
                 />
 
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
+                  disabled={loading}
                   className="px-3 text-sm font-bold text-blue-700"
                 >
                   {showPassword ? "Hide" : "Show"}
