@@ -24,24 +24,21 @@ type CurrencyCode = "CNY" | "USD" | "EUR" | "GBP";
 const adminSections = [
   {
     title: "Direct Sales",
-    description:
-      "Manage products owned and sold directly by Best Sales Ghana.",
+    description: "Manage products owned and sold directly by Best Sales Ghana.",
     icon: "🛒",
     href: "/admin/direct-sales",
     action: "Manage Products",
   },
   {
     title: "Marketplace Listings",
-    description:
-      "Review and manage listings posted by marketplace sellers.",
+    description: "Review and manage listings posted by marketplace sellers.",
     icon: "📋",
     href: "/listings",
     action: "View Listings",
   },
   {
     title: "Sellers",
-    description:
-      "Manage seller accounts, verification and seller activity.",
+    description: "Manage seller accounts, verification and seller activity.",
     icon: "👥",
     href: "#",
     action: "Manage Sellers",
@@ -84,9 +81,10 @@ const adminSections = [
   },
   {
     title: "Advertising",
-    description: "Manage advertising placements and promotional content.",
+    description:
+      "Configure individual seller promotions, company advertising packages and advertising limits.",
     icon: "📢",
-    href: "#",
+    href: "/admin/advertising",
     action: "Manage Advertising",
   },
   {
@@ -125,9 +123,7 @@ export default function AdminDashboardPage() {
     accounts: 0,
   });
 
-  const [loadingDashboardStats, setLoadingDashboardStats] =
-    useState(true);
-
+  const [loadingDashboardStats, setLoadingDashboardStats] = useState(true);
   const [currencies, setCurrencies] = useState<Currency[]>([]);
 
   const [rmbRate, setRmbRate] = useState("");
@@ -139,14 +135,13 @@ export default function AdminDashboardPage() {
   const [usdAmount, setUsdAmount] = useState("");
   const [ghsAmount, setGhsAmount] = useState("");
 
-  const [savingCurrency, setSavingCurrency] =
-    useState<CurrencyCode | null>(null);
-
+  const [savingCurrency, setSavingCurrency] = useState<CurrencyCode | null>(
+    null
+  );
   const [currencyMessage, setCurrencyMessage] = useState("");
 
   const [autoAdjustEnabled, setAutoAdjustEnabled] = useState(true);
   const [adjustmentPercent, setAdjustmentPercent] = useState("100");
-
   const [savingAdjustmentSettings, setSavingAdjustmentSettings] =
     useState(false);
 
@@ -154,9 +149,6 @@ export default function AdminDashboardPage() {
 
   /*
    * ADMIN LOGOUT
-   *
-   * Calls the server route that clears the signed
-   * administrator session cookie.
    */
   async function handleAdminLogout() {
     if (loggingOut) return;
@@ -184,8 +176,8 @@ export default function AdminDashboardPage() {
   /*
    * ADMIN CHECK
    *
-   * The middleware verifies the signed administrator session
-   * before allowing access to this page.
+   * The server middleware must validate the signed admin session.
+   * This client-side state is for rendering only, not authorization.
    */
   useEffect(() => {
     setIsAdmin(true);
@@ -193,7 +185,7 @@ export default function AdminDashboardPage() {
   }, []);
 
   /*
-   * LOAD LIVE DASHBOARD STATISTICS
+   * LOAD DASHBOARD STATISTICS
    */
   useEffect(() => {
     async function loadDashboardStats() {
@@ -204,7 +196,6 @@ export default function AdminDashboardPage() {
           supabase
             .from("listings")
             .select("*", { count: "exact", head: true }),
-
           supabase
             .from("profiles")
             .select("*", { count: "exact", head: true }),
@@ -225,12 +216,8 @@ export default function AdminDashboardPage() {
         }
 
         setDashboardStats({
-          listings: listingsResult.error
-            ? 0
-            : listingsResult.count ?? 0,
-          accounts: accountsResult.error
-            ? 0
-            : accountsResult.count ?? 0,
+          listings: listingsResult.error ? 0 : listingsResult.count ?? 0,
+          accounts: accountsResult.error ? 0 : accountsResult.count ?? 0,
         });
       } catch (error) {
         console.error("Dashboard statistics error:", error);
@@ -269,6 +256,7 @@ export default function AdminDashboardPage() {
 
       if (error) {
         console.error("Currency loading error:", error);
+        setCurrencyMessage("Unable to load currencies. Please refresh.");
         return;
       }
 
@@ -303,9 +291,7 @@ export default function AdminDashboardPage() {
       }
 
       if (settingsCurrency?.adjustment_percent != null) {
-        setAdjustmentPercent(
-          String(settingsCurrency.adjustment_percent)
-        );
+        setAdjustmentPercent(String(settingsCurrency.adjustment_percent));
       }
     }
 
@@ -335,9 +321,7 @@ export default function AdminDashboardPage() {
     const newRate = Number(rawRate);
 
     if (!rawRate || !Number.isFinite(newRate) || newRate <= 0) {
-      setCurrencyMessage(
-        `Please enter a valid ${currencyCode} rate.`
-      );
+      setCurrencyMessage(`Please enter a valid ${currencyCode} rate.`);
       return;
     }
 
@@ -349,8 +333,7 @@ export default function AdminDashboardPage() {
         (currency) => currency.code === currencyCode
       );
 
-      const oldRate =
-        currentCurrency?.manual_rate_from_ghs ?? null;
+      const oldRate = currentCurrency?.manual_rate_from_ghs ?? null;
 
       const { error: updateError } = await supabase
         .from("currencies")
@@ -387,10 +370,8 @@ export default function AdminDashboardPage() {
             old_rate: oldRate,
             reference_rate: currentCurrency?.xe_rate ?? null,
             new_rate: newRate,
-            change_percent:
-              currentCurrency?.xe_change_percent ?? 0,
-            adjustment_percent:
-              currentCurrency?.adjustment_percent ?? 100,
+            change_percent: currentCurrency?.xe_change_percent ?? 0,
+            adjustment_percent: currentCurrency?.adjustment_percent ?? 100,
             adjustment_type: "MANUAL",
             changed_by: user.id,
           });
@@ -416,13 +397,14 @@ export default function AdminDashboardPage() {
       );
 
       const name = currencyCode === "CNY" ? "RMB" : currencyCode;
-
       setCurrencyMessage(`${name} rate saved successfully.`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
 
       setCurrencyMessage(
-        error?.message || "Unable to save the currency rate."
+        error instanceof Error
+          ? error.message
+          : "Unable to save the currency rate."
       );
     } finally {
       setSavingCurrency(null);
@@ -434,9 +416,7 @@ export default function AdminDashboardPage() {
    */
   async function saveAdjustmentSettings() {
     if (!isAdmin) {
-      setCurrencyMessage(
-        "You do not have administrator permission."
-      );
+      setCurrencyMessage("You do not have administrator permission.");
       return;
     }
 
@@ -484,12 +464,13 @@ export default function AdminDashboardPage() {
           autoAdjustEnabled ? "ON" : "OFF"
         } at ${percentage}%.`
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
 
       setCurrencyMessage(
-        error?.message ||
-          "Unable to save XE adjustment settings."
+        error instanceof Error
+          ? error.message
+          : "Unable to save XE adjustment settings."
       );
     } finally {
       setSavingAdjustmentSettings(false);
@@ -567,10 +548,7 @@ export default function AdminDashboardPage() {
     flag: string;
     rate: number | null;
   }) {
-    const record = currencies.find(
-      (currency) => currency.code === code
-    );
-
+    const record = currencies.find((currency) => currency.code === code);
     const movement = record?.xe_change_percent ?? null;
 
     return (
@@ -580,7 +558,6 @@ export default function AdminDashboardPage() {
             <p className="text-xs font-black uppercase tracking-wider text-slate-400">
               {code}
             </p>
-
             <p className="mt-1 font-black">
               {flag} {name}
             </p>
@@ -601,7 +578,6 @@ export default function AdminDashboardPage() {
           <p className="text-xs font-black uppercase text-slate-400">
             Current Rate
           </p>
-
           <p className="mt-1 text-2xl font-black text-blue-700">
             {rate != null ? rate : "Not set"}
           </p>
@@ -611,11 +587,8 @@ export default function AdminDashboardPage() {
           <p className="text-xs font-black uppercase text-slate-400">
             XE Reference
           </p>
-
           <p className="mt-1 font-black">
-            {record?.xe_rate != null
-              ? record.xe_rate
-              : "Waiting for XE"}
+            {record?.xe_rate != null ? record.xe_rate : "Waiting for XE"}
           </p>
         </div>
 
@@ -623,7 +596,6 @@ export default function AdminDashboardPage() {
           <p className="text-xs font-black uppercase text-slate-400">
             XE Movement
           </p>
-
           <p
             className={`mt-1 font-black ${
               (movement ?? 0) > 0
@@ -639,8 +611,7 @@ export default function AdminDashboardPage() {
 
         {record?.last_xe_update && (
           <p className="mt-3 text-[11px] text-slate-400">
-            Updated{" "}
-            {new Date(record.last_xe_update).toLocaleString("en-GH")}
+            Updated {new Date(record.last_xe_update).toLocaleString("en-GH")}
           </p>
         )}
       </div>
@@ -655,14 +626,10 @@ export default function AdminDashboardPage() {
       <main className="flex min-h-screen items-center justify-center bg-slate-100">
         <div className="rounded-2xl bg-white p-8 text-center shadow-sm">
           <div className="text-3xl">🔐</div>
-
           <h1 className="mt-4 text-xl font-black">
             Checking administrator access...
           </h1>
-
-          <p className="mt-2 text-sm text-slate-500">
-            Please wait.
-          </p>
+          <p className="mt-2 text-sm text-slate-500">Please wait.</p>
         </div>
       </main>
     );
@@ -673,16 +640,13 @@ export default function AdminDashboardPage() {
       <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
         <div className="max-w-md rounded-3xl border border-red-200 bg-white p-8 text-center shadow-xl">
           <div className="text-5xl">🔒</div>
-
           <h1 className="mt-5 text-2xl font-black">
             Administrator Access Required
           </h1>
-
           <p className="mt-3 leading-7 text-slate-500">
-            Your account does not have administrator permissions
-            for Best Sales Ghana.
+            Your account does not have administrator permissions for Best
+            Sales Ghana.
           </p>
-
           <Link
             href="/"
             className="mt-6 inline-flex rounded-xl bg-blue-700 px-6 py-3 font-black text-white hover:bg-blue-800"
@@ -700,7 +664,6 @@ export default function AdminDashboardPage() {
         <aside className="admin-sidebar">
           <Link href="/" className="admin-brand">
             <span className="admin-brand-mark">★</span>
-
             <span>
               <strong>BEST SALES</strong>
               <small>GHANA · ADMIN</small>
@@ -742,21 +705,15 @@ export default function AdminDashboardPage() {
               <span>💰</span> Revenue & Settlements
             </Link>
 
-            <a className="admin-nav-link" href="#management">
+            <Link className="admin-nav-link" href="/admin/advertising">
               <span>📢</span> Advertising
-            </a>
+            </Link>
 
-            <Link
-              className="admin-nav-link"
-              href="/admin/support"
-            >
+            <Link className="admin-nav-link" href="/admin/support">
               <span>🎧</span> Customer Service
             </Link>
 
-            <Link
-              className="admin-nav-link"
-              href="/admin/refund-policy"
-            >
+            <Link className="admin-nav-link" href="/admin/refund-policy">
               <span>↩️</span> Refund Policy
             </Link>
 
@@ -768,7 +725,6 @@ export default function AdminDashboardPage() {
           <div className="admin-sidebar-bottom">
             <div className="admin-secure">
               <span>🔐</span>
-
               <div>
                 <strong>Secure workspace</strong>
                 <small>Administrator access</small>
@@ -789,12 +745,10 @@ export default function AdminDashboardPage() {
                 <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-700 text-2xl shadow-md">
                   ⭐
                 </div>
-
                 <div>
                   <div className="text-lg font-black tracking-tight sm:text-xl">
                     BEST SALES GHANA
                   </div>
-
                   <div className="text-xs text-slate-500">
                     Administration Portal
                   </div>
@@ -831,16 +785,14 @@ export default function AdminDashboardPage() {
               <p className="text-sm font-black uppercase tracking-widest text-blue-700">
                 Administration
               </p>
-
               <h1 className="mt-2 text-4xl font-black tracking-tight sm:text-5xl">
                 Admin Dashboard
               </h1>
-
               <p className="mt-3 max-w-3xl text-slate-500">
-                Manage Best Sales Ghana, direct-sales products,
-                marketplace sellers, customers, orders, deliveries,
-                payments, revenue, advertising, refunds, customer service
-                and currency exchange rates.
+                Manage Best Sales Ghana, direct-sales products, marketplace
+                sellers, customers, orders, deliveries, payments, revenue,
+                advertising, refunds, customer service and currency exchange
+                rates.
               </p>
             </div>
 
@@ -853,9 +805,7 @@ export default function AdminDashboardPage() {
                   </span>
                   <span className="text-2xl">🛒</span>
                 </div>
-
                 <div className="mt-4 text-3xl font-black">0</div>
-
                 <p className="mt-1 text-sm text-slate-500">
                   Products published
                 </p>
@@ -868,13 +818,11 @@ export default function AdminDashboardPage() {
                   </span>
                   <span className="text-2xl">📋</span>
                 </div>
-
                 <div className="mt-4 text-3xl font-black">
                   {loadingDashboardStats
                     ? "..."
                     : dashboardStats.listings.toLocaleString("en-GH")}
                 </div>
-
                 <p className="mt-1 text-sm text-slate-500">
                   Seller listings
                 </p>
@@ -887,12 +835,8 @@ export default function AdminDashboardPage() {
                   </span>
                   <span className="text-2xl">📦</span>
                 </div>
-
                 <div className="mt-4 text-3xl font-black">0</div>
-
-                <p className="mt-1 text-sm text-slate-500">
-                  Orders received
-                </p>
+                <p className="mt-1 text-sm text-slate-500">Orders received</p>
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -902,13 +846,11 @@ export default function AdminDashboardPage() {
                   </span>
                   <span className="text-2xl">👤</span>
                 </div>
-
                 <div className="mt-4 text-3xl font-black">
                   {loadingDashboardStats
                     ? "..."
                     : dashboardStats.accounts.toLocaleString("en-GH")}
                 </div>
-
                 <p className="mt-1 text-sm text-slate-500">
                   Registered accounts
                 </p>
@@ -924,15 +866,13 @@ export default function AdminDashboardPage() {
                 <p className="text-sm font-black uppercase tracking-widest text-cyan-100">
                   Financial Control
                 </p>
-
                 <h2 className="mt-2 text-3xl font-black sm:text-4xl">
                   💱 Currency Exchange Control
                 </h2>
-
                 <p className="mt-3 max-w-3xl leading-7 text-white/85">
-                  Control your GHS conversion rates for RMB, USD, EUR
-                  and GBP. XE will provide the reference movement used
-                  for automatic rate adjustment once connected.
+                  Control your GHS conversion rates for RMB, USD, EUR and GBP.
+                  XE will provide the reference movement used for automatic
+                  rate adjustment once connected.
                 </p>
               </div>
 
@@ -1000,12 +940,10 @@ export default function AdminDashboardPage() {
                           <p className="text-sm font-black uppercase tracking-wider text-slate-500">
                             {item.name}
                           </p>
-
                           <h3 className="mt-1 text-2xl font-black">
                             {item.flag} {item.code}
                           </h3>
                         </div>
-
                         <div className="text-4xl">{item.symbol}</div>
                       </div>
 
@@ -1025,18 +963,13 @@ export default function AdminDashboardPage() {
                           placeholder={`Example: ${item.example}`}
                           className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-4 py-3 font-bold outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
                         />
-
                         <button
                           type="button"
-                          onClick={() =>
-                            saveCurrencyRate(item.code)
-                          }
+                          onClick={() => saveCurrencyRate(item.code)}
                           disabled={savingCurrency === item.code}
                           className="rounded-xl bg-blue-700 px-5 py-3 font-black text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          {savingCurrency === item.code
-                            ? "Saving..."
-                            : "Save"}
+                          {savingCurrency === item.code ? "Saving..." : "Save"}
                         </button>
                       </div>
 
@@ -1048,7 +981,6 @@ export default function AdminDashboardPage() {
                         <p className="text-xs font-black uppercase tracking-wider text-slate-400">
                           Current rate
                         </p>
-
                         <p className="mt-1 text-2xl font-black text-blue-700">
                           {item.current ?? "Not set"}
                         </p>
@@ -1058,7 +990,10 @@ export default function AdminDashboardPage() {
                 </div>
 
                 {currencyMessage && (
-                  <div className="mt-5 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm font-bold text-blue-900">
+                  <div
+                    role="status"
+                    className="mt-5 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm font-bold text-blue-900"
+                  >
                     {currencyMessage}
                   </div>
                 )}
@@ -1070,15 +1005,13 @@ export default function AdminDashboardPage() {
                       <p className="text-sm font-black uppercase tracking-widest text-indigo-700">
                         XE Reference System
                       </p>
-
                       <h3 className="mt-2 text-2xl font-black text-indigo-950">
                         ⚡ Automatic XE Rate Adjustment
                       </h3>
-
                       <p className="mt-2 max-w-3xl text-sm leading-6 text-indigo-800">
                         When the XE reference rate changes, Best Sales Ghana
-                        can calculate the percentage movement and apply
-                        that movement to your current marketplace rate.
+                        can calculate the percentage movement and apply that
+                        movement to your current marketplace rate.
                       </p>
                     </div>
 
@@ -1098,7 +1031,6 @@ export default function AdminDashboardPage() {
                           ? "AUTO ADJUST: ON"
                           : "AUTO ADJUST: OFF"}
                       </button>
-
                       <button
                         type="button"
                         onClick={saveAdjustmentSettings}
@@ -1117,7 +1049,6 @@ export default function AdminDashboardPage() {
                       <label className="text-sm font-black text-slate-700">
                         Adjustment Percentage
                       </label>
-
                       <div className="mt-2 flex items-center rounded-xl border border-slate-300 bg-white">
                         <input
                           type="number"
@@ -1130,15 +1061,13 @@ export default function AdminDashboardPage() {
                           }
                           className="w-full rounded-xl border-0 px-4 py-3 font-black outline-none"
                         />
-
                         <span className="pr-4 font-black text-slate-500">
                           %
                         </span>
                       </div>
-
                       <p className="mt-2 text-xs leading-5 text-slate-500">
-                        100% follows the full XE movement. 50% applies
-                        half of the movement.
+                        100% follows the full XE movement. 50% applies half of
+                        the movement.
                       </p>
                     </div>
 
@@ -1146,15 +1075,12 @@ export default function AdminDashboardPage() {
                       <p className="text-sm font-black text-slate-700">
                         XE Connection
                       </p>
-
                       <div className="mt-3 flex items-center gap-2">
                         <span className="h-3 w-3 rounded-full bg-amber-400" />
-
                         <span className="font-black text-amber-700">
                           Awaiting XE API
                         </span>
                       </div>
-
                       <p className="mt-2 text-xs leading-5 text-slate-500">
                         Live XE rates will be activated after your XE API
                         account is recovered and connected.
@@ -1165,7 +1091,6 @@ export default function AdminDashboardPage() {
                       <p className="text-sm font-black text-slate-700">
                         Adjustment Formula
                       </p>
-
                       <div className="mt-3 rounded-xl bg-indigo-50 p-4">
                         <p className="text-sm font-black text-indigo-900">
                           New Rate = Current Rate × (1 + XE Movement ×
@@ -1182,21 +1107,18 @@ export default function AdminDashboardPage() {
                       flag="🇨🇳"
                       rate={currentRmbRate}
                     />
-
                     <CurrencyControlCard
                       code="USD"
                       name="US Dollar"
                       flag="🇺🇸"
                       rate={currentUsdRate}
                     />
-
                     <CurrencyControlCard
                       code="EUR"
                       name="Euro"
                       flag="🇪🇺"
                       rate={currentEurRate}
                     />
-
                     <CurrencyControlCard
                       code="GBP"
                       name="British Pound"
@@ -1209,22 +1131,21 @@ export default function AdminDashboardPage() {
                     <h4 className="font-black text-indigo-950">
                       How automatic adjustment will work
                     </h4>
-
                     <div className="mt-4 grid gap-3 text-sm text-slate-600 md:grid-cols-4">
                       <div className="rounded-xl bg-slate-50 p-4">
                         <strong>1.</strong> XE provides the new reference rate.
                       </div>
-
                       <div className="rounded-xl bg-slate-50 p-4">
-                        <strong>2.</strong> The system calculates the percentage movement.
+                        <strong>2.</strong> The system calculates the
+                        percentage movement.
                       </div>
-
                       <div className="rounded-xl bg-slate-50 p-4">
-                        <strong>3.</strong> Your adjustment percentage is applied.
+                        <strong>3.</strong> Your adjustment percentage is
+                        applied.
                       </div>
-
                       <div className="rounded-xl bg-slate-50 p-4">
-                        <strong>4.</strong> The new marketplace rate is saved in history.
+                        <strong>4.</strong> The new marketplace rate is saved
+                        in history.
                       </div>
                     </div>
                   </div>
@@ -1236,11 +1157,9 @@ export default function AdminDashboardPage() {
                     <p className="text-sm font-black uppercase tracking-widest text-blue-700">
                       Automatic Calculator
                     </p>
-
                     <h3 className="mt-2 text-2xl font-black">
                       Currency Conversion
                     </h3>
-
                     <p className="mt-2 text-slate-500">
                       These calculations use the rates currently saved above.
                     </p>
@@ -1251,12 +1170,10 @@ export default function AdminDashboardPage() {
                       <label className="text-sm font-black text-slate-600">
                         Ghana Cedis
                       </label>
-
                       <div className="mt-2 flex items-center rounded-xl border border-slate-300 bg-white">
                         <span className="px-4 text-lg font-black text-slate-500">
                           GH₵
                         </span>
-
                         <input
                           type="number"
                           min="0"
@@ -1275,17 +1192,14 @@ export default function AdminDashboardPage() {
                           <p className="text-xs font-black uppercase text-blue-600">
                             RMB
                           </p>
-
                           <p className="mt-2 text-xl font-black text-blue-900">
                             ¥{formatNumber(ghsToRmb)}
                           </p>
                         </div>
-
                         <div className="rounded-xl bg-green-50 p-4">
                           <p className="text-xs font-black uppercase text-green-600">
                             USD
                           </p>
-
                           <p className="mt-2 text-xl font-black text-green-900">
                             ${formatNumber(ghsToUsd)}
                           </p>
@@ -1302,7 +1216,6 @@ export default function AdminDashboardPage() {
                         <label className="text-xs font-black uppercase tracking-wider text-slate-400">
                           RMB → GHS
                         </label>
-
                         <input
                           type="number"
                           min="0"
@@ -1314,12 +1227,10 @@ export default function AdminDashboardPage() {
                           placeholder="800"
                           className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-4 font-black outline-none focus:border-blue-600"
                         />
-
                         <div className="mt-2 rounded-xl bg-blue-50 p-4">
                           <p className="text-xs font-black text-blue-600">
                             GH₵ VALUE
                           </p>
-
                           <p className="mt-1 text-xl font-black text-blue-900">
                             GH₵{formatNumber(rmbToGhs)}
                           </p>
@@ -1330,7 +1241,6 @@ export default function AdminDashboardPage() {
                         <label className="text-xs font-black uppercase tracking-wider text-slate-400">
                           USD → GHS
                         </label>
-
                         <input
                           type="number"
                           min="0"
@@ -1342,12 +1252,10 @@ export default function AdminDashboardPage() {
                           placeholder="100"
                           className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-4 font-black outline-none focus:border-blue-600"
                         />
-
                         <div className="mt-2 rounded-xl bg-green-50 p-4">
                           <p className="text-xs font-black text-green-600">
                             GH₵ VALUE
                           </p>
-
                           <p className="mt-1 text-xl font-black text-green-900">
                             GH₵{formatNumber(usdToGhs)}
                           </p>
@@ -1359,22 +1267,19 @@ export default function AdminDashboardPage() {
                   <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 p-5">
                     <div className="flex gap-3">
                       <div className="text-xl">ℹ️</div>
-
                       <div>
                         <h4 className="font-black text-blue-900">
                           How the rate works
                         </h4>
-
                         <p className="mt-2 text-sm leading-6 text-blue-800">
                           If your RMB rate is <strong>0.544</strong>, then
-                          GH₵800 × 0.544 = ¥435.20. To convert back,
-                          ¥800 ÷ 0.544 = GH₵1,470.59.
+                          GH₵800 × 0.544 = ¥435.20. To convert back, ¥800 ÷
+                          0.544 = GH₵1,470.59.
                         </p>
-
                         <p className="mt-2 text-sm leading-6 text-blue-800">
-                          The rate can be controlled manually or, after the
-                          XE API connection is activated, adjusted according
-                          to XE percentage movement.
+                          The rate can be controlled manually or, after the XE
+                          API connection is activated, adjusted according to XE
+                          percentage movement.
                         </p>
                       </div>
                     </div>
@@ -1389,11 +1294,9 @@ export default function AdminDashboardPage() {
                 <p className="text-sm font-black uppercase tracking-widest text-blue-700">
                   Platform Finance
                 </p>
-
                 <h2 className="mt-2 text-3xl font-black">
                   Revenue & Payment Overview
                 </h2>
-
                 <p className="mt-2 max-w-3xl text-slate-500">
                   Monitor marketplace payment activity, platform revenue,
                   seller funds and settlement status.
@@ -1408,13 +1311,11 @@ export default function AdminDashboardPage() {
                     </span>
                     <span className="text-2xl">📊</span>
                   </div>
-
                   <div className="mt-4 text-3xl font-black text-blue-900">
                     2.15%
                   </div>
-
                   <p className="mt-1 text-sm text-blue-700">
-                    Standard marketplace payment fee
+                    Current configured business transaction fee
                   </p>
                 </div>
 
@@ -1425,9 +1326,7 @@ export default function AdminDashboardPage() {
                     </span>
                     <span className="text-2xl">🔒</span>
                   </div>
-
                   <div className="mt-4 text-3xl font-black">GH₵0</div>
-
                   <p className="mt-1 text-sm text-slate-500">
                     Awaiting settlement
                   </p>
@@ -1440,9 +1339,7 @@ export default function AdminDashboardPage() {
                     </span>
                     <span className="text-2xl">💰</span>
                   </div>
-
                   <div className="mt-4 text-3xl font-black">GH₵0</div>
-
                   <p className="mt-1 text-sm text-slate-500">
                     Revenue collected
                   </p>
@@ -1455,9 +1352,7 @@ export default function AdminDashboardPage() {
                     </span>
                     <span className="text-2xl">⏳</span>
                   </div>
-
                   <div className="mt-4 text-3xl font-black">GH₵0</div>
-
                   <p className="mt-1 text-sm text-slate-500">
                     Scheduled for release
                   </p>
@@ -1472,19 +1367,16 @@ export default function AdminDashboardPage() {
                   <p className="text-sm font-black uppercase tracking-widest text-cyan-100">
                     Your Products
                   </p>
-
                   <h2 className="mt-2 text-3xl font-black sm:text-4xl">
                     Direct Sales Products
                   </h2>
-
                   <p className="mt-3 max-w-2xl leading-7 text-white/85">
-                    Add and manage products owned by Best Sales Ghana.
-                    You decide when a product is published. Direct-sales
-                    products appear alongside other marketplace listings
-                    and will not be pinned.
+                    Add and manage products owned by Best Sales Ghana. You
+                    decide when a product is published. Direct-sales products
+                    appear alongside other marketplace listings and will not be
+                    pinned.
                   </p>
                 </div>
-
                 <Link
                   href="/admin/direct-sales"
                   className="inline-flex shrink-0 items-center justify-center rounded-xl bg-white px-6 py-4 font-black text-blue-800 shadow-lg transition hover:-translate-y-1"
@@ -1501,31 +1393,25 @@ export default function AdminDashboardPage() {
                   <p className="text-sm font-black uppercase tracking-widest text-blue-700">
                     Financial Control
                   </p>
-
                   <h2 className="mt-2 text-3xl font-black sm:text-4xl">
                     Revenue & Payments
                   </h2>
-
                   <p className="mt-3 max-w-3xl leading-7 text-slate-500">
                     View customer payments, calculate platform revenue,
                     monitor seller funds and manage settlement releases.
                   </p>
-
                   <div className="mt-5 flex flex-wrap gap-2">
                     <span className="rounded-full bg-blue-100 px-3 py-1.5 text-xs font-black text-blue-700">
-                      2.15% PLATFORM REVENUE
+                      BUSINESS TRANSACTION FEE
                     </span>
-
                     <span className="rounded-full bg-amber-100 px-3 py-1.5 text-xs font-black text-amber-700">
                       SELLER FUNDS HELD
                     </span>
-
                     <span className="rounded-full bg-green-100 px-3 py-1.5 text-xs font-black text-green-700">
                       DELIVERY RELEASE
                     </span>
-
                     <span className="rounded-full bg-purple-100 px-3 py-1.5 text-xs font-black text-purple-700">
-                      5-DAY SETTLEMENT
+                      SETTLEMENT SETTINGS
                     </span>
                   </div>
                 </div>
@@ -1545,7 +1431,6 @@ export default function AdminDashboardPage() {
                 <p className="text-sm font-black uppercase tracking-widest text-blue-700">
                   Management
                 </p>
-
                 <h2 className="mt-2 text-3xl font-black">
                   Marketplace Administration
                 </h2>
@@ -1570,7 +1455,7 @@ export default function AdminDashboardPage() {
 
                       {section.title === "Revenue & Payments" && (
                         <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-black text-green-700">
-                          2.15%
+                          BUSINESS FEE
                         </span>
                       )}
                     </div>
@@ -1578,11 +1463,9 @@ export default function AdminDashboardPage() {
                     <h3 className="mt-5 text-xl font-black">
                       {section.title}
                     </h3>
-
                     <p className="mt-2 min-h-[72px] text-sm leading-6 text-slate-500">
                       {section.description}
                     </p>
-
                     <Link
                       href={section.href}
                       className="mt-5 inline-flex rounded-xl border border-blue-700 px-4 py-3 font-bold text-blue-700 transition hover:bg-blue-700 hover:text-white"
@@ -1596,43 +1479,26 @@ export default function AdminDashboardPage() {
 
             {/* DIRECT SALES CONTROL */}
             <section className="mt-10 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-black">
-                Direct Sales Control
-              </h2>
-
+              <h2 className="text-xl font-black">Direct Sales Control</h2>
               <div className="mt-5 grid gap-4 md:grid-cols-3">
                 <div className="rounded-xl bg-slate-50 p-5">
                   <div className="text-2xl">📷</div>
-
-                  <h3 className="mt-3 font-black">
-                    Product Pictures
-                  </h3>
-
+                  <h3 className="mt-3 font-black">Product Pictures</h3>
                   <p className="mt-1 text-sm leading-6 text-slate-500">
                     Upload and replace product images whenever necessary.
                   </p>
                 </div>
-
                 <div className="rounded-xl bg-slate-50 p-5">
                   <div className="text-2xl">💵</div>
-
-                  <h3 className="mt-3 font-black">
-                    Price Management
-                  </h3>
-
+                  <h3 className="mt-3 font-black">Price Management</h3>
                   <p className="mt-1 text-sm leading-6 text-slate-500">
-                    Change product prices from the admin area without
-                    changing website code.
+                    Change product prices from the admin area without changing
+                    website code.
                   </p>
                 </div>
-
                 <div className="rounded-xl bg-slate-50 p-5">
                   <div className="text-2xl">📦</div>
-
-                  <h3 className="mt-3 font-black">
-                    Stock Management
-                  </h3>
-
+                  <h3 className="mt-3 font-black">Stock Management</h3>
                   <p className="mt-1 text-sm leading-6 text-slate-500">
                     Control stock quantities and product availability.
                   </p>
@@ -1644,8 +1510,7 @@ export default function AdminDashboardPage() {
             <section className="mt-8 rounded-2xl border border-blue-200 bg-blue-50 p-6">
               <div className="flex gap-4">
                 <div className="text-2xl">💳</div>
-
-                <div>
+                <div className="min-w-0 flex-1">
                   <h2 className="text-xl font-black text-blue-900">
                     Marketplace Payment Structure
                   </h2>
@@ -1653,57 +1518,65 @@ export default function AdminDashboardPage() {
                   <div className="mt-4 grid gap-4 md:grid-cols-3">
                     <div className="rounded-xl bg-white p-4">
                       <p className="text-xs font-black uppercase tracking-wider text-blue-700">
-                        Standard Marketplace
+                        Business Transactions
                       </p>
-
-                      <p className="mt-2 text-2xl font-black">
-                        2.15%
-                      </p>
-
+                      <p className="mt-2 text-2xl font-black">2.15%</p>
                       <p className="mt-1 text-sm text-slate-500">
-                        Platform revenue calculated from eligible platform payments.
+                        Current initial fee on eligible company transactions
+                        processed through the platform. The configured rate may
+                        be changed by an authorized administrator.
                       </p>
                     </div>
 
                     <div className="rounded-xl bg-white p-4">
                       <p className="text-xs font-black uppercase tracking-wider text-amber-700">
-                        Settlement
+                        Individual Sellers
                       </p>
-
-                      <p className="mt-2 text-2xl font-black">
-                        5 Days
-                      </p>
-
+                      <p className="mt-2 text-2xl font-black">0%</p>
                       <p className="mt-1 text-sm text-slate-500">
-                        Seller funds can remain held for the settlement period.
+                        Individual sellers collect payments independently and
+                        are excluded from the BSG platform transaction fee.
                       </p>
                     </div>
 
                     <div className="rounded-xl bg-white p-4">
                       <p className="text-xs font-black uppercase tracking-wider text-green-700">
-                        Delivery
+                        Settlements
                       </p>
-
-                      <p className="mt-2 text-2xl font-black">
-                        Successful
-                      </p>
-
+                      <p className="mt-2 text-2xl font-black">By Policy</p>
                       <p className="mt-1 text-sm text-slate-500">
-                        Funds can be released after successful delivery according
-                        to the payment rules.
+                        Business funds may be held and released under the
+                        applicable settlement and delivery rules.
                       </p>
                     </div>
                   </div>
 
                   <div className="mt-5 rounded-xl border border-purple-200 bg-purple-50 p-4">
-                    <p className="text-sm leading-6 text-purple-900">
-                      <strong>Top Priority advertising:</strong> Sellers who
-                      purchase the Top Priority advertising package are not
-                      charged the 2.15% platform payment revenue on payments
-                      covered by that specific arrangement. Top Priority
-                      advertising includes Best Sales Ghana delivery and tracking.
+                    <p className="text-sm leading-6 text-purple-950">
+                      <strong>Top Priority advertising:</strong> Advertising is
+                      a separate service. Buying a Top Priority package does
+                      not waive the business transaction fee, and the package
+                      does not automatically include delivery or tracking.
                     </p>
                   </div>
+
+                  <div className="mt-4 rounded-xl border border-blue-200 bg-white p-4">
+                    <p className="text-sm leading-6 text-slate-700">
+                      <strong>Fee example:</strong> At a 2.15% business
+                      transaction fee, a GH₵1,000 eligible transaction produces
+                      a GH₵21.50 platform fee and a GH₵978.50 balance before
+                      payment-processing charges, refunds or other applicable
+                      adjustments. Actual collection and settlement must follow
+                      the implemented payment flow.
+                    </p>
+                  </div>
+
+                  <Link
+                    href="/admin/advertising"
+                    className="mt-5 inline-flex rounded-xl bg-blue-700 px-5 py-3 font-black text-white transition hover:bg-blue-800"
+                  >
+                    Configure Advertising Settings →
+                  </Link>
                 </div>
               </div>
             </section>
@@ -1712,16 +1585,14 @@ export default function AdminDashboardPage() {
             <section className="mt-8 rounded-2xl border border-amber-200 bg-amber-50 p-5">
               <div className="flex gap-3">
                 <div className="text-xl">🔐</div>
-
                 <div>
                   <h3 className="font-black text-amber-900">
                     Admin security
                   </h3>
-
                   <p className="mt-1 text-sm leading-6 text-amber-800">
-                    Currency changes and other administration controls
-                    should only be available to authenticated accounts
-                    with the admin account type.
+                    Currency changes and other administration controls must
+                    also be protected by server-side authorization. Hiding
+                    controls in the browser alone is not sufficient.
                   </p>
                 </div>
               </div>
@@ -1734,10 +1605,9 @@ export default function AdminDashboardPage() {
               <p className="font-black text-white">
                 BEST SALES GHANA — ADMINISTRATION
               </p>
-
               <p className="mt-2 text-sm text-slate-500">
-                © {new Date().getFullYear()} All Prominent Ghana Limited.
-                All rights reserved.
+                © {new Date().getFullYear()} All Prominent Ghana Limited. All
+                rights reserved.
               </p>
             </div>
           </footer>
