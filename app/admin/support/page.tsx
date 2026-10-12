@@ -1,24 +1,21 @@
 
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { supabaseBrowser } from "@/supabase-browser";
 
 type SupportMessage = {
   id: string;
   user_id: string;
-  sender_role: string;
+  sender_role?: string | null;
   subject?: string | null;
   message?: string | null;
   content?: string | null;
   status?: string | null;
   created_at?: string | null;
-  conversation_id?: string | null;
   assigned_agent_id?: string | null;
   referred_to_admin?: boolean;
-  referred_at?: string | null;
-  updated_at?: string | null;
 };
 
 type SupportAgent = {
@@ -27,133 +24,94 @@ type SupportAgent = {
   display_name: string;
   user_id: string | null;
   is_active: boolean;
-  created_at: string;
 };
-
-type FilterType =
-  | "all"
-  | "unassigned"
-  | "open"
-  | "pending"
-  | "closed"
-  | "referred";
 
 export default function AdminSupportPage() {
   const [messages, setMessages] = useState<SupportMessage[]>([]);
   const [agents, setAgents] = useState<SupportAgent[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<FilterType>("all");
-  const [agentFilter, setAgentFilter] = useState("all");
-  const [showAddAgent, setShowAddAgent] = useState(false);
-  const [agentName, setAgentName] = useState("");
-  const [agentEmail, setAgentEmail] = useState("");
-  const [addingAgent, setAddingAgent] = useState(false);
+  const [filter, setFilter] = useState("all");
+  const [savingId, setSavingId] = useState("");
 
-  const getToken = useCallback(async () => {
-    const supabase = supabaseBrowser();
-    const { data, error: authError } = await supabase.auth.getSession();
-
-    if (authError || !data.session?.access_token) {
-      window.location.href = "/login";
-      throw new Error("Please sign in again.");
-    }
-
-    return data.session.access_token;
-  }, []);
-
-  const loadMessages = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
+  const loadData = useCallback(async () => {
+    setLoading(true);
     setError("");
 
     try {
-      const token = await getToken();
+      const supabase = supabaseBrowser();
+      const {
+        data: { session },
+        error: authError,
+      } = await supabase.auth.getSession();
+
+      if (authError) throw authError;
+
+      if (!session?.access_token) {
+        setError("Please sign in with your administrator account.");
+        setLoading(false);
+        return;
+      }
 
       const response = await fetch("/api/admin/support", {
         method: "GET",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
         cache: "no-store",
       });
 
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || "Unable to load support data.");
+        throw new Error(
+          result.error ||
+            `Support API returned HTTP ${response.status}.`
+        );
       }
 
       setMessages(result.messages ?? []);
       setAgents(result.agents ?? []);
     } catch (err) {
-      console.error("Support CMS load error:", err);
+      console.error("Support CMS:", err);
       setError(
         err instanceof Error
           ? err.message
-          : "Unable to load support data."
+          : "Unable to load the support inbox."
       );
     } finally {
-      if (!silent) setLoading(false);
+      setLoading(false);
     }
-  }, [getToken]);
+  }, []);
 
   useEffect(() => {
-    void loadMessages();
-
-    const supabase = supabaseBrowser();
-
-    const channel = supabase
-      .channel("admin-support-cms-live")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "support_messages",
-        },
-        () => {
-          void loadMessages(true);
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "support_agents",
-        },
-        () => {
-          void loadMessages(true);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      void supabase.removeChannel(channel);
-    };
-  }, [loadMessages]);
+    void loadData();
+  }, [loadData]);
 
   async function updateMessage(
     messageId: string,
-    changes: {
-      status?: "open" | "pending" | "closed";
-      assignedAgentId?: string | null;
-      referredToAdmin?: boolean;
-    },
-    successMessage: string
+    changes: Record<string, unknown>
   ) {
-    setSaving(messageId);
+    setSavingId(messageId);
     setError("");
     setNotice("");
 
     try {
-      const token = await getToken();
+      const supabase = supabaseBrowser();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        throw new Error("Please sign in again.");
+      }
 
       const response = await fetch("/api/admin/support", {
         method: "PATCH",
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${session.access_token}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ messageId, ...changes }),
@@ -162,159 +120,96 @@ export default function AdminSupportPage() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || "Update failed.");
+        throw new Error(result.error || "Unable to update request.");
       }
 
-      setNotice(successMessage);
-      await loadMessages(true);
+      setNotice("Support request updated.");
+      await loadData();
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Unable to update request."
+        err instanceof Error ? err.message : "Update failed."
       );
     } finally {
-      setSaving(null);
+      setSavingId("");
     }
   }
-
-  async function addAgent(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setAddingAgent(true);
-    setError("");
-    setNotice("");
-
-    try {
-      const token = await getToken();
-
-      const response = await fetch("/api/admin/support", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          displayName: agentName.trim(),
-          email: agentEmail.trim(),
-        }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || "Unable to add agent.");
-      }
-
-      setAgentName("");
-      setAgentEmail("");
-      setShowAddAgent(false);
-      setNotice("Staff invitation sent successfully.");
-      await loadMessages(true);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Unable to add agent."
-      );
-    } finally {
-      setAddingAgent(false);
-    }
-  }
-
-  const activeAgents = useMemo(
-    () => agents.filter((agent) => agent.is_active),
-    [agents]
-  );
 
   const openCount = messages.filter(
-    (message) => (message.status || "open").toLowerCase() === "open"
+    (m) => (m.status || "open").toLowerCase() === "open"
   ).length;
 
   const pendingCount = messages.filter(
-    (message) => (message.status || "open").toLowerCase() === "pending"
+    (m) => (m.status || "open").toLowerCase() === "pending"
   ).length;
 
   const closedCount = messages.filter(
-    (message) => (message.status || "open").toLowerCase() === "closed"
+    (m) => (m.status || "open").toLowerCase() === "closed"
   ).length;
 
   const unassignedCount = messages.filter(
-    (message) => !message.assigned_agent_id
+    (m) => !m.assigned_agent_id
   ).length;
 
   const referredCount = messages.filter(
-    (message) => message.referred_to_admin
+    (m) => m.referred_to_admin
   ).length;
 
-  const filteredMessages = useMemo(() => {
+  const visibleMessages = messages.filter((m) => {
+    const status = (m.status || "open").toLowerCase();
     const term = search.trim().toLowerCase();
 
-    return messages.filter((message) => {
-      const status = (message.status || "open").toLowerCase();
+    if (filter === "open" && status !== "open") return false;
+    if (filter === "pending" && status !== "pending") return false;
+    if (filter === "closed" && status !== "closed") return false;
+    if (filter === "unassigned" && m.assigned_agent_id) return false;
+    if (filter === "referred" && !m.referred_to_admin) return false;
 
-      if (filter === "unassigned" && message.assigned_agent_id) {
-        return false;
-      }
-      if (filter === "open" && status !== "open") return false;
-      if (filter === "pending" && status !== "pending") return false;
-      if (filter === "closed" && status !== "closed") return false;
-      if (filter === "referred" && !message.referred_to_admin) {
-        return false;
-      }
+    if (term) {
+      const text = [
+        m.id,
+        m.user_id,
+        m.subject,
+        m.message,
+        m.content,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
 
-      if (
-        agentFilter !== "all" &&
-        message.assigned_agent_id !== agentFilter
-      ) {
-        return false;
-      }
+      if (!text.includes(term)) return false;
+    }
 
-      if (term) {
-        const searchable = [
-          message.subject,
-          message.message,
-          message.content,
-          message.user_id,
-          message.id,
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
-
-        if (!searchable.includes(term)) return false;
-      }
-
-      return true;
-    });
-  }, [messages, filter, agentFilter, search]);
+    return true;
+  });
 
   return (
     <main className="min-h-screen bg-slate-50 p-4 text-slate-900 md:p-8">
       <div className="mx-auto max-w-7xl">
-        <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold md:text-3xl">
-              BestsalesGH Support CMS
-            </h1>
-            <p className="mt-2 text-sm text-slate-600">
-              Manage customer conversations, support staff and referrals.
-            </p>
-            <p className="mt-2 text-xs font-medium text-green-700">
-              Live updates enabled
-            </p>
-          </div>
+        <header className="mb-6">
+          <h1 className="text-3xl font-bold">
+            BestsalesGH Customer Service
+          </h1>
 
-          <div className="flex flex-wrap gap-2">
+          <p className="mt-2 text-slate-600">
+            Manage customer chats, assign support staff and refer
+            difficult cases to the administrator.
+          </p>
+
+          <div className="mt-4 flex flex-wrap gap-3">
             <Link
               href="/admin"
-              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-100"
+              className="rounded-lg border border-slate-300 bg-white px-4 py-3 font-semibold"
             >
-              Back to Admin
+              Back to Admin Dashboard
             </Link>
 
             <button
               type="button"
-              onClick={() => void loadMessages()}
+              onClick={() => void loadData()}
               disabled={loading}
-              className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-60"
+              className="rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white disabled:opacity-60"
             >
-              {loading ? "Refreshing..." : "Refresh"}
+              {loading ? "Loading..." : "Refresh Inbox"}
             </button>
           </div>
         </header>
@@ -322,307 +217,193 @@ export default function AdminSupportPage() {
         {error && (
           <div
             role="alert"
-            className="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"
+            className="mb-5 break-words rounded-xl border border-red-200 bg-red-50 p-4 text-red-800"
           >
-            {error}
+            <p className="font-bold">Support system notice</p>
+            <p className="mt-1">{error}</p>
+            <p className="mt-2 text-sm">
+              If this is a 404, check that
+              app/api/admin/support/route.ts exists and is deployed.
+              If it says administrator access required, the API
+              authentication must be corrected.
+            </p>
           </div>
         )}
 
         {notice && (
-          <div
-            role="status"
-            className="mb-5 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800"
-          >
+          <p className="mb-5 rounded-lg bg-green-50 p-3 text-green-800">
             {notice}
-          </div>
+          </p>
         )}
 
         <section className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-5">
           {[
-            { label: "Total Messages", value: messages.length },
-            { label: "Open", value: openCount },
-            { label: "Pending", value: pendingCount },
-            { label: "Closed", value: closedCount },
-            { label: "Unassigned", value: unassignedCount },
-          ].map((item) => (
+            ["Total Messages", messages.length],
+            ["Open", openCount],
+            ["Pending", pendingCount],
+            ["Closed", closedCount],
+            ["Unassigned", unassignedCount],
+          ].map(([label, count]) => (
             <div
-              key={item.label}
+              key={String(label)}
               className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
             >
-              <p className="text-sm text-slate-500">{item.label}</p>
-              <p className="mt-2 text-3xl font-bold">{item.value}</p>
+              <p className="text-sm text-slate-500">{label}</p>
+              <p className="mt-2 text-3xl font-bold">{count}</p>
             </div>
           ))}
         </section>
 
-        <section className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-xl font-bold">Support Team</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Five initial staff slots, with room to grow.
-              </p>
-            </div>
+        <section className="mb-6 rounded-xl border border-slate-200 bg-white p-5">
+          <h2 className="text-xl font-bold">Support Team</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Five initial staff positions, expandable as the company grows.
+          </p>
 
-            <button
-              type="button"
-              onClick={() => setShowAddAgent((value) => !value)}
-              className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800"
-            >
-              {showAddAgent ? "Cancel" : "+ Add Support Agent"}
-            </button>
-          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            {[1, 2, 3, 4, 5].map((slot) => {
+              const agent = agents.find(
+                (a) => a.slot_number === slot
+              );
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {agents.map((agent) => (
-              <div
-                key={agent.id}
-                className="rounded-lg border border-slate-200 p-4"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-100 text-lg font-bold text-blue-800">
-                    {agent.slot_number ?? "＋"}
-                  </div>
-
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold">
-                      {agent.display_name}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {agent.user_id
-                        ? "Account linked"
-                        : "Awaiting account invitation"}
-                    </p>
-                  </div>
-                </div>
-
-                <p className="mt-3 text-xs text-slate-500">
-                  {agent.is_active ? "Active" : "Inactive"}
-                </p>
-              </div>
-            ))}
-          </div>
-
-          {agents.length === 0 && !loading && (
-            <p className="mt-4 text-sm text-slate-500">
-              No support agents returned by the API.
-            </p>
-          )}
-
-          {showAddAgent && (
-            <form
-              onSubmit={addAgent}
-              className="mt-5 grid gap-4 rounded-lg bg-slate-50 p-4 md:grid-cols-3"
-            >
-              <label className="text-sm font-medium">
-                Agent display name
-                <input
-                  required
-                  maxLength={100}
-                  value={agentName}
-                  onChange={(event) => setAgentName(event.target.value)}
-                  placeholder="e.g. Customer Care 6"
-                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-3 font-normal"
-                />
-              </label>
-
-              <label className="text-sm font-medium">
-                Staff email
-                <input
-                  required
-                  type="email"
-                  value={agentEmail}
-                  onChange={(event) => setAgentEmail(event.target.value)}
-                  placeholder="agent@example.com"
-                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-3 font-normal"
-                />
-              </label>
-
-              <div className="flex items-end">
-                <button
-                  type="submit"
-                  disabled={addingAgent}
-                  className="w-full rounded-lg bg-slate-900 px-4 py-3 font-semibold text-white disabled:opacity-60"
+              return (
+                <div
+                  key={slot}
+                  className="rounded-lg border border-slate-200 p-4"
                 >
-                  {addingAgent ? "Sending invitation..." : "Invite Agent"}
-                </button>
-              </div>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 font-bold text-blue-800">
+                    {slot}
+                  </div>
+                  <p className="mt-3 font-semibold">
+                    {agent?.display_name || `Support Agent ${slot}`}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {agent
+                      ? agent.is_active
+                        ? "Active"
+                        : "Inactive"
+                      : "Not configured"}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
 
-              <p className="text-xs text-slate-500 md:col-span-3">
-                An invitation email is sent by Supabase Auth. This adds the
-                staff record but does not, by itself, grant agent dashboard
-                permissions. Those must be enforced by the agent API.
-              </p>
-            </form>
-          )}
+          <p className="mt-3 text-sm text-slate-500">
+            Active agents returned by the API:{" "}
+            {agents.filter((a) => a.is_active).length}
+          </p>
         </section>
 
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-200 p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h2 className="text-xl font-bold">Support Inbox</h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  Admin referral queue: {referredCount}
-                </p>
-              </div>
-
-              <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-800">
-                {filteredMessages.length} shown
+              <h2 className="text-xl font-bold">Support Inbox</h2>
+              <span className="rounded-full bg-purple-100 px-3 py-1 text-sm text-purple-800">
+                Admin referrals: {referredCount}
               </span>
             </div>
 
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
               <input
                 value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search message, customer ID..."
-                className="rounded-lg border border-slate-300 px-3 py-3 text-sm md:col-span-1"
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search customer ID or message"
+                className="w-full rounded-lg border border-slate-300 px-4 py-3"
               />
 
               <select
                 value={filter}
-                onChange={(event) =>
-                  setFilter(event.target.value as FilterType)
-                }
-                className="rounded-lg border border-slate-300 bg-white px-3 py-3 text-sm"
+                onChange={(e) => setFilter(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3"
               >
-                <option value="all">All messages</option>
-                <option value="unassigned">Unassigned</option>
-                <option value="open">Open</option>
-                <option value="pending">Pending</option>
-                <option value="closed">Closed</option>
+                <option value="all">All requests</option>
+                <option value="open">Open requests</option>
+                <option value="pending">Pending requests</option>
+                <option value="closed">Closed requests</option>
+                <option value="unassigned">Unassigned requests</option>
                 <option value="referred">Referred to admin</option>
-              </select>
-
-              <select
-                value={agentFilter}
-                onChange={(event) => setAgentFilter(event.target.value)}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-3 text-sm"
-              >
-                <option value="all">All agents</option>
-                {activeAgents.map((agent) => (
-                  <option key={agent.id} value={agent.id}>
-                    {agent.slot_number
-                      ? `Agent ${agent.slot_number}: `
-                      : ""}
-                    {agent.display_name}
-                  </option>
-                ))}
               </select>
             </div>
           </div>
 
           {loading && messages.length === 0 && (
-            <p className="p-6 text-slate-500">Loading support messages...</p>
+            <p className="p-6 text-slate-500">
+              Loading support messages...
+            </p>
           )}
 
-          {!loading && filteredMessages.length === 0 && (
-            <div className="p-10 text-center">
-              <p className="font-semibold">No matching messages</p>
-              <p className="mt-2 text-sm text-slate-500">
-                Try another filter or refresh the inbox.
-              </p>
-            </div>
+          {!loading && !error && visibleMessages.length === 0 && (
+            <p className="p-8 text-center text-slate-500">
+              No matching support messages.
+            </p>
           )}
 
           <div className="divide-y divide-slate-200">
-            {filteredMessages.map((message) => {
-              const status = (message.status || "open").toLowerCase();
-              const assignedAgent = agents.find(
-                (agent) => agent.id === message.assigned_agent_id
-              );
+            {visibleMessages.map((m) => {
+              const status = (m.status || "open").toLowerCase();
 
               return (
-                <article key={message.id} className="p-5">
+                <article key={m.id} className="p-5">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
                       <h3 className="font-bold">
-                        {message.subject || "Customer Support Request"}
+                        {m.subject || "Customer Support Request"}
                       </h3>
                       <p className="mt-1 break-all text-xs text-slate-500">
-                        Customer ID: {message.user_id}
+                        Customer ID: {m.user_id}
                       </p>
                       <p className="mt-1 text-xs text-slate-500">
-                        {message.created_at
-                          ? new Date(message.created_at).toLocaleString()
+                        {m.created_at
+                          ? new Date(m.created_at).toLocaleString()
                           : "Date unavailable"}
                       </p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        Sender: {message.sender_role}
-                      </p>
                     </div>
 
-                    <div className="flex flex-wrap gap-2">
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                          status === "closed"
-                            ? "bg-slate-100 text-slate-700"
-                            : status === "pending"
-                              ? "bg-amber-100 text-amber-800"
-                              : "bg-blue-100 text-blue-800"
-                        }`}
-                      >
-                        {status}
-                      </span>
-
-                      {message.referred_to_admin && (
-                        <span className="rounded-full bg-purple-100 px-3 py-1 text-xs font-semibold text-purple-800">
-                          Admin referral
-                        </span>
-                      )}
-                    </div>
+                    <span className="rounded-full bg-blue-100 px-3 py-1 text-sm text-blue-800">
+                      {status}
+                    </span>
                   </div>
 
-                  <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">
-                    {message.message || message.content || "No message text"}
+                  <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-6">
+                    {m.message || m.content || "No message text"}
                   </p>
 
                   <div className="mt-4 grid gap-3 md:grid-cols-2">
                     <label className="text-sm font-medium">
-                      Assign conversation
+                      Assign to staff
                       <select
-                        value={message.assigned_agent_id || ""}
-                        disabled={saving === message.id}
-                        onChange={(event) => {
-                          const value = event.target.value;
-                          void updateMessage(
-                            message.id,
-                            { assignedAgentId: value || null },
-                            "Assignment updated."
-                          );
-                        }}
-                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-3 font-normal"
+                        value={m.assigned_agent_id || ""}
+                        disabled={savingId === m.id}
+                        onChange={(e) =>
+                          void updateMessage(m.id, {
+                            assignedAgentId: e.target.value || null,
+                          })
+                        }
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-3"
                       >
                         <option value="">Unassigned</option>
-                        {activeAgents.map((agent) => (
-                          <option key={agent.id} value={agent.id}>
-                            {agent.slot_number
-                              ? `Agent ${agent.slot_number}: `
-                              : ""}
-                            {agent.display_name}
-                          </option>
-                        ))}
+                        {agents
+                          .filter((a) => a.is_active)
+                          .map((a) => (
+                            <option key={a.id} value={a.id}>
+                              {a.display_name}
+                            </option>
+                          ))}
                       </select>
                     </label>
 
                     <label className="text-sm font-medium">
-                      Request status
+                      Update status
                       <select
                         value={status}
-                        disabled={saving === message.id}
-                        onChange={(event) => {
-                          const value = event.target.value as
-                            | "open"
-                            | "pending"
-                            | "closed";
-                          void updateMessage(
-                            message.id,
-                            { status: value },
-                            "Status updated."
-                          );
-                        }}
-                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-3 font-normal"
+                        disabled={savingId === m.id}
+                        onChange={(e) =>
+                          void updateMessage(m.id, {
+                            status: e.target.value,
+                          })
+                        }
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-3"
                       >
                         <option value="open">Open</option>
                         <option value="pending">Pending</option>
@@ -631,49 +412,33 @@ export default function AdminSupportPage() {
                     </label>
                   </div>
 
-                  <p className="mt-2 text-xs text-slate-500">
-                    Assigned to: {assignedAgent?.display_name || "No agent"}
-                  </p>
-
                   <div className="mt-4 flex flex-wrap gap-2">
                     <button
                       type="button"
-                      disabled={saving === message.id}
+                      disabled={savingId === m.id}
                       onClick={() =>
-                        void updateMessage(
-                          message.id,
-                          {
-                            referredToAdmin: !message.referred_to_admin,
-                          },
-                          message.referred_to_admin
-                            ? "Admin referral removed."
-                            : "Conversation referred to admin."
-                        )
+                        void updateMessage(m.id, {
+                          referredToAdmin: !m.referred_to_admin,
+                        })
                       }
-                      className="rounded-lg border border-purple-200 px-3 py-2 text-sm font-medium text-purple-800 hover:bg-purple-50 disabled:opacity-60"
+                      className="rounded-lg border border-purple-300 px-4 py-2 font-medium text-purple-800 disabled:opacity-60"
                     >
-                      {message.referred_to_admin
-                        ? "Remove Referral"
+                      {m.referred_to_admin
+                        ? "Remove Admin Referral"
                         : "Refer to Admin"}
                     </button>
 
                     <button
                       type="button"
-                      disabled={saving === message.id}
+                      disabled={savingId === m.id}
                       onClick={() =>
-                        void updateMessage(
-                          message.id,
-                          {
-                            status: status === "closed" ? "open" : "closed",
-                          },
-                          status === "closed"
-                            ? "Request reopened."
-                            : "Request closed."
-                        )
+                        void updateMessage(m.id, {
+                          status: status === "closed" ? "open" : "closed",
+                        })
                       }
-                      className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60"
+                      className="rounded-lg bg-slate-900 px-4 py-2 font-medium text-white disabled:opacity-60"
                     >
-                      {saving === message.id
+                      {savingId === m.id
                         ? "Saving..."
                         : status === "closed"
                           ? "Reopen Request"
@@ -685,13 +450,6 @@ export default function AdminSupportPage() {
             })}
           </div>
         </section>
-
-        <p className="mt-4 text-xs leading-5 text-slate-500">
-          Live monitoring depends on Supabase Realtime being enabled and
-          authorized. This admin page manages message records; customer-facing
-          conversation threading and agent replies require their own connected
-          pages and secure APIs.
-        </p>
       </div>
     </main>
   );
