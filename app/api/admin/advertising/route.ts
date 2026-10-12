@@ -1,23 +1,31 @@
 
-import { NextRequest, NextResponse } from "next/server";
-import { createHmac, timingSafeEqual } from "crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
+import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
-const ALLOWED_SETTINGS = {
-  individual_premium_price: { min: 0, max: 1000000 },
-  individual_priority_price: { min: 0, max: 1000000 },
-  individual_top_priority_price: { min: 0, max: 1000000 },
-  company_top_priority_monthly_price: { min: 0, max: 1000000 },
-  business_transaction_fee_percent: { min: 0, max: 100 },
-  individual_free_ads_limit: { min: 0, max: 10000, integer: true },
-  company_free_ads_limit: { min: 0, max: 10000, integer: true },
-  company_priority_ads_limit: { min: 0, max: 10000, integer: true },
-  promotion_duration_days: { min: 1, max: 3650, integer: true },
-} as const;
+const SETTING_DESCRIPTIONS: Record<string, string> = {
+  individual_premium_price: "Individual seller Premium promotion price per ad",
+  individual_priority_price: "Individual seller Priority promotion price per ad",
+  individual_top_priority_price: "Individual seller Top Priority promotion price per ad",
+  company_top_priority_monthly_price: "Company Top Priority monthly advertising price",
+  business_transaction_fee_percent: "Business transaction platform fee percentage",
+  individual_free_ads_limit: "Number of free ads for individual sellers",
+  company_free_ads_limit: "Number of free ads for companies",
+  company_priority_ads_limit: "Company Priority advertising limit",
+  promotion_duration_days: "Promotion duration in days",
+};
 
-type SettingKey = keyof typeof ALLOWED_SETTINGS;
+const ALLOWED_KEYS = Object.keys(SETTING_DESCRIPTIONS);
+
+const INTEGER_KEYS = new Set([
+  "individual_free_ads_limit",
+  "company_free_ads_limit",
+  "company_priority_ads_limit",
+  "promotion_duration_days",
+]);
 
 function jsonError(message: string, status: number) {
   return NextResponse.json(
@@ -39,12 +47,12 @@ function isValidAdminSession(request: NextRequest): boolean {
     const [payload, signature] = parts;
     if (!payload || !signature) return false;
 
-    const expectedSignature = createHmac("sha256", secret)
+    const expected = createHmac("sha256", secret)
       .update(payload)
       .digest("base64url");
 
     const actualBuffer = Buffer.from(signature);
-    const expectedBuffer = Buffer.from(expectedSignature);
+    const expectedBuffer = Buffer.from(expected);
 
     if (
       actualBuffer.length !== expectedBuffer.length ||
@@ -69,16 +77,16 @@ function isValidAdminSession(request: NextRequest): boolean {
 
 function getSupabaseAdmin() {
   const url =
-    process.env.SUPABASE_URL ??
+    process.env.SUPABASE_URL ||
     process.env.NEXT_PUBLIC_SUPABASE_URL;
 
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!url || !serviceRoleKey) {
-    throw new Error("Server Supabase configuration is missing.");
+  if (!url || !serviceKey) {
+    throw new Error("Missing server-side Supabase environment variables.");
   }
 
-  return createClient(url, serviceRoleKey, {
+  return createClient(url, serviceKey, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
@@ -86,16 +94,50 @@ function getSupabaseAdmin() {
   });
 }
 
-function normalizeSettings(rows: { setting_key: string; setting_value: number | string }[]) {
-  const settings: Record<string, number> = {};
-
-  for (const row of rows) {
-    if (row.setting_key in ALLOWED_SETTINGS) {
-      settings[row.setting_key] = Number(row.setting_value);
-    }
+function validateSettings(input: unknown): {
+  settings?: Record<string, number>;
+  error?: string;
+} {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return { error: "Please provide a valid settings object." };
   }
 
-  return settings;
+  const source = input as Record<string, unknown>;
+  const settings: Record<string, number> = {};
+
+  for (const key of ALLOWED_KEYS) {
+    const value = source[key];
+
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      return { error: `A valid numeric value is required for ${key}.` };
+    }
+
+    if (value < 0) {
+      return { error: `${key} cannot be negative.` };
+    }
+
+    if (INTEGER_KEYS.has(key) && !Number.isInteger(value)) {
+      return { error: `${key} must be a whole number.` };
+    }
+
+    if (
+      key === "business_transaction_fee_percent" &&
+      value > 100
+    ) {
+      return { error: "The transaction fee cannot exceed 100%." };
+    }
+
+    if (
+      key === "promotion_duration_days" &&
+      value < 1
+    ) {
+      return { error: "Promotion duration must be at least one day." };
+    }
+
+    settings[key] = value;
+  }
+
+  return { settings };
 }
 
 export async function GET(request: NextRequest) {
@@ -109,27 +151,38 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase
       .from("advertising_settings")
       .select("setting_key, setting_value")
-      .order("setting_key");
+      .in("setting_key", ALLOWED_KEYS);
 
     if (error) {
       console.error("Advertising settings read failed:", error.message);
       return jsonError("Could not load advertising settings.", 500);
     }
 
+    const settings: Record<string, number> = {};
+
+    for (const row of data ?? []) {
+      settings[row.setting_key] = Number(row.setting_value);
+    }
+
+    const missingKeys = ALLOWED_KEYS.filter(
+      (key) => !Object.prototype.hasOwnProperty.call(settings, key)
+    );
+
+    if (missingKeys.length > 0) {
+      console.error("Missing advertising settings:", missingKeys);
+      return jsonError(
+        "Some advertising settings are missing from the database. Check the seeded settings.",
+        500
+      );
+    }
+
     return NextResponse.json(
-      {
-        success: true,
-        settings: normalizeSettings(data ?? []),
-      },
+      { success: true, settings },
       { headers: { "Cache-Control": "no-store" } }
     );
   } catch (error) {
-    console.error(
-      "Advertising settings configuration error:",
-      error instanceof Error ? error.message : "Unknown error"
-    );
-
-    return jsonError("Advertising settings are not configured correctly.", 500);
+    console.error("Advertising settings GET failed:", error);
+    return jsonError("Server configuration error.", 500);
   }
 }
 
@@ -138,66 +191,35 @@ export async function PUT(request: NextRequest) {
     return jsonError("Unauthorized. Please sign in again.", 401);
   }
 
-  let body: { settings?: Record<string, unknown> };
+  let body: unknown;
 
   try {
     body = await request.json();
   } catch {
-    return jsonError("Invalid JSON request.", 400);
+    return jsonError("The request body must contain valid JSON.", 400);
   }
 
-  if (
-    !body.settings ||
-    typeof body.settings !== "object" ||
-    Array.isArray(body.settings)
-  ) {
-    return jsonError("A settings object is required.", 400);
-  }
+  const input =
+    body && typeof body === "object" && !Array.isArray(body)
+      ? (body as Record<string, unknown>).settings
+      : undefined;
 
-  const submitted = body.settings;
-  const rows: {
-    setting_key: SettingKey;
-    setting_value: number;
-    updated_at: string;
-  }[] = [];
+  const validation = validateSettings(input);
 
-  for (const key of Object.keys(ALLOWED_SETTINGS) as SettingKey[]) {
-    if (!(key in submitted)) {
-      return jsonError(`Missing setting: ${key}`, 400);
-    }
-
-    const value = submitted[key];
-    const rule = ALLOWED_SETTINGS[key];
-
-    if (
-      typeof value !== "number" ||
-      !Number.isFinite(value) ||
-      value < rule.min ||
-      value > rule.max ||
-      ("integer" in rule && rule.integer && !Number.isInteger(value))
-    ) {
-      return jsonError(`Invalid value for ${key}.`, 400);
-    }
-
-    rows.push({
-      setting_key: key,
-      setting_value: value,
-      updated_at: new Date().toISOString(),
-    });
-  }
-
-  // Reject unexpected settings instead of silently accepting them.
-  const allowedKeys = new Set(Object.keys(ALLOWED_SETTINGS));
-  const unexpectedKeys = Object.keys(submitted).filter(
-    (key) => !allowedKeys.has(key)
-  );
-
-  if (unexpectedKeys.length > 0) {
-    return jsonError("The request contains unsupported settings.", 400);
+  if (validation.error || !validation.settings) {
+    return jsonError(validation.error ?? "Invalid settings.", 400);
   }
 
   try {
     const supabase = getSupabaseAdmin();
+    const now = new Date().toISOString();
+
+    const rows = ALLOWED_KEYS.map((key) => ({
+      setting_key: key,
+      setting_value: validation.settings![key],
+      description: SETTING_DESCRIPTIONS[key],
+      updated_at: now,
+    }));
 
     const { error } = await supabase
       .from("advertising_settings")
@@ -212,18 +234,12 @@ export async function PUT(request: NextRequest) {
       {
         success: true,
         message: "Advertising settings saved successfully.",
-        settings: Object.fromEntries(
-          rows.map((row) => [row.setting_key, row.setting_value])
-        ),
+        settings: validation.settings,
       },
       { headers: { "Cache-Control": "no-store" } }
     );
   } catch (error) {
-    console.error(
-      "Advertising settings configuration error:",
-      error instanceof Error ? error.message : "Unknown error"
-    );
-
-    return jsonError("Advertising settings are not configured correctly.", 500);
+    console.error("Advertising settings PUT failed:", error);
+    return jsonError("Server configuration error.", 500);
   }
 }
