@@ -4,6 +4,18 @@ import { createHmac, timingSafeEqual } from "crypto";
 
 export const dynamic = "force-dynamic";
 
+type PaystackPayment = {
+  reference?: unknown;
+  status?: unknown;
+  currency?: unknown;
+  amount?: unknown;
+};
+
+type PaystackEvent = {
+  event?: unknown;
+  data?: PaystackPayment;
+};
+
 export async function POST(request: NextRequest) {
   const secretKey = process.env.PAYSTACK_SECRET_KEY;
 
@@ -17,8 +29,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Read the original request body. Paystack's signature must be
-    // calculated from the unmodified body.
+    // Read the raw body because Paystack signs the original payload.
     const rawBody = await request.text();
     const signature = request.headers.get("x-paystack-signature");
 
@@ -29,6 +40,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Verify the signature using the Paystack secret key.
     const expectedSignature = createHmac("sha512", secretKey)
       .update(rawBody)
       .digest("hex");
@@ -46,18 +58,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let event: {
-      event?: string;
-      data?: {
-        reference?: string;
-        status?: string;
-        currency?: string;
-        amount?: number;
-      };
-    };
+    let event: PaystackEvent;
 
     try {
-      event = JSON.parse(rawBody);
+      event = JSON.parse(rawBody) as PaystackEvent;
     } catch {
       return NextResponse.json(
         { error: "Invalid webhook payload." },
@@ -65,17 +69,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // We only process successful charge notifications here.
+    // Ignore events this endpoint does not process.
     if (event.event !== "charge.success") {
       return NextResponse.json({ received: true });
     }
 
     const payment = event.data;
 
+    // Validate every field before using it.
     if (
       !payment ||
       payment.status !== "success" ||
       typeof payment.reference !== "string" ||
+      payment.reference.length < 1 ||
+      payment.reference.length > 100 ||
+      typeof payment.amount !== "number" ||
       !Number.isSafeInteger(payment.amount) ||
       payment.amount <= 0 ||
       payment.currency !== "GHS"
@@ -87,20 +95,21 @@ export async function POST(request: NextRequest) {
     }
 
     /*
-     * NEXT REQUIRED INTEGRATION:
+     * IMPORTANT:
+     * This endpoint verifies the Paystack signature and validates
+     * the notification's fields. It does NOT yet mark an order or
+     * advertisement as paid.
      *
-     * 1. Find the matching pending payment in Supabase by reference.
-     * 2. Compare the expected amount and currency with this notification.
-     * 3. Confirm the payment purpose (advertisement or order).
-     * 4. Atomically mark the payment as paid, preventing duplicate events.
-     * 5. Activate the advertisement or fulfil the eligible order only
-     *    after all checks pass.
-     *
-     * Do not activate ads or release funds until these database checks
-     * are implemented.
+     * Before production, connect this handler to your Supabase
+     * payment records and:
+     * 1. Find the pending payment by its reference.
+     * 2. Compare the expected amount and currency.
+     * 3. Confirm the customer and payment purpose.
+     * 4. Update the payment status atomically to prevent duplicates.
+     * 5. Activate the ad or fulfil the order only after verification.
      */
 
-    console.info("Verified Paystack charge notification received.", {
+    console.info("Verified Paystack notification received.", {
       reference: payment.reference,
       amount: payment.amount,
       currency: payment.currency,
@@ -110,10 +119,14 @@ export async function POST(request: NextRequest) {
       received: true,
       verified: true,
       processed: false,
-      message: "Signature verified; database processing is not configured yet.",
+      message:
+        "Webhook signature verified. Database payment processing is not yet configured.",
     });
   } catch (error) {
-    console.error("Paystack webhook error:", error);
+    console.error(
+      "Paystack webhook error:",
+      error instanceof Error ? error.message : "Unknown error"
+    );
 
     return NextResponse.json(
       { error: "Could not process webhook." },
