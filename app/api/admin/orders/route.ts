@@ -6,45 +6,57 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const PLATFORM_FEE_RATE = 0.0215;
+const ADMIN_EMAIL = "admin@bestsalesgh.com";
+
+type OrderRow = {
+  id: string;
+  user_id: string | null;
+  order_number: string | null;
+  product_name: string | null;
+  product_id: string | null;
+  order_type: string | null;
+  quantity: number | null;
+  total_amount: number | string | null;
+  deposit_percentage: number | string | null;
+  deposit_amount: number | string | null;
+  balance_percentage: number | string | null;
+  balance_amount: number | string | null;
+  amount_paid: number | string | null;
+  amount_remaining: number | string | null;
+  status: string | null;
+  phone: string | null;
+  delivery_address: string | null;
+  terms_accepted: boolean | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+type BuyerProfile = {
+  id: string;
+  full_name: string | null;
+  phone: string | null;
+  account_type: string | null;
+  verification_status: string | null;
+};
 
 function jsonError(message: string, status: number) {
   return NextResponse.json(
     { success: false, error: message },
-    { status }
+    {
+      status,
+      headers: { "Cache-Control": "no-store" },
+    }
   );
 }
 
-/**
- * Validate the existing central-admin session cookie.
- * This expects the same HMAC session format used by
- * app/api/admin/login/route.ts.
- *
- * Expected cookie payload:
- * base64url(JSON.stringify({ email, expiresAt }))
- * followed by "." and an HMAC-SHA256 signature.
- *
- * IMPORTANT:
- * If your existing login route uses a different cookie
- * format, keep its validation logic consistent here.
- */
 function verifyAdminSession(request: NextRequest): boolean {
   const secret = process.env.ADMIN_SESSION_SECRET;
-
-  if (!secret) {
-    return false;
-  }
-
   const cookie = request.cookies.get("bsg_admin_session")?.value;
 
-  if (!cookie) {
-    return false;
-  }
+  if (!secret || !cookie) return false;
 
   const separator = cookie.lastIndexOf(".");
-
-  if (separator < 1) {
-    return false;
-  }
+  if (separator < 1) return false;
 
   const payload = cookie.slice(0, separator);
   const suppliedSignature = cookie.slice(separator + 1);
@@ -69,7 +81,7 @@ function verifyAdminSession(request: NextRequest): boolean {
     );
 
     return (
-      decoded.email === "admin@bestsalesgh.com" &&
+      decoded.email === ADMIN_EMAIL &&
       typeof decoded.expiresAt === "number" &&
       decoded.expiresAt > Date.now()
     );
@@ -84,7 +96,7 @@ function getSupabaseAdmin() {
 
   if (!url || !serviceRoleKey) {
     throw new Error(
-      "Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY."
+      "Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in Vercel environment variables."
     );
   }
 
@@ -97,9 +109,8 @@ function getSupabaseAdmin() {
 }
 
 function numberOrZero(value: unknown): number {
-  const valueAsNumber = Number(value ?? 0);
-
-  return Number.isFinite(valueAsNumber) ? valueAsNumber : 0;
+  const number = Number(value ?? 0);
+  return Number.isFinite(number) ? number : 0;
 }
 
 function roundMoney(value: number): number {
@@ -113,34 +124,28 @@ export async function GET(request: NextRequest) {
 
   try {
     const supabase = getSupabaseAdmin();
-    const searchParams = request.nextUrl.searchParams;
+    const params = request.nextUrl.searchParams;
 
-    const search = (searchParams.get("search") || "")
-      .trim()
-      .toLowerCase();
-
-    const requestedStatus = (
-      searchParams.get("status") || ""
-    ).trim();
+    const search = (params.get("search") || "").trim().toLowerCase();
+    const requestedStatus = (params.get("status") || "").trim();
 
     const page = Math.max(
       1,
-      Number.parseInt(searchParams.get("page") || "1", 10) || 1
+      Number.parseInt(params.get("page") || "1", 10) || 1
     );
 
     const pageSize = Math.min(
       100,
       Math.max(
         1,
-        Number.parseInt(searchParams.get("pageSize") || "50", 10) || 50
+        Number.parseInt(params.get("pageSize") || "50", 10) || 50
       )
     );
 
-    /*
-     * Load the orders table.
-     * Only use columns confirmed in the database schema.
-     */
-    let orderQuery = supabase
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize - 1;
+
+    let query = supabase
       .from("orders")
       .select(
         [
@@ -170,94 +175,65 @@ export async function GET(request: NextRequest) {
       .order("created_at", { ascending: false });
 
     if (requestedStatus && requestedStatus !== "all") {
-      orderQuery = orderQuery.eq("status", requestedStatus);
+      query = query.eq("status", requestedStatus);
     }
 
     const {
-      data: orderData,
+      data: rawOrders,
       error: orderError,
       count,
-    } = await orderQuery.range(
-      (page - 1) * pageSize,
-      page * pageSize - 1
-    );
+    } = await query.range(start, end);
 
     if (orderError) {
       console.error("Admin orders query failed:", orderError.message);
-
       return jsonError(
-        "Unable to load orders from the database. Check the orders table and Supabase permissions.",
+        "Unable to load orders. Check the orders table columns and database configuration.",
         500
       );
     }
 
-    const orders = orderData || [];
+    // Explicit typing fixes the TypeScript error at order.user_id.
+    const orders: OrderRow[] = (rawOrders ?? []) as unknown as OrderRow[];
 
-    /*
-     * Load buyer profiles for the orders.
-     */
     const userIds = Array.from(
       new Set(
         orders
           .map((order) => order.user_id)
-          .filter((id): id is string => Boolean(id))
+          .filter((id): id is string => typeof id === "string" && id.length > 0)
       )
     );
 
-    const profilesById = new Map<
-      string,
-      {
-        id: string;
-        full_name: string | null;
-        phone: string | null;
-        account_type: string | null;
-        verification_status: string | null;
-      }
-    >();
+    const profilesById = new Map<string, BuyerProfile>();
 
     if (userIds.length > 0) {
-      const {
-        data: profiles,
-        error: profilesError,
-      } = await supabase
+      const { data: rawProfiles, error: profilesError } = await supabase
         .from("profiles")
-        .select(
-          "id,full_name,phone,account_type,verification_status"
-        )
+        .select("id,full_name,phone,account_type,verification_status")
         .in("id", userIds);
 
       if (profilesError) {
-        console.error(
-          "Buyer profile lookup failed:",
-          profilesError.message
-        );
+        console.error("Buyer profile lookup failed:", profilesError.message);
       } else {
-        for (const profile of profiles || []) {
+        const profiles = (rawProfiles ?? []) as BuyerProfile[];
+
+        for (const profile of profiles) {
           profilesById.set(profile.id, profile);
         }
       }
     }
 
-    /*
-     * Calculate the platform fee.
-     *
-     * This is an estimate based on order total.
-     * It is not evidence that the fee has been collected.
-     */
     const enrichedOrders = orders.map((order) => {
       const total = numberOrZero(order.total_amount);
       const paid = numberOrZero(order.amount_paid);
       const remaining = numberOrZero(order.amount_remaining);
 
-      const platformFee = roundMoney(total * PLATFORM_FEE_RATE);
-      const feeOnAmountPaid = roundMoney(paid * PLATFORM_FEE_RATE);
-
       const buyer = order.user_id
-        ? profilesById.get(order.user_id) || null
+        ? profilesById.get(order.user_id) ?? null
         : null;
 
       return {
         ...order,
+
         buyer: buyer
           ? {
               id: buyer.id,
@@ -269,8 +245,8 @@ export async function GET(request: NextRequest) {
           : null,
 
         platform_fee_rate: PLATFORM_FEE_RATE,
-        estimated_platform_fee: platformFee,
-        estimated_fee_on_amount_paid: feeOnAmountPaid,
+        estimated_platform_fee: roundMoney(total * PLATFORM_FEE_RATE),
+        estimated_fee_on_amount_paid: roundMoney(paid * PLATFORM_FEE_RATE),
 
         buyer_paid_amount: paid,
         outstanding_balance: remaining,
@@ -282,10 +258,7 @@ export async function GET(request: NextRequest) {
               ? "PARTIALLY_PAID"
               : "PAID",
 
-        /*
-         * The current orders schema does not identify the
-         * receiving seller/company or confirm fee collection.
-         */
+        // The current orders schema does not link orders to a seller/company.
         seller_id: null,
         seller_name: null,
         company_payment_status: "NOT_RECORDED",
@@ -296,7 +269,7 @@ export async function GET(request: NextRequest) {
 
     const filteredOrders = search
       ? enrichedOrders.filter((order) => {
-          const searchableText = [
+          const searchable = [
             order.order_number,
             order.product_name,
             order.product_id,
@@ -312,25 +285,22 @@ export async function GET(request: NextRequest) {
             .join(" ")
             .toLowerCase();
 
-          return searchableText.includes(search);
+          return searchable.includes(search);
         })
       : enrichedOrders;
 
     const summary = filteredOrders.reduce(
-      (totals, order) => {
-        totals.order_value += numberOrZero(order.total_amount);
-        totals.amount_paid += numberOrZero(order.amount_paid);
-        totals.outstanding_balance += numberOrZero(
-          order.amount_remaining
-        );
-        totals.estimated_platform_fee += numberOrZero(
+      (result, order) => {
+        result.order_value += numberOrZero(order.total_amount);
+        result.amount_paid += numberOrZero(order.amount_paid);
+        result.outstanding_balance += numberOrZero(order.amount_remaining);
+        result.estimated_platform_fee += numberOrZero(
           order.estimated_platform_fee
         );
-        totals.estimated_fee_on_amount_paid += numberOrZero(
+        result.estimated_fee_on_amount_paid += numberOrZero(
           order.estimated_fee_on_amount_paid
         );
-
-        return totals;
+        return result;
       },
       {
         order_value: 0,
@@ -348,16 +318,14 @@ export async function GET(request: NextRequest) {
         pagination: {
           page,
           pageSize,
-          total: count || 0,
-          totalPages: Math.ceil((count || 0) / pageSize),
+          total: count ?? 0,
+          totalPages: Math.ceil((count ?? 0) / pageSize),
         },
         summary: {
           matching_orders: filteredOrders.length,
           order_value: roundMoney(summary.order_value),
           amount_paid: roundMoney(summary.amount_paid),
-          outstanding_balance: roundMoney(
-            summary.outstanding_balance
-          ),
+          outstanding_balance: roundMoney(summary.outstanding_balance),
           estimated_platform_fee: roundMoney(
             summary.estimated_platform_fee
           ),
@@ -366,14 +334,12 @@ export async function GET(request: NextRequest) {
           ),
           platform_fee_rate: PLATFORM_FEE_RATE,
           note:
-            "Platform fees are estimates only. Actual collection and company payments must be verified against payment transaction records.",
+            "Fees are estimates, not proof of collection. Verify payment transactions before recording fees as received.",
         },
       },
       {
         status: 200,
-        headers: {
-          "Cache-Control": "no-store, max-age=0",
-        },
+        headers: { "Cache-Control": "no-store, max-age=0" },
       }
     );
   } catch (error) {
