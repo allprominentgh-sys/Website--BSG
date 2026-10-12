@@ -1,62 +1,26 @@
 import { NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST(request: Request) {
-  const response = NextResponse.redirect(
-    new URL("/cms/login", request.url),
-    303
-  );
+const COOKIE_NAME = "bsg_cms_session";
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+export async function POST() {
+  const response = NextResponse.json({
+    success: true,
+    message: "Logged out successfully.",
+  });
 
-  if (!supabaseUrl || !supabaseAnonKey) {
-    return NextResponse.json(
-      { error: "Supabase environment variables are missing." },
-      { status: 500 }
-    );
-  }
-
-  const supabase = createServerClient(
-    supabaseUrl,
-    supabaseAnonKey,
-    {
-      cookies: {
-        getAll() {
-          return request.headers
-            .get("cookie")
-            ?.split(";")
-            .map((cookie) => {
-              const separator = cookie.indexOf("=");
-
-              return {
-                name: cookie.slice(0, separator).trim(),
-                value: cookie.slice(separator + 1).trim(),
-              };
-            })
-            .filter((cookie) => cookie.name.length > 0) ?? [];
-        },
-
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            response.cookies.set(name, value, options);
-          });
-        },
-      },
-    }
-  );
-
-  const { error } = await supabase.auth.signOut();
-
-  if (error) {
-    return NextResponse.json(
-      { error: "Unable to sign out. Please try again." },
-      { status: 500 }
-    );
-  }
+  response.cookies.set({
+    name: COOKIE_NAME,
+    value: "",
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+    expires: new Date(0),
+  });
 
   return response;
 }
