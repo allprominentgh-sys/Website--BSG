@@ -52,7 +52,9 @@ function getSupabaseAdmin() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!url || !key) {
-    throw new Error("Missing Supabase server environment variables.");
+    throw new Error(
+      "Missing Supabase server environment variables."
+    );
   }
 
   return createClient(url, key, {
@@ -66,7 +68,10 @@ function getSupabaseAdmin() {
 export async function GET(request: NextRequest) {
   if (!isValidAdminSession(request)) {
     return NextResponse.json(
-      { error: "Unauthorized. Please sign in as an administrator." },
+      {
+        error:
+          "Unauthorized. Please sign in as an administrator.",
+      },
       { status: 401 }
     );
   }
@@ -74,32 +79,42 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = getSupabaseAdmin();
 
-    const { data: listings, error: listingsError } = await supabase
-      .from("listings")
-      .select(
-        "id,seller_id,title,description,price,currency_code,status,featured,created_at,category,subcategory,location"
-      )
-      .order("created_at", { ascending: false })
-      .limit(500);
+    const { data: listings, error: listingsError } =
+      await supabase
+        .from("listings")
+        .select(
+          "id,seller_id,title,description,price,currency_code,status,featured,created_at,category,subcategory,location"
+        )
+        .order("created_at", { ascending: false })
+        .limit(500);
 
-    if (listingsError) throw listingsError;
+    if (listingsError) {
+      throw listingsError;
+    }
 
-    const sellerIds = [
-      ...new Set(
-        (listings || [])
-          .map((listing) => listing.seller_id)
-          .filter((id): id is string => Boolean(id))
-      ),
-    ];
+    // Explicitly type seller IDs as strings to fix the
+    // TypeScript Set<string> build error.
+    const sellerIdValues: string[] = (listings ?? [])
+      .map((listing) => listing.seller_id)
+      .filter(
+        (id): id is string =>
+          typeof id === "string" && id.length > 0
+      );
 
-    let profiles: {
+    const sellerIds: string[] = Array.from(
+      new Set<string>(sellerIdValues)
+    );
+
+    type SellerProfile = {
       id: string;
       full_name: string | null;
       phone: string | null;
       account_type: string | null;
       verified: boolean | null;
       verification_status: string | null;
-    }[] = [];
+    };
+
+    let profiles: SellerProfile[] = [];
 
     if (sellerIds.length > 0) {
       const { data, error } = await supabase
@@ -109,18 +124,26 @@ export async function GET(request: NextRequest) {
         )
         .in("id", sellerIds);
 
-      if (error) throw error;
-      profiles = data || [];
+      if (error) {
+        throw error;
+      }
+
+      profiles = (data ?? []) as SellerProfile[];
     }
 
-    const profileMap = new Map(
-      profiles.map((profile) => [profile.id, profile])
+    const profileMap = new Map<string, SellerProfile>(
+      profiles.map(
+        (profile): [string, SellerProfile] => [
+          profile.id,
+          profile,
+        ]
+      )
     );
 
-    const result = (listings || []).map((listing) => ({
+    const result = (listings ?? []).map((listing) => ({
       ...listing,
       seller: listing.seller_id
-        ? profileMap.get(listing.seller_id) || null
+        ? profileMap.get(listing.seller_id) ?? null
         : null,
     }));
 
@@ -136,7 +159,10 @@ export async function GET(request: NextRequest) {
     console.error("Admin sellers API error:", error);
 
     return NextResponse.json(
-      { error: "Unable to load seller listings. Check the server configuration and database columns." },
+      {
+        error:
+          "Unable to load seller listings. Check the server configuration and database columns.",
+      },
       { status: 500 }
     );
   }
@@ -145,7 +171,10 @@ export async function GET(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   if (!isValidAdminSession(request)) {
     return NextResponse.json(
-      { error: "Unauthorized. Please sign in as an administrator." },
+      {
+        error:
+          "Unauthorized. Please sign in as an administrator.",
+      },
       { status: 401 }
     );
   }
@@ -209,11 +238,16 @@ export async function PATCH(request: NextRequest) {
       .select("id,status,featured")
       .maybeSingle();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
 
     if (!data) {
       return NextResponse.json(
-        { error: "Listing not found or could not be updated." },
+        {
+          error:
+            "Listing not found or could not be updated.",
+        },
         { status: 404 }
       );
     }
