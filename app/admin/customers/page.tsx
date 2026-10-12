@@ -1,17 +1,20 @@
+
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { supabaseBrowser } from "@/supabase-browser";
 
-type Customer = {
+type Profile = {
   id: string;
   full_name: string | null;
   phone: string | null;
   location: string | null;
-  account_type: string | null;
+  avatar_url: string | null;
   verified: boolean | null;
-  verification_status: string | null;
   created_at: string | null;
+  account_type: string | null;
+  verification_status: string | null;
   delivery_region: string | null;
   delivery_city: string | null;
   delivery_area: string | null;
@@ -20,80 +23,80 @@ type Customer = {
 };
 
 type CustomerOrder = {
-  id: string | number;
-  created_at?: string;
-  status?: string;
-  total_amount?: number | string;
-  total?: number | string;
+  id: string;
+  user_id: string;
+  order_number: string | null;
+  product_name: string | null;
+  order_type: string | null;
+  quantity: number | null;
+  total_amount: number | null;
+  amount_paid: number | null;
+  amount_remaining: number | null;
+  status: string | null;
+  created_at: string | null;
+  delivery_address: string | null;
 };
 
-const PAGE_SIZE = 500;
-
-// Only these account types are displayed as customers.
-// Seller, business and admin accounts are excluded.
 const CUSTOMER_TYPES = ["buyer", "customer"];
 
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === "") {
-    return "Not provided";
-  }
-
-  return String(value);
-}
-
-function formatDate(value: string | null | undefined): string {
-  if (!value) return "Not available";
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) return value;
-
-  return date.toLocaleString("en-GH", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-}
-
-function formatMoney(value: number | string | undefined): string {
-  if (value === undefined || value === "") return "Not available";
-
-  const amount = Number(value);
-
-  if (!Number.isFinite(amount)) return String(value);
-
+function money(value: number | null | undefined) {
   return new Intl.NumberFormat("en-GH", {
     style: "currency",
     currency: "GHS",
-  }).format(amount);
+    maximumFractionDigits: 2,
+  }).format(Number(value ?? 0));
 }
 
-function isVerified(customer: Customer): boolean {
-  return (
-    customer.verified === true ||
-    (customer.verification_status ?? "").toLowerCase() === "verified"
-  );
+function dateLabel(value: string | null | undefined) {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? "—"
+    : date.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+}
+
+function statusClass(status: string | null | undefined) {
+  const value = (status ?? "").toLowerCase();
+
+  if (
+    value.includes("complete") ||
+    value.includes("deliver") ||
+    value.includes("paid") ||
+    value.includes("approved")
+  ) {
+    return "bg-green-100 text-green-800";
+  }
+
+  if (
+    value.includes("cancel") ||
+    value.includes("reject") ||
+    value.includes("fail")
+  ) {
+    return "bg-red-100 text-red-800";
+  }
+
+  return "bg-amber-100 text-amber-800";
 }
 
 export default function AdminCustomersPage() {
   const supabase = useMemo(() => supabaseBrowser(), []);
 
-  const [checking, setChecking] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
-
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [selectedCustomer, setSelectedCustomer] =
-    useState<Customer | null>(null);
-  const [orders, setOrders] = useState<CustomerOrder[]>([]);
-
-  const [search, setSearch] = useState("");
-  const [verificationFilter, setVerificationFilter] = useState("all");
-
+  const [authenticated, setAuthenticated] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [ordersLoading, setOrdersLoading] = useState(false);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [orders, setOrders] = useState<CustomerOrder[]>([]);
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [selectedCustomer, setSelectedCustomer] =
+    useState<Profile | null>(null);
 
-  const checkAdminSession = useCallback(async () => {
+  const checkSession = useCallback(async () => {
     try {
       const response = await fetch("/api/admin/session", {
         method: "GET",
@@ -101,14 +104,17 @@ export default function AdminCustomersPage() {
         cache: "no-store",
       });
 
-      const result = await response.json();
+      if (!response.ok) {
+        setAuthenticated(false);
+        return;
+      }
 
-      setIsAdmin(response.ok && result.authenticated === true);
-    } catch (err) {
-      console.error("Admin session check failed:", err);
-      setIsAdmin(false);
+      const result = await response.json();
+      setAuthenticated(result.authenticated === true);
+    } catch {
+      setAuthenticated(false);
     } finally {
-      setChecking(false);
+      setCheckingSession(false);
     }
   }, []);
 
@@ -117,22 +123,52 @@ export default function AdminCustomersPage() {
     setError("");
 
     try {
-      const { data, error: queryError } = await supabase
-        .from("profiles")
-        .select(
-          "id, full_name, phone, location, account_type, verified, verification_status, created_at, delivery_region, delivery_city, delivery_area, delivery_address, ghana_post_gps"
+      const [profilesResult, ordersResult] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select(
+            "id,full_name,phone,location,avatar_url,verified,created_at,account_type,verification_status,delivery_region,delivery_city,delivery_area,delivery_address,ghana_post_gps"
+          )
+          .order("created_at", { ascending: false })
+          .limit(1000),
+
+        supabase
+          .from("orders")
+          .select(
+            "id,user_id,order_number,product_name,order_type,quantity,total_amount,amount_paid,amount_remaining,status,created_at,delivery_address"
+          )
+          .order("created_at", { ascending: false })
+          .limit(5000),
+      ]);
+
+      if (profilesResult.error) {
+        throw new Error(profilesResult.error.message);
+      }
+
+      if (ordersResult.error) {
+        throw new Error(
+          "Customer profiles loaded, but orders could not be loaded: " +
+            ordersResult.error.message
+        );
+      }
+
+      const customerProfiles = (profilesResult.data ?? []) as Profile[];
+      const customerOrders = (ordersResult.data ?? []) as CustomerOrder[];
+
+      setProfiles(
+        customerProfiles.filter((profile) =>
+          CUSTOMER_TYPES.includes(
+            (profile.account_type ?? "").trim().toLowerCase()
+          )
         )
-        .in("account_type", CUSTOMER_TYPES)
-        .order("created_at", { ascending: false })
-        .limit(PAGE_SIZE);
+      );
 
-      if (queryError) throw queryError;
-
-      setCustomers((data ?? []) as Customer[]);
+      setOrders(customerOrders);
     } catch (err) {
-      console.error("Customer loading failed:", err);
       setError(
-        "Unable to load customers. Check the profiles column names, account types, and Supabase access policies."
+        err instanceof Error
+          ? err.message
+          : "Unable to load customer records."
       );
     } finally {
       setLoading(false);
@@ -140,346 +176,227 @@ export default function AdminCustomersPage() {
   }, [supabase]);
 
   useEffect(() => {
-    void checkAdminSession();
-  }, [checkAdminSession]);
+    void checkSession();
+  }, [checkSession]);
 
   useEffect(() => {
-    if (isAdmin) {
+    if (authenticated) {
       void loadCustomers();
     }
-  }, [isAdmin, loadCustomers]);
+  }, [authenticated, loadCustomers]);
 
-  const filteredCustomers = useMemo(() => {
+  const filteredCustomers = profiles.filter((customer) => {
     const term = search.trim().toLowerCase();
 
-    return customers.filter((customer) => {
-      const searchableValues = [
-        customer.full_name,
-        customer.id,
-        customer.phone,
-        customer.location,
-        customer.account_type,
-        customer.verification_status,
-        customer.delivery_region,
-        customer.delivery_city,
-        customer.delivery_area,
-        customer.delivery_address,
-        customer.ghana_post_gps,
-      ];
+    const matchesSearch =
+      !term ||
+      (customer.full_name ?? "").toLowerCase().includes(term) ||
+      (customer.phone ?? "").toLowerCase().includes(term) ||
+      (customer.location ?? "").toLowerCase().includes(term) ||
+      customer.id.toLowerCase().includes(term);
 
-      const matchesSearch =
-        !term ||
-        searchableValues.some((value) =>
-          String(value ?? "").toLowerCase().includes(term)
-        );
+    const accountType = (customer.account_type ?? "").toLowerCase();
 
-      const verified = isVerified(customer);
+    const matchesType =
+      typeFilter === "all" || accountType === typeFilter;
 
-      const matchesVerification =
-        verificationFilter === "all" ||
-        (verificationFilter === "verified" && verified) ||
-        (verificationFilter === "unverified" && !verified);
+    return matchesSearch && matchesType;
+  });
 
-      return matchesSearch && matchesVerification;
-    });
-  }, [customers, search, verificationFilter]);
-
-  async function openCustomer(customer: Customer) {
-    setSelectedCustomer(customer);
-    setOrders([]);
-    setNotice("");
-    setOrdersLoading(true);
-
-    try {
-      // Try the common customer ID columns used by order tables.
-      const ownershipColumns = ["customer_id", "buyer_id", "user_id"];
-
-      let foundOrders: CustomerOrder[] | null = null;
-      let lastError: unknown = null;
-
-      for (const column of ownershipColumns) {
-        const { data, error: queryError } = await supabase
-          .from("orders")
-          .select("*")
-          .eq(column, customer.id)
-          .order("created_at", { ascending: false })
-          .limit(100);
-
-        if (!queryError) {
-          foundOrders = (data ?? []) as CustomerOrder[];
-          break;
-        }
-
-        lastError = queryError;
-      }
-
-      if (foundOrders !== null) {
-        setOrders(foundOrders);
-      } else {
-        console.error("Order history lookup failed:", lastError);
-        setNotice(
-          "The customer profile loaded, but order history could not be retrieved. The orders table may use another customer ID column or restrict access."
-        );
-      }
-    } catch (err) {
-      console.error("Order history lookup failed:", err);
-      setNotice(
-        "The customer profile loaded, but order history is currently unavailable."
-      );
-    } finally {
-      setOrdersLoading(false);
-    }
+  function customerOrders(customerId: string) {
+    return orders.filter((order) => order.user_id === customerId);
   }
 
-  function exportCustomers() {
-    const headers = [
-      "Customer ID",
-      "Full Name",
-      "Phone",
-      "Account Type",
-      "Verified",
-      "Verification Status",
-      "Registration Date",
-      "Region",
-      "City",
-      "Area",
-      "Delivery Address",
-      "GhanaPost GPS",
-    ];
-
-    const rows = filteredCustomers.map((customer) => [
-      customer.id,
-      customer.full_name,
-      customer.phone,
-      customer.account_type,
-      isVerified(customer) ? "Yes" : "No",
-      customer.verification_status,
-      customer.created_at,
-      customer.delivery_region,
-      customer.delivery_city,
-      customer.delivery_area,
-      customer.delivery_address,
-      customer.ghana_post_gps,
-    ]);
-
-    const csv = [headers, ...rows]
-      .map((row) =>
-        row
-          .map((value) => `"${String(value ?? "").replace(/"/g, '""')}"`)
-          .join(",")
-      )
-      .join("\r\n");
-
-    const blob = new Blob(["\uFEFF", csv], {
-      type: "text/csv;charset=utf-8;",
-    });
-
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-
-    link.href = url;
-    link.download = "bestsalesgh-customers.csv";
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-
-    URL.revokeObjectURL(url);
+  function totalSpent(customerId: string) {
+    return customerOrders(customerId).reduce(
+      (total, order) => total + Number(order.amount_paid ?? 0),
+      0
+    );
   }
 
-  if (checking) {
+  function orderTotal(customerId: string) {
+    return customerOrders(customerId).reduce(
+      (total, order) => total + Number(order.total_amount ?? 0),
+      0
+    );
+  }
+
+  if (checkingSession) {
     return (
-      <main className="min-h-screen bg-slate-50 p-6 text-slate-700">
-        Checking administrator session...
+      <main className="min-h-screen bg-slate-50 p-6">
+        <p className="text-slate-600">Checking administrator session...</p>
       </main>
     );
   }
 
-  if (!isAdmin) {
+  if (!authenticated) {
     return (
       <main className="min-h-screen bg-slate-50 p-6">
-        <div className="mx-auto max-w-xl rounded-2xl border bg-white p-8">
+        <div className="mx-auto max-w-xl rounded-xl border bg-white p-6">
           <h1 className="text-xl font-bold text-slate-900">
             Administrator access required
           </h1>
-
-          <p className="mt-2 text-sm text-slate-600">
-            Your administrator session is not active. Sign in to the central
-            admin account, then return to this page.
+          <p className="mt-2 text-slate-600">
+            Sign in through the central BestSalesGH administrator login.
           </p>
-
-          <a
-            href="/login"
-            className="mt-5 inline-flex rounded-lg bg-blue-800 px-5 py-3 font-semibold text-white"
+          <Link
+            href="/admin/login"
+            className="mt-4 inline-block rounded-lg bg-blue-800 px-4 py-2 text-white"
           >
-            Go to login
-          </a>
+            Admin login
+          </Link>
         </div>
       </main>
     );
   }
 
-  const verifiedCount = customers.filter(isVerified).length;
+  const selectedOrders = selectedCustomer
+    ? customerOrders(selectedCustomer.id)
+    : [];
 
   return (
-    <main className="min-h-screen bg-slate-50 p-4 text-slate-800 sm:p-6">
-      <div className="mx-auto max-w-7xl">
-        <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+    <main className="min-h-screen bg-slate-50 p-4 text-slate-900 sm:p-8">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-wider text-blue-800">
-              BestSalesGH Administration
-            </p>
-
-            <h1 className="mt-1 text-3xl font-bold text-slate-900">
-              Customer Management
-            </h1>
-
-            <p className="mt-2 text-sm text-slate-600">
-              View customer accounts, registration dates, verification and
-              delivery information. Seller and business accounts are excluded.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <a
+            <Link
               href="/admin"
-              className="rounded-lg border border-slate-300 bg-white px-4 py-2 font-medium"
+              className="text-sm font-medium text-blue-800 hover:underline"
             >
-              Admin dashboard
-            </a>
-
-            <button
-              type="button"
-              onClick={() => void loadCustomers()}
-              disabled={loading}
-              className="rounded-lg bg-blue-800 px-4 py-2 font-semibold text-white disabled:opacity-50"
-            >
-              {loading ? "Refreshing..." : "Refresh"}
-            </button>
-
-            <button
-              type="button"
-              onClick={exportCustomers}
-              disabled={filteredCustomers.length === 0}
-              className="rounded-lg border border-slate-300 bg-white px-4 py-2 font-medium disabled:opacity-50"
-            >
-              Export CSV
-            </button>
-          </div>
-        </header>
-
-        <section className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="rounded-xl border bg-white p-5">
-            <p className="text-sm text-slate-500">Customer accounts loaded</p>
-            <p className="mt-2 text-3xl font-bold text-slate-900">
-              {customers.length}
+              ← Admin dashboard
+            </Link>
+            <h1 className="mt-2 text-3xl font-bold">Customer Management</h1>
+            <p className="mt-1 text-slate-600">
+              Review customer accounts and their order activity.
             </p>
+          </div>
+
+          <button
+            onClick={() => void loadCustomers()}
+            disabled={loading}
+            className="rounded-lg bg-blue-800 px-4 py-2 font-semibold text-white disabled:opacity-50"
+          >
+            {loading ? "Refreshing..." : "Refresh data"}
+          </button>
+        </div>
+
+        {error && (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-800">
+            <p className="font-semibold">Unable to complete the data load</p>
+            <p className="mt-1 break-words text-sm">{error}</p>
+          </div>
+        )}
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-xl border bg-white p-5">
+            <p className="text-sm text-slate-500">Customer accounts</p>
+            <p className="mt-2 text-3xl font-bold">{profiles.length}</p>
           </div>
 
           <div className="rounded-xl border bg-white p-5">
             <p className="text-sm text-slate-500">Verified customers</p>
-            <p className="mt-2 text-3xl font-bold text-green-700">
-              {verifiedCount}
+            <p className="mt-2 text-3xl font-bold">
+              {profiles.filter((p) => p.verified === true).length}
             </p>
           </div>
 
           <div className="rounded-xl border bg-white p-5">
-            <p className="text-sm text-slate-500">Not verified</p>
-            <p className="mt-2 text-3xl font-bold text-amber-700">
-              {customers.length - verifiedCount}
+            <p className="text-sm text-slate-500">Customer orders</p>
+            <p className="mt-2 text-3xl font-bold">{orders.length}</p>
+          </div>
+
+          <div className="rounded-xl border bg-white p-5">
+            <p className="text-sm text-slate-500">Amount paid on loaded orders</p>
+            <p className="mt-2 text-2xl font-bold">
+              {money(
+                orders.reduce(
+                  (sum, order) => sum + Number(order.amount_paid ?? 0),
+                  0
+                )
+              )}
             </p>
           </div>
-        </section>
+        </div>
 
-        <section className="mt-6 rounded-xl border bg-white p-4 shadow-sm sm:p-5">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <section className="rounded-xl border bg-white p-5">
+          <div className="flex flex-col gap-3 md:flex-row">
             <input
-              type="search"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search name, customer ID, phone, address or GPS..."
-              className="w-full rounded-lg border border-slate-300 px-4 py-3"
+              placeholder="Search name, phone, location or customer ID..."
+              className="min-w-0 flex-1 rounded-lg border px-4 py-3 outline-none focus:border-blue-700"
             />
 
             <select
-              value={verificationFilter}
-              onChange={(event) =>
-                setVerificationFilter(event.target.value)
-              }
-              className="rounded-lg border border-slate-300 bg-white px-4 py-3"
+              value={typeFilter}
+              onChange={(event) => setTypeFilter(event.target.value)}
+              className="rounded-lg border bg-white px-4 py-3"
             >
-              <option value="all">All verification statuses</option>
-              <option value="verified">Verified</option>
-              <option value="unverified">Not verified</option>
+              <option value="all">All customer types</option>
+              <option value="buyer">Buyer</option>
+              <option value="customer">Customer</option>
             </select>
           </div>
 
-          {error && (
-            <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-              {error}
-            </div>
-          )}
-
-          <p className="mt-4 text-sm text-slate-600">
-            Showing {filteredCustomers.length} of {customers.length} loaded
-            customer accounts.
-          </p>
-
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full min-w-[850px] border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b bg-slate-50 text-slate-600">
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full min-w-[850px] text-left text-sm">
+              <thead className="bg-slate-100 text-slate-600">
+                <tr>
                   <th className="p-3">Customer</th>
-                  <th className="p-3">Contact</th>
-                  <th className="p-3">Account type</th>
+                  <th className="p-3">Phone</th>
+                  <th className="p-3">Location</th>
+                  <th className="p-3">Orders</th>
+                  <th className="p-3">Amount paid</th>
                   <th className="p-3">Verification</th>
-                  <th className="p-3">Registered</th>
-                  <th className="p-3">Details</th>
+                  <th className="p-3">Joined</th>
+                  <th className="p-3">Action</th>
                 </tr>
               </thead>
 
-              <tbody>
+              <tbody className="divide-y">
                 {filteredCustomers.map((customer) => {
-                  const verified = isVerified(customer);
+                  const count = customerOrders(customer.id).length;
 
                   return (
-                    <tr key={customer.id} className="border-b hover:bg-slate-50">
+                    <tr key={customer.id} className="hover:bg-slate-50">
                       <td className="p-3">
-                        <p className="font-semibold text-slate-900">
-                          {display(customer.full_name)}
+                        <p className="font-semibold">
+                          {customer.full_name || "Name not provided"}
                         </p>
-                        <p className="mt-1 break-all text-xs text-slate-500">
-                          ID: {customer.id}
+                        <p className="max-w-48 truncate text-xs text-slate-500">
+                          {customer.id}
                         </p>
                       </td>
-
+                      <td className="p-3">{customer.phone || "—"}</td>
                       <td className="p-3">
-                        <p>{display(customer.phone)}</p>
-                        <p className="mt-1 text-xs text-slate-500">
-                          {display(customer.location)}
-                        </p>
+                        {[
+                          customer.delivery_city,
+                          customer.delivery_region,
+                          customer.location,
+                        ]
+                          .filter(Boolean)
+                          .join(", ") || "—"}
                       </td>
-
-                      <td className="p-3">{display(customer.account_type)}</td>
-
+                      <td className="p-3">{count}</td>
+                      <td className="p-3 font-medium">
+                        {money(totalSpent(customer.id))}
+                      </td>
                       <td className="p-3">
                         <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
-                            verified
+                          className={`rounded-full px-2 py-1 text-xs ${
+                            customer.verified
                               ? "bg-green-100 text-green-800"
-                              : "bg-amber-100 text-amber-800"
+                              : "bg-slate-100 text-slate-700"
                           }`}
                         >
-                          {verified ? "Verified" : "Not verified"}
+                          {customer.verified ? "Verified" : "Not verified"}
                         </span>
                       </td>
-
-                      <td className="p-3">{formatDate(customer.created_at)}</td>
-
+                      <td className="p-3">{dateLabel(customer.created_at)}</td>
                       <td className="p-3">
                         <button
-                          type="button"
-                          onClick={() => void openCustomer(customer)}
-                          className="rounded-lg bg-blue-800 px-3 py-2 font-semibold text-white"
+                          onClick={() => setSelectedCustomer(customer)}
+                          className="rounded-lg border border-blue-700 px-3 py-2 font-medium text-blue-800 hover:bg-blue-50"
                         >
                           View details
                         </button>
@@ -488,154 +405,171 @@ export default function AdminCustomersPage() {
                   );
                 })}
 
-                {loading && (
+                {!loading && filteredCustomers.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="p-8 text-center text-slate-500">
-                      Loading customer accounts...
-                    </td>
-                  </tr>
-                )}
-
-                {!loading && !error && filteredCustomers.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="p-8 text-center text-slate-500">
-                      No customer accounts found. If you expected customers to
-                      appear, check the actual account_type values in Supabase.
+                    <td
+                      colSpan={8}
+                      className="p-8 text-center text-slate-500"
+                    >
+                      No customer accounts match this search. Check the
+                      account_type values if customers are missing.
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
           </div>
+
+          <p className="mt-3 text-sm text-slate-500">
+            Showing {filteredCustomers.length} of {profiles.length} customer
+            accounts.
+          </p>
         </section>
 
         {selectedCustomer && (
-          <div
-            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-3 py-8 sm:p-6"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Customer details"
-          >
-            <section className="my-auto w-full max-w-4xl rounded-2xl bg-white p-5 shadow-2xl sm:p-7">
+          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:items-center">
+            <section className="my-4 w-full max-w-3xl rounded-2xl bg-white p-5 shadow-xl sm:p-7">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-sm font-semibold text-blue-800">
-                    Customer profile
-                  </p>
-
-                  <h2 className="mt-1 text-2xl font-bold text-slate-900">
-                    {display(selectedCustomer.full_name)}
+                  <h2 className="text-2xl font-bold">
+                    {selectedCustomer.full_name || "Customer details"}
                   </h2>
-
-                  <p className="mt-1 break-all text-xs text-slate-500">
+                  <p className="mt-1 break-all text-sm text-slate-500">
                     Customer ID: {selectedCustomer.id}
                   </p>
                 </div>
 
                 <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedCustomer(null);
-                    setOrders([]);
-                    setNotice("");
-                  }}
-                  className="rounded-lg border border-slate-300 px-3 py-2"
+                  onClick={() => setSelectedCustomer(null)}
+                  className="rounded-lg border px-3 py-2"
+                  aria-label="Close customer details"
                 >
                   Close
                 </button>
               </div>
 
-              {notice && (
-                <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                  {notice}
+              <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                <div className="rounded-lg bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">Phone</p>
+                  <p className="mt-1 font-semibold">
+                    {selectedCustomer.phone || "Not provided"}
+                  </p>
                 </div>
-              )}
 
-              <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                {[
-                  ["Full name", selectedCustomer.full_name],
-                  ["Phone", selectedCustomer.phone],
-                  ["Account type", selectedCustomer.account_type],
-                  [
-                    "Verification status",
-                    isVerified(selectedCustomer)
-                      ? "Verified"
-                      : selectedCustomer.verification_status ??
-                        "Not verified",
-                  ],
-                  ["Registration date", formatDate(selectedCustomer.created_at)],
-                  ["Location", selectedCustomer.location],
-                  ["Delivery region", selectedCustomer.delivery_region],
-                  ["Delivery city", selectedCustomer.delivery_city],
-                  ["Delivery area", selectedCustomer.delivery_area],
-                  ["Delivery address", selectedCustomer.delivery_address],
-                  ["GhanaPost GPS", selectedCustomer.ghana_post_gps],
-                ].map(([label, value]) => (
-                  <div key={label} className="rounded-lg border p-4">
-                    <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                      {label}
-                    </p>
-                    <p className="mt-1 break-words font-medium text-slate-900">
-                      {display(value)}
-                    </p>
-                  </div>
-                ))}
+                <div className="rounded-lg bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">Account type</p>
+                  <p className="mt-1 font-semibold">
+                    {selectedCustomer.account_type || "Not specified"}
+                  </p>
+                </div>
+
+                <div className="rounded-lg bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">Verification status</p>
+                  <p className="mt-1 font-semibold">
+                    {selectedCustomer.verification_status ||
+                      (selectedCustomer.verified ? "Verified" : "Not verified")}
+                  </p>
+                </div>
+
+                <div className="rounded-lg bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">Registration date</p>
+                  <p className="mt-1 font-semibold">
+                    {dateLabel(selectedCustomer.created_at)}
+                  </p>
+                </div>
+
+                <div className="rounded-lg bg-slate-50 p-4 sm:col-span-2">
+                  <p className="text-sm text-slate-500">Delivery address</p>
+                  <p className="mt-1">
+                    {[
+                      selectedCustomer.delivery_address,
+                      selectedCustomer.delivery_area,
+                      selectedCustomer.delivery_city,
+                      selectedCustomer.delivery_region,
+                      selectedCustomer.ghana_post_gps,
+                    ]
+                      .filter(Boolean)
+                      .join(", ") || "No delivery address saved"}
+                  </p>
+                </div>
+
+                <div className="rounded-lg bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">Total orders</p>
+                  <p className="mt-1 text-xl font-bold">
+                    {selectedOrders.length}
+                  </p>
+                </div>
+
+                <div className="rounded-lg bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">Amount paid</p>
+                  <p className="mt-1 text-xl font-bold">
+                    {money(totalSpent(selectedCustomer.id))}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Order totals: {money(orderTotal(selectedCustomer.id))}
+                  </p>
+                </div>
               </div>
 
-              <section className="mt-7">
-                <h3 className="text-lg font-bold text-slate-900">
-                  Order history
-                </h3>
+              <h3 className="mt-7 text-lg font-bold">Order history</h3>
 
-                {ordersLoading ? (
-                  <p className="mt-3 text-sm text-slate-500">
-                    Loading order history...
-                  </p>
-                ) : orders.length === 0 ? (
-                  <p className="mt-3 rounded-lg bg-slate-50 p-4 text-sm text-slate-600">
-                    No orders were returned. This can mean the customer has no
-                    orders, or the orders table uses a different customer ID
-                    column or access policy.
-                  </p>
-                ) : (
-                  <div className="mt-3 overflow-x-auto">
-                    <table className="w-full min-w-[500px] text-left text-sm">
-                      <thead>
-                        <tr className="border-b bg-slate-50">
-                          <th className="p-3">Order ID</th>
-                          <th className="p-3">Date</th>
-                          <th className="p-3">Status</th>
-                          <th className="p-3">Total</th>
-                        </tr>
-                      </thead>
+              <div className="mt-3 space-y-3">
+                {selectedOrders.map((order) => (
+                  <div
+                    key={order.id}
+                    className="rounded-lg border p-4"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className="font-semibold">
+                          {order.product_name || "Order"}{" "}
+                          {order.order_number
+                            ? `· ${order.order_number}`
+                            : ""}
+                        </p>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {dateLabel(order.created_at)}
+                          {order.quantity != null
+                            ? ` · Quantity: ${order.quantity}`
+                            : ""}
+                        </p>
+                      </div>
 
-                      <tbody>
-                        {orders.map((order) => (
-                          <tr key={String(order.id)} className="border-b">
-                            <td className="p-3">{order.id}</td>
-                            <td className="p-3">
-                              {formatDate(order.created_at)}
-                            </td>
-                            <td className="p-3">{display(order.status)}</td>
-                            <td className="p-3">
-                              {formatMoney(
-                                order.total_amount ?? order.total
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                      <span
+                        className={`rounded-full px-2 py-1 text-xs ${statusClass(
+                          order.status
+                        )}`}
+                      >
+                        {order.status || "Status unavailable"}
+                      </span>
+                    </div>
+
+                    <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
+                      <p>
+                        <span className="text-slate-500">Order total: </span>
+                        <strong>{money(order.total_amount)}</strong>
+                      </p>
+                      <p>
+                        <span className="text-slate-500">Paid: </span>
+                        <strong>{money(order.amount_paid)}</strong>
+                      </p>
+                      <p>
+                        <span className="text-slate-500">Remaining: </span>
+                        <strong>{money(order.amount_remaining)}</strong>
+                      </p>
+                    </div>
                   </div>
+                ))}
+
+                {selectedOrders.length === 0 && (
+                  <p className="rounded-lg bg-slate-50 p-5 text-slate-600">
+                    No orders were found for this customer.
+                  </p>
                 )}
-              </section>
+              </div>
             </section>
           </div>
         )}
-
-        <footer className="py-6 text-center text-xs text-slate-500">
-          BestSalesGH Administration
-        </footer>
       </div>
     </main>
   );
