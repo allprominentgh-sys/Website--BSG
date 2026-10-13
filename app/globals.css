@@ -49,3 +49,90 @@
  .admin-content { padding:22px 14px 36px!important; }
  .admin-dashboard h1 { font-size:2rem!important; }
 }
+
+/* BestSalesGH theme fixes: readable form fields and royal-blue buttons */
+
+/* Keep native controls consistent with the selected theme. */
+html {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+/* Default form fields in light mode. */
+input,
+textarea,
+select {
+  background-color: #ffffff;
+  color: #172033;
+  border-color: #cbd5e1;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #64748b;
+  opacity: 1;
+}
+
+/* Explicit dark-mode form colours. */
+html.dark input,
+html.dark textarea,
+html.dark select {
+  background-color: #111827;
+  color: #f8fafc;
+  border-color: #475569;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #94a3b8;
+}
+
+/* Restore BestSalesGH royal-blue buttons.
+   Excludes buttons with explicit semantic colours such as red or green. */
+.bg-blue-600,
+.bg-blue-700,
+.bg-blue-800,
+.admin-nav-link.active {
+  color: #ffffff;
+}
+
+.bg-blue-600 {
+  background-color: #2453d4;
+}
+
+.bg-blue-700 {
+  background-color: #1d4ed8;
+}
+
+.bg-blue-800 {
+  background-color: #1e40af;
+}
+
+/* Accessible hover states for common royal-blue buttons. */
+button.bg-blue-600:hover,
+a.bg-blue-600:hover {
+  background-color: #1d4ed8;
+}
+
+button.bg-blue-700:hover,
+a.bg-blue-700:hover {
+  background-color: #1e40af;
+}
+
+/* Preserve the dark admin workspace input styling. */
+.admin-dashboard input,
+.admin-dashboard textarea,
+.admin-dashboard select {
+  color: #172033;
+  background-color: #ffffff;
+}
+
+html.dark .admin-dashboard input,
+html.dark .admin-dashboard textarea,
+html.dark .admin-dashboard select {
+  color: #f8fafc;
+  background-color: #111827;
+}
