@@ -19,14 +19,13 @@ type Listing = {
 };
 
 const navigation = [
-  { label: "Dashboard", href: "/dashboard", icon: "🏠" },
-  { label: "My Listings", href: "/dashboard/listings", icon: "📦" },
-  { label: "Post an Ad", href: "/sell", icon: "➕" },
-  { label: "My Profile", href: "/dashboard/profile", icon: "👤" },
-  { label: "Company Profile", href: "/dashboard/company", icon: "🏢" },
-  { label: "Promote Ads", href: "/dashboard/promote", icon: "⭐" },
-  { label: "Analytics", href: "/dashboard/analytics", icon: "📊" },
-  { label: "Messages", href: "/dashboard/messages", icon: "💬" },
+  { label: "Dashboard", href: "/dashboard", icon: "⌂" },
+  { label: "My Listings", href: "/dashboard/listings", icon: "▣" },
+  { label: "Post an Ad", href: "/sell", icon: "+" },
+  { label: "My Profile", href: "/dashboard/profile", icon: "♙" },
+  { label: "Company Profile", href: "/dashboard/company", icon: "▤" },
+  { label: "Promote Ads", href: "/dashboard/promote", icon: "★" },
+  { label: "Messages", href: "/dashboard/messages", icon: "✉" },
   { label: "More", href: "/dashboard/settings", icon: "☰" },
 ];
 
@@ -35,16 +34,14 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [userEmail, setUserEmail] = useState("");
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [accountType, setAccountType] = useState("");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [chatFilter, setChatFilter] = useState("All");
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadDashboard() {
-      setLoading(true);
-      setErrorMessage("");
-
       try {
         const supabase = supabaseBrowser();
 
@@ -62,7 +59,6 @@ export default function DashboardPage() {
 
         setUserEmail(user.email || "");
 
-        // Load account type from the existing profile.
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
           .select("account_type")
@@ -89,20 +85,15 @@ export default function DashboardPage() {
 
         if (error) {
           console.error("DASHBOARD LISTINGS ERROR:", error);
-          setErrorMessage(error.message);
+          setErrorMessage("Your listings could not be loaded. Please refresh.");
           return;
         }
 
         setListings((data || []) as Listing[]);
       } catch (error) {
         if (cancelled) return;
-
         console.error("DASHBOARD ERROR:", error);
-        setErrorMessage(
-          error instanceof Error
-            ? error.message
-            : "Unable to load dashboard."
-        );
+        setErrorMessage("Unable to load your dashboard. Please try again.");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -128,18 +119,15 @@ export default function DashboardPage() {
   }
 
   const activeListings = listings.filter(
-    (listing) =>
-      String(listing.status || "").toLowerCase() === "active"
+    (listing) => String(listing.status || "").toLowerCase() === "active"
   );
 
+  const businessAccount = accountType.toLowerCase() === "business";
+
   function formatPrice(listing: Listing) {
-    if (listing.price === null || listing.price === undefined) {
-      return "Price not available";
-    }
+    if (listing.price == null) return "Price not available";
 
-    const currency =
-      listing.currency_code || listing.currency || "GHS";
-
+    const currency = listing.currency_code || listing.currency || "GHS";
     const symbols: Record<string, string> = {
       GHS: "GH₵",
       USD: "$",
@@ -156,125 +144,96 @@ export default function DashboardPage() {
   const stats = [
     {
       title: "My Listings",
-      value: String(listings.length),
-      icon: "📦",
+      value: listings.length,
+      icon: "▣",
       href: "/dashboard/listings",
-      color: "bg-blue-50",
+      color: "bg-blue-50 text-blue-700",
     },
     {
       title: "Active Ads",
-      value: String(activeListings.length),
-      icon: "🟢",
+      value: activeListings.length,
+      icon: "✓",
       href: "/dashboard/listings",
-      color: "bg-green-50",
+      color: "bg-green-50 text-green-700",
     },
     {
       title: "Listing Views",
       value: "—",
-      icon: "👁️",
+      icon: "◉",
       href: "/dashboard/analytics",
-      color: "bg-purple-50",
+      color: "bg-purple-50 text-purple-700",
     },
     {
-      title: "Website Visits",
-      value: "—",
-      icon: "🌐",
-      href: "/dashboard/visits",
-      color: "bg-orange-50",
+      title: "Payments",
+      value: "View",
+      icon: "₵",
+      href: "/dashboard/payments",
+      color: "bg-orange-50 text-orange-700",
     },
   ];
 
   const quickActions = [
     {
       title: "Post an Ad",
-      description: "Create a new product or service listing.",
-      icon: "➕",
+      description: "List a product or service.",
+      icon: "+",
       href: "/sell",
-      color: "bg-blue-50",
+      color: "bg-blue-700 text-white",
+    },
+    {
+      title: "Promote Ads",
+      description: "Give your advertisements more visibility.",
+      icon: "★",
+      href: "/dashboard/promote",
+      color: "bg-amber-100 text-amber-700",
     },
     {
       title: "My Listings",
       description: "Edit and manage your advertisements.",
-      icon: "📦",
+      icon: "▣",
       href: "/dashboard/listings",
-      color: "bg-sky-50",
+      color: "bg-sky-100 text-sky-700",
     },
     {
-      title: "My Profile",
-      description: "Update your personal account information.",
-      icon: "👤",
+      title: "My Account",
+      description: "Update your personal information.",
+      icon: "♙",
       href: "/dashboard/profile",
-      color: "bg-purple-50",
-    },
-    {
-      title: "Company Profile",
-      description: "Manage company details and verification documents.",
-      icon: "🏢",
-      href: "/dashboard/company",
-      color: "bg-indigo-50",
-    },
-    {
-      title: "Promote Ads",
-      description: "Manage priority placement for your advertisements.",
-      icon: "⭐",
-      href: "/dashboard/promote",
-      color: "bg-amber-50",
-    },
-    {
-      title: "Payments",
-      description: "View available payment and transaction features.",
-      icon: "💳",
-      href: "/dashboard/payments",
-      color: "bg-green-50",
-    },
-    {
-      title: "Messages",
-      description: "Connect with interested customers.",
-      icon: "💬",
-      href: "/dashboard/messages",
-      color: "bg-pink-50",
-    },
-    {
-      title: "Help & Support",
-      description: "Get help with your account or listings.",
-      icon: "🛟",
-      href: "/dashboard/support",
-      color: "bg-slate-100",
+      color: "bg-purple-100 text-purple-700",
     },
   ];
 
-  const businessAccount =
-    accountType.toLowerCase() === "business";
+  const chatFilters = ["All", "Read", "Unread", "Unanswered", "Spam"];
 
   return (
     <main className="min-h-screen bg-[#f3f7fb] text-[#15365d]">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-[1500px] items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <Link href="/" className="flex min-w-0 items-center gap-3">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#12345b] text-lg font-black text-white">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#12345b] text-lg font-black text-white">
               BS
             </div>
             <div className="min-w-0">
-              <div className="truncate text-sm font-black tracking-wide text-[#12345b] sm:text-base">
+              <p className="truncate text-sm font-black tracking-wide">
                 BEST SALES GHANA
-              </div>
-              <div className="text-[10px] font-bold tracking-[0.18em] text-slate-500 sm:text-xs">
-                BUY • SELL • ADVERTISE
-              </div>
+              </p>
+              <p className="text-[10px] font-bold tracking-widest text-slate-500">
+                BUY · SELL · ADVERTISE
+              </p>
             </div>
           </Link>
 
-          <div className="hidden items-center gap-4 sm:flex">
+          <div className="hidden items-center gap-3 sm:flex">
             <Link
               href="/dashboard/profile"
-              className="max-w-[220px] truncate text-sm font-semibold text-slate-600"
+              className="max-w-48 truncate text-sm font-semibold text-slate-600"
             >
               {userEmail || "My Account"}
             </Link>
             <button
               type="button"
               onClick={handleLogout}
-              className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-bold hover:bg-slate-50"
+              className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold hover:bg-slate-50"
             >
               Logout
             </button>
@@ -283,274 +242,302 @@ export default function DashboardPage() {
           <button
             type="button"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="rounded-xl border border-slate-200 px-4 py-2 text-xl sm:hidden"
-            aria-label="Toggle menu"
+            className="rounded-xl border border-slate-200 px-3 py-2 text-xl sm:hidden"
+            aria-label="Toggle navigation"
             aria-expanded={mobileMenuOpen}
           >
             ☰
           </button>
         </div>
-      </header>
 
-      {mobileMenuOpen && (
-        <div className="border-b bg-white p-3 shadow-sm sm:hidden">
-          <nav className="space-y-1">
+        <nav className="hidden overflow-x-auto bg-[#12345b] px-4 py-2 text-white md:block">
+          <div className="mx-auto flex max-w-7xl gap-2">
+            {navigation.map((item, index) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`shrink-0 rounded-lg px-3 py-2 text-sm font-bold ${
+                  index === 0
+                    ? "bg-white/15 text-white"
+                    : "text-blue-100 hover:bg-white/10"
+                }`}
+              >
+                {item.icon} {item.label}
+              </Link>
+            ))}
+          </div>
+        </nav>
+
+        {mobileMenuOpen && (
+          <nav className="grid grid-cols-2 gap-2 border-t bg-white p-3 md:hidden">
             {navigation.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
                 onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-3 rounded-xl px-4 py-3 font-semibold text-slate-700 hover:bg-blue-50"
+                className="rounded-xl px-3 py-3 text-sm font-semibold hover:bg-blue-50"
               >
-                <span>{item.icon}</span>
-                {item.label}
+                {item.icon} {item.label}
               </Link>
             ))}
             <button
               type="button"
               onClick={handleLogout}
-              className="w-full rounded-xl px-4 py-3 text-left font-semibold text-red-600"
+              className="rounded-xl px-3 py-3 text-left text-sm font-semibold text-red-600"
             >
-              🚪 Logout
+              Logout
             </button>
           </nav>
-        </div>
-      )}
+        )}
+      </header>
 
-      <div className="bg-[#12345b] text-white">
-        <nav className="mx-auto flex max-w-[1500px] gap-2 overflow-x-auto px-4 py-3 sm:px-6 lg:px-8">
-          {navigation.map((item, index) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex shrink-0 items-center gap-2 rounded-xl px-4 py-3 text-sm font-bold ${
-                index === 0
-                  ? "bg-white/15 text-white"
-                  : "text-blue-100 hover:bg-white/10"
-              }`}
-            >
-              <span>{item.icon}</span>
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-      </div>
-
-      <section className="mx-auto max-w-[1500px] px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-[#6d87a3]">
-            BEST SALES GHANA
-          </p>
-          <h1 className="mt-2 text-3xl font-black tracking-tight text-[#12345b] sm:text-4xl">
-            My Dashboard
-          </h1>
-          <p className="mt-3 text-base text-slate-500 sm:text-lg">
-            Manage your account, company, listings and customers from one place.
-          </p>
-          {userEmail && (
-            <p className="mt-2 text-sm text-slate-500">
-              Welcome back, {userEmail}
+      <div className="mx-auto max-w-7xl space-y-5 px-4 py-5 sm:px-6 sm:py-7">
+        <section className="flex flex-col justify-between gap-4 rounded-2xl bg-[#12345b] p-5 text-white sm:flex-row sm:items-center sm:p-7">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-200">
+              Seller Centre
             </p>
-          )}
-        </div>
+            <h1 className="mt-2 text-2xl font-black sm:text-3xl">
+              Welcome back!
+            </h1>
+            <p className="mt-2 break-all text-sm text-blue-100">
+              {userEmail || "Manage your BestSalesGH account"}
+            </p>
+          </div>
+          <Link
+            href="/sell"
+            className="inline-flex items-center justify-center rounded-xl bg-white px-5 py-3 font-black text-[#12345b] hover:bg-blue-50"
+          >
+            + Post an Ad
+          </Link>
+        </section>
 
         {errorMessage && (
           <div
             role="alert"
-            className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700"
+            className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
           >
-            <strong>Dashboard notice:</strong>
-            <p className="mt-1">{errorMessage}</p>
+            {errorMessage}
           </div>
         )}
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {stats.map((stat) => (
             <Link
               key={stat.title}
               href={stat.href}
-              className="flex items-center gap-4 rounded-2xl border border-[#dce6ef] bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+              className="flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md sm:p-5"
             >
-              <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-2xl ${stat.color}`}>
+              <span
+                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl font-black ${stat.color}`}
+              >
                 {stat.icon}
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-[#7890a8]">
+              </span>
+              <span className="min-w-0">
+                <span className="block text-xs font-bold text-slate-500">
                   {stat.title}
-                </p>
-                <p className="mt-1 text-3xl font-black text-[#12345b]">
-                  {loading ? "..." : stat.value}
-                </p>
-              </div>
+                </span>
+                <span className="mt-1 block text-2xl font-black text-[#12345b]">
+                  {loading ? "…" : stat.value}
+                </span>
+              </span>
             </Link>
           ))}
-        </div>
+        </section>
 
-        {/* Business priority allowance information */}
         {businessAccount && (
-          <section className="mt-8 rounded-3xl border border-blue-200 bg-white p-6 shadow-sm sm:p-8">
+          <section className="rounded-2xl border border-blue-200 bg-white p-5 shadow-sm sm:p-6">
             <p className="text-xs font-black uppercase tracking-widest text-blue-700">
               Business Seller Benefits
             </p>
-            <h2 className="mt-2 text-2xl font-black text-[#12345b]">
-              Priority Posting Allowance
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              Eligible business accounts can have up to 12 ads included
-              in the priority-posting allowance. Additional ads may incur
-              posting charges. Qualifying on-platform sales remain subject
-              to the 2.15% platform transaction fee.
-            </p>
-            <p className="mt-2 text-xs leading-5 text-slate-500">
-              This is informational only. The actual allowance, eligibility,
-              payment and priority status must be enforced by the backend.
-            </p>
-            <div className="mt-5 flex flex-wrap gap-3">
-              <Link
-                href="/dashboard/company"
-                className="rounded-xl bg-blue-700 px-5 py-3 text-sm font-bold text-white hover:bg-blue-800"
-              >
-                Complete Company Profile
-              </Link>
-              <Link
-                href="/dashboard/promote"
-                className="rounded-xl border border-blue-200 px-5 py-3 text-sm font-bold text-blue-700 hover:bg-blue-50"
-              >
-                Manage Priority Ads
-              </Link>
+            <div className="mt-2 flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+              <div className="max-w-3xl">
+                <h2 className="text-xl font-black text-[#12345b] sm:text-2xl">
+                  Priority Posting Allowance
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Eligible business accounts can have up to 12 ads included
+                  in the priority-posting allowance. Additional ads may incur
+                  posting charges. Qualifying on-platform sales remain subject
+                  to the 2.15% platform transaction fee.
+                </p>
+                <p className="mt-2 text-xs leading-5 text-slate-500">
+                  Actual allowance, eligibility, payment and priority status
+                  must be enforced by the backend.
+                </p>
+              </div>
+              <div className="flex shrink-0 flex-wrap gap-2">
+                <Link
+                  href="/dashboard/company"
+                  className="rounded-xl bg-blue-700 px-4 py-3 text-center text-sm font-bold text-white hover:bg-blue-800"
+                >
+                  Complete Company Profile
+                </Link>
+                <Link
+                  href="/dashboard/promote"
+                  className="rounded-xl border border-blue-200 px-4 py-3 text-center text-sm font-bold text-blue-700 hover:bg-blue-50"
+                >
+                  Manage Priority Ads
+                </Link>
+              </div>
             </div>
           </section>
         )}
 
-        <section className="mt-8 rounded-3xl border border-[#dce6ef] bg-white p-5 shadow-sm sm:p-7">
-          <div className="mb-6">
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-[#7890a8]">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="mb-4">
+            <p className="text-xs font-black uppercase tracking-widest text-slate-500">
               Quick Actions
             </p>
-            <h2 className="mt-2 text-2xl font-black text-[#12345b] sm:text-3xl">
+            <h2 className="mt-1 text-xl font-black text-[#12345b]">
               Manage Your Account
             </h2>
-            <p className="mt-2 text-sm text-slate-500">
-              Access your profile, company information, listings and payments.
-            </p>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {quickActions.map((action) => (
               <Link
                 key={action.title}
                 href={action.href}
-                className="group flex min-h-[170px] flex-col justify-between rounded-2xl border border-[#dce6ef] bg-[#fbfdff] p-6 transition hover:border-blue-300 hover:bg-blue-50/40 hover:shadow-md"
+                className="rounded-xl border border-slate-200 p-4 transition hover:border-blue-300 hover:bg-blue-50/50"
               >
-                <div className={`flex h-14 w-14 items-center justify-center rounded-2xl text-3xl ${action.color}`}>
+                <span
+                  className={`flex h-11 w-11 items-center justify-center rounded-xl text-2xl font-black ${action.color}`}
+                >
                   {action.icon}
-                </div>
-                <div className="mt-5">
-                  <h3 className="text-lg font-black text-[#15365d]">
-                    {action.title}
-                  </h3>
-                  <p className="mt-1 text-sm leading-6 text-slate-500">
-                    {action.description}
-                  </p>
-                </div>
-                <div className="mt-4 text-sm font-black text-blue-700">
-                  Open section →
-                </div>
+                </span>
+                <h3 className="mt-3 font-black text-[#15365d]">
+                  {action.title}
+                </h3>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  {action.description}
+                </p>
+                <p className="mt-3 text-xs font-black text-blue-700">
+                  Open →
+                </p>
               </Link>
             ))}
           </div>
         </section>
 
-        <section className="mt-8 rounded-3xl border border-[#dce6ef] bg-white p-5 shadow-sm sm:p-7">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#7890a8]">
+              <p className="text-xs font-black uppercase tracking-widest text-slate-500">
+                Inbox
+              </p>
+              <h2 className="mt-1 text-xl font-black text-[#12345b]">
+                Chats & Messages
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Organize your customer conversations.
+              </p>
+            </div>
+            <span className="rounded-xl bg-blue-50 p-3 text-2xl">✉</span>
+          </div>
+
+          <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
+            {chatFilters.map((filter) => (
+              <button
+                key={filter}
+                type="button"
+                onClick={() => setChatFilter(filter)}
+                className={`shrink-0 rounded-full border px-4 py-2 text-sm font-bold ${
+                  chatFilter === filter
+                    ? "border-blue-700 bg-blue-700 text-white"
+                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                {filter}
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-3 rounded-xl bg-slate-50 p-4">
+            <p className="font-bold text-slate-700">
+              {chatFilter === "All"
+                ? "Your conversations will appear here."
+                : `${chatFilter} conversations will appear here.`}
+            </p>
+            <p className="mt-1 text-sm leading-5 text-slate-500">
+              The messaging system is not connected yet. These filters are
+              visual controls only until the real chat database is built.
+            </p>
+          </div>
+
+          <Link
+            href="/dashboard/messages"
+            className="mt-4 inline-flex rounded-xl bg-blue-700 px-5 py-3 text-sm font-bold text-white hover:bg-blue-800"
+          >
+            Open Messages →
+          </Link>
+        </section>
+
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+            <div>
+              <p className="text-xs font-black uppercase tracking-widest text-slate-500">
                 Seller Centre
               </p>
-              <h2 className="mt-2 text-2xl font-black text-[#12345b] sm:text-3xl">
+              <h2 className="mt-1 text-xl font-black text-[#12345b]">
                 Recent Listings
               </h2>
-              <p className="mt-2 text-sm text-slate-500">
-                Your latest advertisements on BestSalesGH.
-              </p>
             </div>
             <Link
               href="/dashboard/listings"
-              className="inline-flex items-center justify-center rounded-xl border border-blue-200 px-5 py-3 text-sm font-black text-blue-700 hover:bg-blue-50"
+              className="text-sm font-black text-blue-700 hover:underline"
             >
               View All Listings →
             </Link>
           </div>
 
           {loading ? (
-            <div className="mt-6 rounded-2xl bg-slate-50 p-10 text-center">
-              <p className="font-bold text-slate-600">
-                Loading your listings...
-              </p>
-            </div>
+            <p className="mt-5 rounded-xl bg-slate-50 p-6 text-center text-sm text-slate-500">
+              Loading your listings…
+            </p>
           ) : listings.length === 0 ? (
-            <div className="mt-6 rounded-2xl bg-slate-50 p-10 text-center">
-              <div className="text-4xl">📦</div>
-              <h3 className="mt-3 text-lg font-black text-slate-800">
-                No listings yet
-              </h3>
-              <p className="mt-2 text-sm text-slate-500">
-                Create your first advertisement to start selling.
+            <div className="mt-5 rounded-xl bg-slate-50 p-6 text-center">
+              <p className="font-bold">No listings yet</p>
+              <p className="mt-1 text-sm text-slate-500">
+                Post your first ad to start selling.
               </p>
               <Link
                 href="/sell"
-                className="mt-5 inline-flex rounded-xl bg-blue-700 px-6 py-3 font-black text-white hover:bg-blue-800"
+                className="mt-4 inline-flex rounded-xl bg-blue-700 px-5 py-3 text-sm font-bold text-white"
               >
-                ➕ Post Your First Ad
+                + Post Your First Ad
               </Link>
             </div>
           ) : (
-            <div className="mt-6 space-y-3">
-              {listings.slice(0, 5).map((listing) => (
+            <div className="mt-4 divide-y divide-slate-100">
+              {listings.slice(0, 3).map((listing) => (
                 <article
                   key={String(listing.id)}
-                  className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-[#fbfdff] p-5 sm:flex-row sm:items-center sm:justify-between"
+                  className="flex items-center justify-between gap-3 py-4"
                 >
                   <div className="min-w-0">
-                    <h3 className="truncate text-lg font-black text-[#15365d]">
+                    <h3 className="truncate font-bold text-[#15365d]">
                       {listing.title || "Untitled Listing"}
                     </h3>
-                    <p className="mt-1 text-lg font-black text-blue-700">
+                    <p className="mt-1 text-sm font-black text-blue-700">
                       {formatPrice(listing)}
                     </p>
-                    <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-slate-500">
-                      {listing.category && (
-                        <span className="rounded-full bg-blue-50 px-3 py-1">
-                          {listing.category}
-                        </span>
-                      )}
-                      {listing.subcategory && (
-                        <span className="rounded-full bg-slate-100 px-3 py-1">
-                          {listing.subcategory}
-                        </span>
-                      )}
-                      {listing.status && (
-                        <span className="rounded-full bg-green-50 px-3 py-1 text-green-700">
-                          {listing.status}
-                        </span>
-                      )}
-                    </div>
-                    {listing.location && (
-                      <p className="mt-3 truncate text-sm text-slate-500">
-                        📍 {listing.location}
-                      </p>
-                    )}
+                    <p className="mt-1 text-xs text-slate-500">
+                      {[listing.category, listing.status]
+                        .filter(Boolean)
+                        .join(" · ") || "Status unavailable"}
+                    </p>
                   </div>
                   <div className="flex shrink-0 gap-2">
                     <Link
                       href={`/listings/${listing.id}`}
-                      className="rounded-xl border border-blue-700 px-4 py-2 text-sm font-bold text-blue-700 hover:bg-blue-50"
+                      className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold"
                     >
                       View
                     </Link>
                     <Link
                       href="/dashboard/listings"
-                      className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800"
+                      className="rounded-lg bg-blue-700 px-3 py-2 text-xs font-bold text-white"
                     >
                       Manage
                     </Link>
@@ -561,39 +548,31 @@ export default function DashboardPage() {
           )}
         </section>
 
-        <div className="mt-8 flex flex-col gap-5 rounded-3xl bg-[#12345b] p-6 text-white sm:flex-row sm:items-center sm:justify-between sm:p-8">
+        <section className="flex flex-col justify-between gap-3 rounded-2xl bg-[#12345b] p-5 text-white sm:flex-row sm:items-center sm:p-6">
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-200">
-              Need Assistance?
-            </p>
-            <h2 className="mt-2 text-2xl font-black">
-              We are here to help.
-            </h2>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-blue-100">
-              Contact our support team for help with your account,
-              advertisements or payments.
+            <h2 className="text-lg font-black">Need assistance?</h2>
+            <p className="mt-1 text-sm text-blue-100">
+              Get help with your account, advertisements or payments.
             </p>
           </div>
           <Link
             href="/dashboard/support"
-            className="inline-flex shrink-0 items-center justify-center rounded-xl bg-white px-6 py-3 font-black text-[#12345b] hover:bg-blue-50"
+            className="inline-flex shrink-0 justify-center rounded-xl bg-white px-5 py-3 text-sm font-black text-[#12345b] hover:bg-blue-50"
           >
             Help & Support →
           </Link>
-        </div>
+        </section>
 
-        <footer className="mt-10 border-t border-slate-200 py-8 text-center">
+        <footer className="border-t border-slate-200 py-5 text-center text-xs text-slate-500">
           <p className="font-black tracking-wide text-[#12345b]">
             BEST SALES GHANA
           </p>
-          <p className="mt-1 text-sm text-slate-500">
-            Buy • Sell • Advertise • Connect
-          </p>
-          <p className="mt-4 text-xs text-slate-400">
+          <p className="mt-1">Buy · Sell · Advertise · Connect</p>
+          <p className="mt-2">
             © 2026 All Prominent Ghana Limited. All rights reserved.
           </p>
         </footer>
-      </section>
+      </div>
     </main>
   );
 }
