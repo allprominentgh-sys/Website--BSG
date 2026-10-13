@@ -1,21 +1,23 @@
 import type { Metadata } from "next";
-import type { ReactNode } from "react";
+import { ThemeProvider } from "./components/ThemeProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "BEST SALES GHANA | Buy • Sell • Advertise • Connect",
+  title: "BestSalesGH | Buy, Sell & Advertise",
   description:
-    "Ghana's marketplace for products, vehicles, property, services, machinery, equipment and business opportunities.",
+    "BestSalesGH is a marketplace to buy, sell, and advertise products and services in Ghana.",
 };
 
 export default function RootLayout({
   children,
-}: {
-  children: ReactNode;
-}) {
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html lang="en" suppressHydrationWarning>
+      <body>
+        <ThemeProvider>{children}</ThemeProvider>
+      </body>
     </html>
   );
 }
