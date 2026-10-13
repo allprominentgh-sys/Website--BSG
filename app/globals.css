@@ -136,3 +136,27 @@ html.dark .admin-dashboard select {
   color: #f8fafc;
   background-color: #111827;
 }
+/* BestSalesGH homepage search — force readable colours */
+.home-search-form input,
+.home-search-form select {
+  background-color: #ffffff !important;
+  color: #172033 !important;
+  border-color: #cbd5e1 !important;
+  -webkit-text-fill-color: #172033 !important;
+}
+
+.home-search-form input::placeholder {
+  color: #64748b !important;
+  opacity: 1 !important;
+}
+
+.home-search-form button[type="submit"] {
+  background-color: #2453d4 !important;
+  color: #ffffff !important;
+  border-color: #2453d4 !important;
+}
+
+.home-search-form button[type="submit"]:hover {
+  background-color: #1d4ed8 !important;
+  border-color: #1d4ed8 !important;
+}
