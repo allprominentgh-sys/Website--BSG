@@ -1,9 +1,9 @@
-
 "use client";
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
+  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -33,16 +33,15 @@ const FILTERS: Filter[] = [
   "Spam",
 ];
 
-export default function ChatPage() {
+function ChatContent() {
   const searchParams = useSearchParams();
-
-  // Create the Supabase client using your existing client function.
   const supabase = useMemo(() => supabaseBrowser(), []);
 
   const listingParam = searchParams.get("listing");
   const sellerParam = searchParams.get("seller");
   const title = searchParams.get("title") || "Marketplace listing";
   const price = searchParams.get("price") || "";
+
   const listingId =
     listingParam && Number.isSafeInteger(Number(listingParam))
       ? Number(listingParam)
@@ -60,25 +59,28 @@ export default function ChatPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
-  const loadMessages = useCallback(async (currentUser: string) => {
-    const { data, error: fetchError } = await supabase
-      .from("messages")
-      .select(
-        "id, sender_id, receiver_id, listing_id, message, created_at, is_read, is_spam, read_at"
-      )
-      .or(
-        `sender_id.eq.${currentUser},receiver_id.eq.${currentUser}`
-      )
-      .order("created_at", { ascending: true });
+  const loadMessages = useCallback(
+    async (currentUser: string) => {
+      const { data, error: fetchError } = await supabase
+        .from("messages")
+        .select(
+          "id, sender_id, receiver_id, listing_id, message, created_at, is_read, is_spam, read_at"
+        )
+        .or(
+          `sender_id.eq.${currentUser},receiver_id.eq.${currentUser}`
+        )
+        .order("created_at", { ascending: true });
 
-    if (fetchError) {
-      setError(fetchError.message);
-      return;
-    }
+      if (fetchError) {
+        setError(fetchError.message);
+        return;
+      }
 
-    setMessages((data || []) as Message[]);
-    setError("");
-  }, [supabase]);
+      setMessages((data || []) as Message[]);
+      setError("");
+    },
+    [supabase]
+  );
 
   useEffect(() => {
     let active = true;
@@ -96,7 +98,6 @@ export default function ChatPage() {
       }
 
       const currentUser = data.user.id;
-
       setUserId(currentUser);
 
       if (sellerParam && sellerParam !== currentUser) {
@@ -173,28 +174,30 @@ export default function ChatPage() {
             !message.is_read &&
             !message.is_spam
         ),
-        spam: latest.is_spam,
+        spam: items.some((message) => message.is_spam),
         unanswered: latest.sender_id !== userId,
       };
     });
   }, [messages, userId]);
 
-  const visibleConversations = useMemo(() => {
-    return conversations.filter((conversation) => {
-      switch (activeFilter) {
-        case "Read":
-          return !conversation.unread && !conversation.spam;
-        case "Unread":
-          return conversation.unread && !conversation.spam;
-        case "Unanswered":
-          return conversation.unanswered && !conversation.spam;
-        case "Spam":
-          return conversation.spam;
-        default:
-          return !conversation.spam;
-      }
-    });
-  }, [activeFilter, conversations]);
+  const visibleConversations = useMemo(
+    () =>
+      conversations.filter((conversation) => {
+        switch (activeFilter) {
+          case "Read":
+            return !conversation.unread && !conversation.spam;
+          case "Unread":
+            return conversation.unread && !conversation.spam;
+          case "Unanswered":
+            return conversation.unanswered && !conversation.spam;
+          case "Spam":
+            return conversation.spam;
+          default:
+            return !conversation.spam;
+        }
+      }),
+    [activeFilter, conversations]
+  );
 
   const selectedConversation = conversations.find(
     (conversation) =>
@@ -309,10 +312,8 @@ export default function ChatPage() {
 
   async function toggleSpam(conversation: {
     items: Message[];
-    latest: Message;
+    spam: boolean;
   }) {
-    const nextSpam = !conversation.latest.is_spam;
-
     const receivedIds = conversation.items
       .filter((message) => message.receiver_id === userId)
       .map((message) => message.id);
@@ -321,6 +322,8 @@ export default function ChatPage() {
       setError("Only received messages can be marked as spam.");
       return;
     }
+
+    const nextSpam = !conversation.spam;
 
     const { error: updateError } = await supabase
       .from("messages")
@@ -485,7 +488,7 @@ export default function ChatPage() {
                   onClick={() => void toggleSpam(selectedConversation)}
                   className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold hover:bg-slate-100"
                 >
-                  {selectedConversation.latest.is_spam
+                  {selectedConversation.spam
                     ? "Remove Spam"
                     : "Mark Spam"}
                 </button>
@@ -593,5 +596,21 @@ export default function ChatPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+export default function ChatPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-slate-50 p-6">
+          <div className="mx-auto max-w-7xl rounded-2xl border border-slate-200 bg-white p-6">
+            Loading messages...
+          </div>
+        </main>
+      }
+    >
+      <ChatContent />
+    </Suspense>
   );
 }
