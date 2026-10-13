@@ -120,7 +120,9 @@ export default function PromoteAdsPage() {
 
         if (listingsError) {
           console.error("PROMOTION LISTINGS ERROR:", listingsError);
-          setError("Could not load your advertisements. Please refresh.");
+          setError(
+            "Could not load your advertisements. Please refresh."
+          );
           return;
         }
 
@@ -135,7 +137,9 @@ export default function PromoteAdsPage() {
         console.error("PROMOTION PAGE ERROR:", err);
 
         if (!cancelled) {
-          setError("Something went wrong while loading your advertisements.");
+          setError(
+            "Something went wrong while loading your advertisements."
+          );
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -149,16 +153,20 @@ export default function PromoteAdsPage() {
     };
   }, []);
 
-  async function startPayment() {
+  async function startPayment(packageId?: string) {
+    if (submitting) return;
+
     setError("");
 
+    const packageToPay = packageId || selectedPackage;
+
     if (!selectedListing) {
-      setError("Please select an advertisement.");
+      setError("Please select an advertisement first.");
       return;
     }
 
     const chosenPackage = packages.find(
-      (item) => item.id === selectedPackage
+      (item) => item.id === packageToPay
     );
 
     if (!chosenPackage) {
@@ -166,6 +174,7 @@ export default function PromoteAdsPage() {
       return;
     }
 
+    setSelectedPackage(chosenPackage.id);
     setSubmitting(true);
 
     try {
@@ -206,11 +215,13 @@ export default function PromoteAdsPage() {
         return;
       }
 
-      // Redirect the seller to Paystack's hosted checkout.
       window.location.assign(result.authorizationUrl);
     } catch (err) {
       console.error("START PROMOTION PAYMENT ERROR:", err);
-      setError("Unable to connect to payment checkout. Please try again.");
+
+      setError(
+        "Unable to connect to payment checkout. Please try again."
+      );
     } finally {
       setSubmitting(false);
     }
@@ -220,8 +231,18 @@ export default function PromoteAdsPage() {
     (item) => item.id === selectedPackage
   );
 
+  const selectedAd = listings.find(
+    (item) => String(item.id) === selectedListing
+  );
+
+  const canPay =
+    !loading &&
+    !submitting &&
+    listings.length > 0 &&
+    Boolean(selectedListing);
+
   return (
-    <main className="min-h-screen bg-[#f3f7fb] px-4 py-6 text-[#15365d] sm:px-6 sm:py-10">
+    <main className="min-h-screen bg-[#f3f7fb] px-4 pb-36 pt-6 text-[#15365d] sm:px-6 sm:pb-12 sm:pt-10">
       <div className="mx-auto max-w-6xl">
         <Link
           href="/dashboard"
@@ -234,12 +255,15 @@ export default function PromoteAdsPage() {
           <p className="text-xs font-black uppercase tracking-[0.2em] text-blue-700">
             BEST SALES GHANA
           </p>
+
           <h1 className="mt-2 text-3xl font-black text-slate-950 sm:text-4xl">
             Promote Your Ads
           </h1>
+
           <p className="mt-2 text-slate-500">
-            Select your advertisement, choose a package, and proceed to
-            secure payment through Paystack.
+            Choose your advertisement and promotion package.
+            Tap a package's Pay button to proceed directly to secure
+            Paystack checkout.
           </p>
         </header>
 
@@ -266,9 +290,11 @@ export default function PromoteAdsPage() {
               <h3 className="font-bold text-slate-900">
                 No advertisements found
               </h3>
+
               <p className="mt-2 text-sm text-slate-500">
                 Post an advertisement before requesting promotion.
               </p>
+
               <Link
                 href="/sell"
                 className="mt-5 inline-block rounded-xl bg-blue-700 px-5 py-3 font-bold text-white"
@@ -277,41 +303,58 @@ export default function PromoteAdsPage() {
               </Link>
             </div>
           ) : (
-            <div className="mt-5 space-y-3">
-              {listings.map((listing) => (
-                <label
-                  key={String(listing.id)}
-                  className={`flex cursor-pointer items-start gap-4 rounded-2xl border p-4 ${
-                    selectedListing === String(listing.id)
-                      ? "border-blue-500 bg-blue-50"
-                      : "border-slate-200"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="listing"
-                    value={String(listing.id)}
-                    checked={selectedListing === String(listing.id)}
-                    onChange={() =>
-                      setSelectedListing(String(listing.id))
-                    }
-                    className="mt-1 h-4 w-4 accent-blue-700"
-                  />
+            <>
+              <p className="mt-2 text-sm text-slate-500">
+                Select the advertisement you want to promote.
+              </p>
 
-                  <span className="min-w-0 flex-1">
-                    <span className="block break-words font-bold text-slate-900">
-                      {listing.title || "Untitled Advertisement"}
+              <div className="mt-5 space-y-3">
+                {listings.map((listing) => (
+                  <label
+                    key={String(listing.id)}
+                    className={`flex cursor-pointer items-start gap-4 rounded-2xl border p-4 ${
+                      selectedListing === String(listing.id)
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-slate-200 bg-white"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="listing"
+                      value={String(listing.id)}
+                      checked={
+                        selectedListing === String(listing.id)
+                      }
+                      onChange={() => {
+                        setSelectedListing(String(listing.id));
+                        setError("");
+                      }}
+                      className="mt-1 h-4 w-4 accent-blue-700"
+                    />
+
+                    <span className="min-w-0 flex-1">
+                      <span className="block break-words font-bold text-slate-900">
+                        {listing.title || "Untitled Advertisement"}
+                      </span>
+
+                      <span className="mt-1 block font-semibold text-blue-700">
+                        {formatPrice(listing)}
+                      </span>
+
+                      <span className="mt-2 block text-xs text-slate-500">
+                        Status: {listing.status || "Unknown"}
+                      </span>
                     </span>
-                    <span className="mt-1 block font-semibold text-blue-700">
-                      {formatPrice(listing)}
-                    </span>
-                    <span className="mt-2 block text-xs text-slate-500">
-                      Status: {listing.status || "Unknown"}
-                    </span>
-                  </span>
-                </label>
-              ))}
-            </div>
+
+                    {selectedListing === String(listing.id) && (
+                      <span className="rounded-full bg-blue-700 px-3 py-1 text-xs font-bold text-white">
+                        Selected
+                      </span>
+                    )}
+                  </label>
+                ))}
+              </div>
+            </>
           )}
         </section>
 
@@ -320,111 +363,141 @@ export default function PromoteAdsPage() {
             2. Choose a Promotion Package
           </h2>
 
+          <p className="mt-2 text-sm text-slate-500">
+            Select a package and tap its Pay button to go straight to
+            checkout. You do not need to scroll to another payment section.
+          </p>
+
           <div className="mt-5 grid gap-5 md:grid-cols-3">
-            {packages.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setSelectedPackage(item.id)}
-                className={`flex flex-col rounded-2xl border bg-white p-5 text-left shadow-sm transition hover:shadow-md ${
-                  selectedPackage === item.id
-                    ? "border-blue-600 ring-2 ring-blue-100"
-                    : "border-slate-200"
-                }`}
-              >
-                <span className="text-sm font-black uppercase text-blue-700">
-                  {item.durationDays} days
-                </span>
-                <span className="mt-3 text-xl font-black text-slate-950">
-                  {item.name}
-                </span>
-                <span className="mt-3 text-3xl font-black text-blue-700">
-                  GH₵{item.price}
-                </span>
-                <span className="mt-3 text-sm leading-6 text-slate-500">
-                  {item.description}
-                </span>
+            {packages.map((item) => {
+              const isSelected = selectedPackage === item.id;
 
-                <span className="mt-5 space-y-2 text-sm text-slate-700">
-                  {item.features.map((feature) => (
-                    <span key={feature} className="block">
-                      ✓ {feature}
-                    </span>
-                  ))}
-                </span>
-
-                <span
-                  className={`mt-6 rounded-xl px-4 py-3 text-center text-sm font-bold ${
-                    selectedPackage === item.id
-                      ? "bg-blue-700 text-white"
-                      : "bg-slate-100 text-slate-700"
+              return (
+                <article
+                  key={item.id}
+                  className={`flex flex-col rounded-2xl border bg-white p-5 shadow-sm transition ${
+                    isSelected
+                      ? "border-blue-600 ring-2 ring-blue-100"
+                      : "border-slate-200"
                   }`}
                 >
-                  {selectedPackage === item.id
-                    ? "Selected"
-                    : "Choose Package"}
-                </span>
-              </button>
-            ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedPackage(item.id);
+                      setError("");
+                    }}
+                    aria-pressed={isSelected}
+                    className="flex flex-1 flex-col text-left"
+                  >
+                    <span className="text-sm font-black uppercase text-blue-700">
+                      {item.durationDays} days
+                    </span>
+
+                    <span className="mt-3 text-xl font-black text-slate-950">
+                      {item.name}
+                    </span>
+
+                    <span className="mt-3 text-3xl font-black text-blue-700">
+                      GH₵{item.price}
+                    </span>
+
+                    <span className="mt-3 text-sm leading-6 text-slate-500">
+                      {item.description}
+                    </span>
+
+                    <span className="mt-5 space-y-2 text-sm text-slate-700">
+                      {item.features.map((feature) => (
+                        <span key={feature} className="block">
+                          ✓ {feature}
+                        </span>
+                      ))}
+                    </span>
+
+                    <span
+                      className={`mt-6 block rounded-xl px-4 py-3 text-center text-sm font-bold ${
+                        isSelected
+                          ? "bg-blue-50 text-blue-800"
+                          : "bg-slate-100 text-slate-700"
+                      }`}
+                    >
+                      {isSelected ? "✓ Package Selected" : "Select Package"}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => startPayment(item.id)}
+                    disabled={!canPay}
+                    className="mt-3 w-full rounded-xl bg-blue-700 px-4 py-4 text-center font-black text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {submitting && isSelected
+                      ? "Connecting..."
+                      : `Pay GH₵${item.price}`}
+                  </button>
+                </article>
+              );
+            })}
           </div>
         </section>
 
-        <section className="mt-8 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
-          <h2 className="text-xl font-black text-slate-950">
-            3. Review and Pay
-          </h2>
+        {selectedAd && chosenPackage && (
+          <section className="mt-8 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
+            <h2 className="text-lg font-black text-slate-950">
+              Your selection
+            </h2>
 
-          <div className="mt-5 rounded-2xl bg-slate-50 p-5">
-            <p className="text-sm text-slate-500">
-              Selected advertisement
-            </p>
-            <p className="mt-1 break-words font-bold text-slate-900">
-              {listings.find(
-                (item) => String(item.id) === selectedListing
-              )?.title || "No advertisement selected"}
+            <p className="mt-3 break-words font-bold text-slate-900">
+              {selectedAd.title || "Untitled Advertisement"}
             </p>
 
-            <p className="mt-4 text-sm text-slate-500">
-              Selected package
-            </p>
-            <p className="mt-1 font-bold text-slate-900">
-              {chosenPackage?.name}
+            <p className="mt-1 text-sm text-slate-500">
+              {chosenPackage.name} · {chosenPackage.durationDays} days
             </p>
 
-            <p className="mt-4 text-sm text-slate-500">
-              Total to pay
+            <p className="mt-3 text-sm text-slate-500">
+              Total payment
             </p>
-            <p className="mt-1 text-3xl font-black text-blue-700">
-              GH₵{chosenPackage?.price ?? 0}
+
+            <p className="text-2xl font-black text-blue-700">
+              GH₵{chosenPackage.price}
             </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={startPayment}
-            disabled={
-              loading ||
-              submitting ||
-              listings.length === 0 ||
-              !selectedListing
-            }
-            className="mt-6 w-full rounded-xl bg-blue-700 px-6 py-4 font-black text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-          >
-            {submitting
-              ? "Connecting to Paystack..."
-              : `Proceed to Pay GH₵${chosenPackage?.price ?? 0}`}
-          </button>
-
-          <p className="mt-3 text-xs leading-5 text-slate-500">
-            Your payment is handled by Paystack. Do not pay again if money
-            has been deducted; check the transaction status first.
-          </p>
-        </section>
+          </section>
+        )}
 
         <footer className="py-8 text-center text-sm text-slate-500">
+          Your payment is handled securely by Paystack. If money has
+          been deducted, check your transaction status before paying again.
+          <br />
           © 2026 All Prominent Ghana Limited. All rights reserved.
         </footer>
       </div>
+
+      {/* Fixed payment bar for mobile and tablet users */}
+      {!loading && listings.length > 0 && (
+        <div className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white/95 p-3 shadow-[0_-8px_25px_rgba(15,23,42,0.08)] backdrop-blur sm:hidden">
+          <div className="mx-auto flex max-w-lg items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-semibold text-slate-500">
+                {chosenPackage?.name || "Promotion package"}
+              </p>
+
+              <p className="text-xl font-black text-blue-700">
+                GH₵{chosenPackage?.price ?? 0}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => startPayment()}
+              disabled={!canPay}
+              className="min-h-12 rounded-xl bg-blue-700 px-5 py-3 font-black text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {submitting ? "Please wait..." : "Pay Now →"}
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
