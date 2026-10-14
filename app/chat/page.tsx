@@ -1,14 +1,9 @@
+
 "use client";
 
 import Link from "next/link";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import {
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
 import { supabaseBrowser } from "@/supabase-browser";
 
 type Message = {
@@ -18,20 +13,9 @@ type Message = {
   listing_id: number | null;
   message: string;
   created_at: string;
-  is_read: boolean;
-  is_spam: boolean;
-  read_at?: string | null;
 };
 
-type Filter = "All" | "Read" | "Unread" | "Unanswered" | "Spam";
-
-const FILTERS: Filter[] = [
-  "All",
-  "Read",
-  "Unread",
-  "Unanswered",
-  "Spam",
-];
+type Filter = "All" | "Unanswered";
 
 function ChatContent() {
   const searchParams = useSearchParams();
@@ -39,18 +23,22 @@ function ChatContent() {
 
   const listingParam = searchParams.get("listing");
   const sellerParam = searchParams.get("seller");
-  const title = searchParams.get("title") || "Marketplace listing";
+  const titleParam = searchParams.get("title") || "";
   const price = searchParams.get("price") || "";
 
   const listingId =
-    listingParam && Number.isSafeInteger(Number(listingParam))
+    listingParam && /^\d+$/.test(listingParam)
       ? Number(listingParam)
       : null;
 
   const [userId, setUserId] = useState("");
+  const [sellerId, setSellerId] = useState(sellerParam || "");
+  const [listingTitle, setListingTitle] = useState(
+    titleParam || "Marketplace listing"
+  );
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeFilter, setActiveFilter] = useState<Filter>("All");
-  const [selectedUser, setSelectedUser] = useState("");
+  const [selectedUser, setSelectedUser] = useState(sellerParam || "");
   const [selectedListingId, setSelectedListingId] =
     useState<number | null>(listingId);
   const [draft, setDraft] = useState("");
@@ -64,7 +52,7 @@ function ChatContent() {
       const { data, error: fetchError } = await supabase
         .from("messages")
         .select(
-          "id, sender_id, receiver_id, listing_id, message, created_at, is_read, is_spam, read_at"
+          "id,sender_id,receiver_id,listing_id,message,created_at"
         )
         .or(
           `sender_id.eq.${currentUser},receiver_id.eq.${currentUser}`
@@ -72,7 +60,10 @@ function ChatContent() {
         .order("created_at", { ascending: true });
 
       if (fetchError) {
-        setError(fetchError.message);
+        setError(
+          "Unable to load messages. Please check your message-table permissions."
+        );
+        console.error("Message loading error:", fetchError.message);
         return;
       }
 
@@ -86,23 +77,59 @@ function ChatContent() {
     let active = true;
 
     async function initialize() {
-      const { data, error: authError } =
+      setLoading(true);
+      setError("");
+
+      const { data: authData, error: authError } =
         await supabase.auth.getUser();
 
       if (!active) return;
 
-      if (authError || !data.user) {
-        setError("Please sign in to view your messages.");
+      if (authError || !authData.user) {
+        setError("Please sign in to view or send messages.");
         setLoading(false);
         return;
       }
 
-      const currentUser = data.user.id;
+      const currentUser = authData.user.id;
       setUserId(currentUser);
 
-      if (sellerParam && sellerParam !== currentUser) {
+      if (listingId !== null) {
+        const { data: listing, error: listingError } = await supabase
+          .from("listings")
+          .select("id,title,price,seller_id")
+          .eq("id", listingId)
+          .maybeSingle();
+
+        if (!active) return;
+
+        if (listingError) {
+          console.error("Listing lookup error:", listingError.message);
+          setError("Unable to load this listing's seller.");
+        } else if (!listing) {
+          setError("This listing could not be found.");
+        } else {
+          setListingTitle(listing.title || "Marketplace listing");
+
+          if (!titleParam && listing.price !== null) {
+            // The price remains optional in the chat header.
+          }
+
+          const actualSellerId = listing.seller_id;
+
+          if (actualSellerId && actualSellerId !== currentUser) {
+            setSellerId(actualSellerId);
+            setSelectedUser(actualSellerId);
+            setSelectedListingId(listingId);
+          } else if (actualSellerId === currentUser) {
+            setError("This is your own listing. Choose a buyer conversation.");
+            setSellerId("");
+            setSelectedUser("");
+          }
+        }
+      } else if (sellerParam && sellerParam !== currentUser) {
+        setSellerId(sellerParam);
         setSelectedUser(sellerParam);
-        setSelectedListingId(listingId);
       }
 
       await loadMessages(currentUser);
@@ -115,13 +142,19 @@ function ChatContent() {
     return () => {
       active = false;
     };
-  }, [supabase, sellerParam, listingId, loadMessages]);
+  }, [
+    supabase,
+    listingId,
+    sellerParam,
+    titleParam,
+    loadMessages,
+  ]);
 
   useEffect(() => {
     if (!userId) return;
 
     const channel = supabase
-      .channel(`messages-inbox-${userId}`)
+      .channel(`messages-${userId}`)
       .on(
         "postgres_changes",
         {
@@ -168,36 +201,18 @@ function ChatContent() {
         listingId: latest.listing_id,
         latest,
         items,
-        unread: items.some(
-          (message) =>
-            message.receiver_id === userId &&
-            !message.is_read &&
-            !message.is_spam
-        ),
-        spam: items.some((message) => message.is_spam),
         unanswered: latest.sender_id !== userId,
       };
     });
   }, [messages, userId]);
 
-  const visibleConversations = useMemo(
-    () =>
-      conversations.filter((conversation) => {
-        switch (activeFilter) {
-          case "Read":
-            return !conversation.unread && !conversation.spam;
-          case "Unread":
-            return conversation.unread && !conversation.spam;
-          case "Unanswered":
-            return conversation.unanswered && !conversation.spam;
-          case "Spam":
-            return conversation.spam;
-          default:
-            return !conversation.spam;
-        }
-      }),
-    [activeFilter, conversations]
-  );
+  const visibleConversations = useMemo(() => {
+    if (activeFilter === "Unanswered") {
+      return conversations.filter((conversation) => conversation.unanswered);
+    }
+
+    return conversations;
+  }, [activeFilter, conversations]);
 
   const selectedConversation = conversations.find(
     (conversation) =>
@@ -207,63 +222,11 @@ function ChatContent() {
 
   const conversationMessages = selectedConversation?.items || [];
 
-  const markRead = useCallback(
-    async (message: Message) => {
-      if (
-        message.receiver_id !== userId ||
-        message.is_read ||
-        message.is_spam
-      ) {
-        return;
-      }
-
-      const readAt = new Date().toISOString();
-
-      const { error: updateError } = await supabase
-        .from("messages")
-        .update({
-          is_read: true,
-          read_at: readAt,
-        })
-        .eq("id", message.id)
-        .eq("receiver_id", userId);
-
-      if (updateError) {
-        setError(updateError.message);
-        return;
-      }
-
-      setMessages((current) =>
-        current.map((item) =>
-          item.id === message.id
-            ? { ...item, is_read: true, read_at: readAt }
-            : item
-        )
-      );
-    },
-    [supabase, userId]
-  );
-
-  useEffect(() => {
-    if (!selectedConversation) return;
-
-    for (const message of selectedConversation.items) {
-      if (
-        message.receiver_id === userId &&
-        !message.is_read &&
-        !message.is_spam
-      ) {
-        void markRead(message);
-      }
-    }
-  }, [selectedConversation, userId, markRead]);
-
   async function sendMessage() {
     const text = draft.trim();
+    const recipient = selectedUser || sellerId;
 
     if (!text || !userId || sending) return;
-
-    const recipient = selectedUser || sellerParam || "";
 
     if (!recipient || recipient === userId) {
       setError("Open a valid buyer or seller conversation first.");
@@ -299,66 +262,37 @@ function ChatContent() {
       .insert(payload);
 
     if (sendError) {
-      setError(sendError.message);
+      console.error("Message send error:", sendError.message);
+      setError(
+        "Message could not be sent. Please check your Supabase message insert policy."
+      );
     } else {
       setDraft("");
       setSelectedUser(recipient);
-      setNotice("Message sent successfully.");
+      setNotice("Message sent.");
       await loadMessages(userId);
     }
 
     setSending(false);
   }
 
-  async function toggleSpam(conversation: {
-    items: Message[];
-    spam: boolean;
-  }) {
-    const receivedIds = conversation.items
-      .filter((message) => message.receiver_id === userId)
-      .map((message) => message.id);
-
-    if (receivedIds.length === 0) {
-      setError("Only received messages can be marked as spam.");
-      return;
-    }
-
-    const nextSpam = !conversation.spam;
-
-    const { error: updateError } = await supabase
-      .from("messages")
-      .update({ is_spam: nextSpam })
-      .in("id", receivedIds)
-      .eq("receiver_id", userId);
-
-    if (updateError) {
-      setError(updateError.message);
-      return;
-    }
-
-    await loadMessages(userId);
-    setNotice(nextSpam ? "Messages marked as spam." : "Spam status removed.");
-  }
-
   return (
     <main className="min-h-screen bg-slate-50 p-3 text-slate-800 sm:p-6">
       <div className="mx-auto max-w-7xl">
-        <header className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <header className="mb-5 flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm text-slate-500">
-              BestSalesGH / Dashboard
-            </p>
-            <h1 className="mt-1 text-2xl font-bold">Messages</h1>
+            <p className="text-sm text-slate-500">BestSalesGH</p>
+            <h1 className="mt-1 text-2xl font-black">Chat with seller</h1>
             <p className="mt-1 text-sm text-slate-500">
-              Communicate with buyers and sellers.
+              Discuss a listing directly with its seller.
             </p>
           </div>
 
           <Link
-            href="/dashboard"
-            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-100"
+            href={listingId ? `/listings/${listingId}` : "/listings"}
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-blue-700"
           >
-            Back to Dashboard
+            ← Back
           </Link>
         </header>
 
@@ -380,24 +314,24 @@ function ChatContent() {
           </div>
         )}
 
-        <section className="grid min-h-[650px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:grid-cols-[340px_1fr]">
+        <section className="grid min-h-[650px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:grid-cols-[320px_1fr]">
           <aside className="border-b border-slate-200 lg:border-b-0 lg:border-r">
             <div className="border-b border-slate-200 p-4">
-              <h2 className="font-semibold">Your Inbox</h2>
+              <h2 className="font-black">Your conversations</h2>
               <p className="mt-1 text-xs text-slate-500">
                 {conversations.length} conversations
               </p>
 
-              <div className="mt-4 flex flex-wrap gap-2">
-                {FILTERS.map((filter) => (
+              <div className="mt-3 flex gap-2">
+                {(["All", "Unanswered"] as Filter[]).map((filter) => (
                   <button
                     key={filter}
                     type="button"
                     onClick={() => setActiveFilter(filter)}
-                    className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+                    className={`rounded-full px-3 py-2 text-xs font-bold ${
                       activeFilter === filter
                         ? "bg-blue-700 text-white"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        : "bg-slate-100 text-slate-600"
                     }`}
                   >
                     {filter}
@@ -406,14 +340,14 @@ function ChatContent() {
               </div>
             </div>
 
-            <div className="max-h-[360px] overflow-y-auto lg:max-h-[600px]">
+            <div className="max-h-[330px] overflow-y-auto lg:max-h-[600px]">
               {loading ? (
-                <p className="p-5 text-sm text-slate-500">
-                  Loading messages...
+                <p className="p-4 text-sm text-slate-500">
+                  Loading conversations...
                 </p>
               ) : visibleConversations.length === 0 ? (
-                <p className="p-5 text-sm text-slate-500">
-                  No conversations in this filter.
+                <p className="p-4 text-sm text-slate-500">
+                  No conversations yet. Open a listing and tap Contact Seller.
                 </p>
               ) : (
                 visibleConversations.map((conversation) => (
@@ -422,33 +356,24 @@ function ChatContent() {
                     type="button"
                     onClick={() => {
                       setSelectedUser(conversation.otherUser);
+                      setSellerId(conversation.otherUser);
                       setSelectedListingId(conversation.listingId);
                       setError("");
                       setNotice("");
                     }}
-                    className={`w-full border-b border-slate-100 p-4 text-left hover:bg-slate-50 ${
+                    className={`w-full border-b border-slate-100 p-4 text-left ${
                       selectedUser === conversation.otherUser &&
                       selectedListingId === conversation.listingId
                         ? "bg-blue-50"
-                        : ""
+                        : "hover:bg-slate-50"
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="break-all text-sm font-semibold">
-                        User {conversation.otherUser.slice(0, 8)}...
-                      </span>
-
-                      {conversation.unread && (
-                        <span className="rounded-full bg-blue-700 px-2 py-0.5 text-[10px] font-semibold text-white">
-                          Unread
-                        </span>
-                      )}
-                    </div>
-
+                    <p className="break-all text-sm font-bold">
+                      User {conversation.otherUser.slice(0, 8)}…
+                    </p>
                     <p className="mt-1 truncate text-sm text-slate-600">
                       {conversation.latest.message}
                     </p>
-
                     <p className="mt-2 text-xs text-slate-400">
                       {new Date(
                         conversation.latest.created_at
@@ -460,52 +385,34 @@ function ChatContent() {
             </div>
           </aside>
 
-          <section className="flex min-h-[500px] flex-col">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 p-4 sm:p-5">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
-                  Conversation
-                </p>
-                <h2 className="mt-1 break-all text-lg font-bold">
-                  {selectedUser
-                    ? `User ${selectedUser.slice(0, 8)}...`
-                    : sellerParam
-                      ? `Seller ${sellerParam.slice(0, 8)}...`
-                      : "Select a conversation"}
-                </h2>
-
-                {(listingParam || title !== "Marketplace listing") && (
-                  <p className="mt-1 text-sm text-slate-500">
-                    {title}
+          <section className="flex min-h-[520px] min-w-0 flex-col">
+            <div className="border-b border-slate-200 p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xl">
+                  👤
+                </div>
+                <div className="min-w-0">
+                  <h2 className="font-black">
+                    {selectedUser
+                      ? "Chat with seller"
+                      : "Start a conversation"}
+                  </h2>
+                  <p className="mt-1 truncate text-sm text-slate-500">
+                    {listingTitle}
                     {price ? ` · ${price}` : ""}
                   </p>
-                )}
+                </div>
               </div>
-
-              {selectedConversation && (
-                <button
-                  type="button"
-                  onClick={() => void toggleSpam(selectedConversation)}
-                  className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold hover:bg-slate-100"
-                >
-                  {selectedConversation.spam
-                    ? "Remove Spam"
-                    : "Mark Spam"}
-                </button>
-              )}
             </div>
 
             <div className="flex-1 space-y-3 overflow-y-auto bg-slate-50 p-4 sm:p-6">
               {conversationMessages.length === 0 ? (
-                <div className="mx-auto mt-12 max-w-sm text-center">
-                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-xl">
-                    ✉
-                  </div>
-                  <h3 className="mt-3 font-semibold">
-                    Start a conversation
-                  </h3>
-                  <p className="mt-1 text-sm text-slate-500">
-                    Select a conversation or open chat from a listing to get started.
+                <div className="mx-auto mt-10 max-w-sm text-center">
+                  <div className="text-4xl">💬</div>
+                  <h3 className="mt-3 font-bold">Send your first message</h3>
+                  <p className="mt-2 text-sm leading-6 text-slate-500">
+                    Ask about availability, condition, price, or delivery.
+                    Your message will be sent to the listing seller.
                   </p>
                 </div>
               ) : (
@@ -520,10 +427,10 @@ function ChatContent() {
                       }`}
                     >
                       <div
-                        className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm sm:max-w-[70%] ${
+                        className={`max-w-[88%] rounded-2xl px-4 py-3 shadow-sm sm:max-w-[75%] ${
                           ownMessage
-                            ? "bg-blue-700 text-white"
-                            : "border border-slate-200 bg-white text-slate-800"
+                            ? "rounded-br-sm bg-blue-700 text-white"
+                            : "rounded-bl-sm border border-slate-200 bg-white text-slate-800"
                         }`}
                       >
                         <p className="whitespace-pre-wrap break-words text-sm">
@@ -531,15 +438,10 @@ function ChatContent() {
                         </p>
                         <p
                           className={`mt-2 text-[10px] ${
-                            ownMessage
-                              ? "text-blue-100"
-                              : "text-slate-400"
+                            ownMessage ? "text-blue-100" : "text-slate-400"
                           }`}
                         >
-                          {new Date(
-                            message.created_at
-                          ).toLocaleString()}
-                          {ownMessage && message.is_read ? " · Read" : ""}
+                          {new Date(message.created_at).toLocaleString()}
                         </p>
                       </div>
                     </div>
@@ -549,7 +451,7 @@ function ChatContent() {
             </div>
 
             <form
-              className="border-t border-slate-200 bg-white p-4"
+              className="border-t border-slate-200 bg-white p-3 sm:p-4"
               onSubmit={(event) => {
                 event.preventDefault();
                 void sendMessage();
@@ -557,40 +459,41 @@ function ChatContent() {
             >
               <label
                 htmlFor="message-draft"
-                className="mb-2 block text-sm font-semibold"
+                className="mb-2 block text-sm font-bold"
               >
                 Your message
               </label>
 
-              <textarea
-                id="message-draft"
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                placeholder="Write your message..."
-                rows={3}
-                maxLength={5000}
-                disabled={!userId || sending}
-                className="w-full resize-y rounded-xl border border-slate-300 p-3 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
-              />
-
-              <div className="mt-3 flex items-center justify-between gap-3">
-                <p className="text-xs text-slate-400">
-                  Keep conversations safe and respectful.
-                </p>
+              <div className="flex items-end gap-2">
+                <textarea
+                  id="message-draft"
+                  value={draft}
+                  onChange={(event) => setDraft(event.target.value)}
+                  placeholder="Type your message..."
+                  rows={2}
+                  maxLength={5000}
+                  disabled={!userId || sending || !selectedUser}
+                  className="min-w-0 flex-1 resize-none rounded-2xl border border-slate-300 p-3 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
+                />
 
                 <button
                   type="submit"
+                  aria-label="Send message"
                   disabled={
                     !draft.trim() ||
                     !userId ||
                     sending ||
-                    !(selectedUser || sellerParam)
+                    !selectedUser
                   }
-                  className="rounded-xl bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex h-12 shrink-0 items-center justify-center rounded-full bg-blue-700 px-5 font-bold text-white hover:bg-blue-800 disabled:opacity-50"
                 >
-                  {sending ? "Sending..." : "Send Message"}
+                  {sending ? "…" : "➤"}
                 </button>
               </div>
+
+              <p className="mt-2 text-xs text-slate-400">
+                Never share passwords or verification codes.
+              </p>
             </form>
           </section>
         </section>
@@ -604,9 +507,7 @@ export default function ChatPage() {
     <Suspense
       fallback={
         <main className="min-h-screen bg-slate-50 p-6">
-          <div className="mx-auto max-w-7xl rounded-2xl border border-slate-200 bg-white p-6">
-            Loading messages...
-          </div>
+          <p className="text-slate-600">Loading chat...</p>
         </main>
       }
     >
