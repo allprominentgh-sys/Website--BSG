@@ -16,42 +16,42 @@ const defaultPages: CMSPageData[] = [
   {
     title: "About Us",
     slug: "about",
-    published: false,
     content:
       "BEST SALES GHANA is a marketplace operated by All Prominent Ghana Limited. Our platform connects buyers, sellers and businesses across Ghana.",
+    published: false,
   },
   {
     title: "Contact Us",
     slug: "contact",
-    published: false,
     content:
       "Contact BEST SALES GHANA for enquiries, account assistance, marketplace support and business partnerships.\n\nEmail: info@bestsalesgh.com\n\nAdd your official business phone number and address before publishing.",
+    published: false,
   },
   {
     title: "Privacy Policy",
     slug: "privacy-policy",
-    published: false,
     content:
-      "Add your complete privacy policy here. Explain the personal information collected, how it is used and protected, how long it is retained, and how users can exercise their rights. Review before publishing.",
+      "Add your complete privacy policy here. Explain what personal information is collected, how it is used and protected, how long it is retained, and how users can exercise their rights. Review before publishing.",
+    published: false,
   },
   {
     title: "Terms & Conditions",
     slug: "terms",
-    published: false,
     content:
-      "Add your complete terms and conditions here, including rules for buyers and sellers, listings, advertising, payments, disputes, account termination and liability. Review before publishing.",
+      "Add your complete terms and conditions, including rules for buyers and sellers, listings, advertising, payments, disputes, account termination and liability. Review before publishing.",
+    published: false,
   },
   {
     title: "Homepage",
     slug: "home",
-    published: false,
     content:
       "Welcome to BEST SALES GHANA — Buy, Sell, Advertise and Connect. Ghana's marketplace for products, vehicles, property, services, machinery, equipment and business opportunities.",
+    published: false,
   },
 ];
 
 export default function CMSPage() {
-  const [pages, setPages] = useState<CMSPageData[]>([]);
+  const [pages, setPages] = useState<CMSPageData[]>(defaultPages);
   const [selectedSlug, setSelectedSlug] = useState("about");
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
@@ -72,12 +72,13 @@ export default function CMSPage() {
 
       if (!response.ok || !result.success) {
         throw new Error(
-          result.message || "Could not load CMS pages. Check your admin session."
+          result.message ||
+            "Could not load CMS pages. Check the API route and your admin session."
         );
       }
 
-      const savedPages = Array.isArray(result.pages)
-        ? (result.pages as CMSPageData[])
+      const savedPages: CMSPageData[] = Array.isArray(result.pages)
+        ? result.pages
         : [];
 
       const mergedPages = defaultPages.map((defaultPage) => {
@@ -92,12 +93,12 @@ export default function CMSPage() {
 
       setPages(mergedPages);
     } catch (error) {
+      setPages(defaultPages);
       setNotice(
         error instanceof Error
           ? error.message
-          : "Unable to connect to the CMS."
+          : "Unable to connect to the CMS API."
       );
-      setPages(defaultPages);
     } finally {
       setLoading(false);
     }
@@ -126,10 +127,18 @@ export default function CMSPage() {
   }
 
   async function saveSelected(publish: boolean) {
-    if (!selectedPage) return;
+    if (!selectedPage) {
+      setNotice("Select a page first.");
+      return;
+    }
 
     if (!selectedPage.title.trim()) {
       setNotice("Enter a page title before saving.");
+      return;
+    }
+
+    if (publish && !selectedPage.content.trim()) {
+      setNotice("Add page content before publishing.");
       return;
     }
 
@@ -151,10 +160,13 @@ export default function CMSPage() {
         }),
       });
 
-      const result = await response.json();
+      const result = await response.json().catch(() => null);
 
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || "Unable to save this page.");
+      if (!response.ok || !result?.success) {
+        throw new Error(
+          result?.message ||
+            `Could not save the page. Server returned ${response.status}.`
+        );
       }
 
       if (result.page) {
@@ -165,18 +177,26 @@ export default function CMSPage() {
               : page
           )
         );
+      } else {
+        setPages((current) =>
+          current.map((page) =>
+            page.slug === selectedSlug
+              ? { ...page, published: publish }
+              : page
+          )
+        );
       }
 
       setNotice(
         publish
-          ? "Page published in Supabase. Public pages will show it once connected to the CMS."
-          : "Draft saved successfully in Supabase."
+          ? "Page published successfully in the CMS. Confirm that its public website route reads published content."
+          : "Draft saved successfully."
       );
     } catch (error) {
       setNotice(
         error instanceof Error
           ? error.message
-          : "An unexpected error occurred."
+          : "An unexpected error occurred while saving."
       );
     } finally {
       setSaving(false);
@@ -186,7 +206,9 @@ export default function CMSPage() {
   if (loading) {
     return (
       <main className="min-h-screen bg-slate-100 p-6 text-slate-900">
-        Loading Content Management System...
+        <p className="font-semibold">
+          Loading Content Management System...
+        </p>
       </main>
     );
   }
@@ -203,7 +225,7 @@ export default function CMSPage() {
               Content Management System
             </h1>
             <p className="mt-1 text-sm text-slate-500">
-              Manage and publish website content.
+              Manage your website pages and content.
             </p>
           </div>
 
@@ -217,16 +239,17 @@ export default function CMSPage() {
       </header>
 
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <section className="mb-6 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-900">
-          Drafts and publishing status are stored in Supabase.
-          Publishing a page here does not automatically connect it to
-          its public website route; that is the next step.
-        </section>
+        <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-900">
+          Changes are sent to the CMS API. Public pages will reflect
+          published content only after their website routes are connected
+          to the CMS data.
+        </div>
 
         {notice && (
           <div
             role="status"
-            className="mb-6 rounded-xl border border-slate-200 bg-white p-4 text-sm"
+            aria-live="polite"
+            className="mb-6 break-words rounded-xl border border-slate-200 bg-white p-4 text-sm"
           >
             {notice}
           </div>
@@ -263,7 +286,7 @@ export default function CMSPage() {
             </div>
           </aside>
 
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+          <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
             {selectedPage && (
               <>
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -271,7 +294,7 @@ export default function CMSPage() {
                     <p className="text-sm font-bold uppercase tracking-wider text-blue-700">
                       Page editor
                     </p>
-                    <h2 className="mt-1 text-2xl font-black">
+                    <h2 className="mt-1 break-words text-2xl font-black">
                       {selectedPage.title}
                     </h2>
                   </div>
@@ -340,11 +363,11 @@ export default function CMSPage() {
                       }
                       rows={14}
                       maxLength={30000}
-                      placeholder="Enter the content for this page..."
+                      placeholder="Enter content for this page..."
                       className="w-full rounded-xl border border-slate-300 p-3 leading-7 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
                     />
                     <p className="mt-1 text-xs text-slate-500">
-                      {selectedPage.content.length} / 30,000 characters
+                      {selectedPage.content.length.toLocaleString()} / 30,000 characters
                     </p>
                   </div>
                 </div>
@@ -398,7 +421,7 @@ export default function CMSPage() {
                 <div className="mt-8 border-t border-slate-200 pt-6">
                   <h3 className="text-lg font-black">Content Preview</h3>
                   <article className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-5">
-                    <h4 className="text-2xl font-black">
+                    <h4 className="break-words text-2xl font-black">
                       {selectedPage.title}
                     </h4>
                     <div className="mt-4 whitespace-pre-wrap break-words leading-7 text-slate-700">
@@ -421,4 +444,3 @@ export default function CMSPage() {
     </main>
   );
 }
-
