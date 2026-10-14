@@ -1,0 +1,366 @@
+
+"use client";
+
+import Link from "next/link";
+import { useEffect, useState } from "react";
+
+type PageContent = {
+  title: string;
+  slug: string;
+  content: string;
+  published: boolean;
+};
+
+const defaultPages: PageContent[] = [
+  {
+    title: "About Us",
+    slug: "about",
+    published: true,
+    content:
+      "BEST SALES GHANA is a marketplace operated by All Prominent Ghana Limited. Our platform connects buyers, sellers and businesses across Ghana.",
+  },
+  {
+    title: "Contact Us",
+    slug: "contact",
+    published: true,
+    content:
+      "Contact BEST SALES GHANA for enquiries, account assistance, marketplace support and business partnerships.\n\nEmail: info@bestsalesgh.com\n\nPhone: Add your official business phone number.\n\nAddress: Add your official business address.",
+  },
+  {
+    title: "Privacy Policy",
+    slug: "privacy-policy",
+    published: true,
+    content:
+      "BEST SALES GHANA respects your privacy. This policy should explain what personal information the platform collects, how it is used, how it is protected, and the rights available to users. Review and complete this policy before publishing.",
+  },
+  {
+    title: "Terms & Conditions",
+    slug: "terms",
+    published: true,
+    content:
+      "These Terms & Conditions govern the use of BEST SALES GHANA, including buying, selling, advertising, payments, communications, disputes and account verification. Users should review the full terms before using the platform.",
+  },
+  {
+    title: "Homepage",
+    slug: "home",
+    published: true,
+    content:
+      "Welcome to BEST SALES GHANA — Buy, Sell, Advertise and Connect. Ghana's marketplace for products, vehicles, property, services, machinery, equipment and business opportunities.",
+  },
+];
+
+const STORAGE_KEY = "bestsalesgh-cms-drafts-v1";
+
+export default function CMSPage() {
+  const [pages, setPages] = useState<PageContent[]>(defaultPages);
+  const [selectedSlug, setSelectedSlug] = useState("about");
+  const [notice, setNotice] = useState("");
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(STORAGE_KEY);
+
+      if (saved) {
+        const parsed = JSON.parse(saved) as PageContent[];
+
+        if (Array.isArray(parsed)) {
+          setPages(parsed);
+        }
+      }
+    } catch {
+      setNotice("Could not load saved browser drafts.");
+    } finally {
+      setReady(true);
+    }
+  }, []);
+
+  const selectedPage =
+    pages.find((page) => page.slug === selectedSlug) ?? pages[0];
+
+  function updateSelected(
+    field: "title" | "content" | "published",
+    value: string | boolean
+  ) {
+    setPages((current) =>
+      current.map((page) =>
+        page.slug === selectedSlug
+          ? { ...page, [field]: value }
+          : page
+      )
+    );
+
+    setNotice("");
+  }
+
+  function saveDrafts() {
+    try {
+      window.localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify(pages)
+      );
+
+      setNotice(
+        "Draft saved in this browser. It has not been published to the live website."
+      );
+    } catch {
+      setNotice("Unable to save drafts in this browser.");
+    }
+  }
+
+  function resetDrafts() {
+    const confirmed = window.confirm(
+      "Reset all CMS edits in this browser to the original sample content?"
+    );
+
+    if (!confirmed) return;
+
+    setPages(defaultPages);
+    window.localStorage.removeItem(STORAGE_KEY);
+    setSelectedSlug("about");
+    setNotice("Browser drafts have been reset.");
+  }
+
+  if (!ready || !selectedPage) {
+    return (
+      <main className="min-h-screen bg-slate-100 p-6">
+        Loading Content Management System...
+      </main>
+    );
+  }
+
+  return (
+    <main className="min-h-screen bg-slate-100 text-slate-900">
+      <header className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-5 sm:px-6 lg:px-8">
+          <div>
+            <p className="text-sm font-bold text-blue-700">
+              BEST SALES GHANA
+            </p>
+            <h1 className="mt-1 text-2xl font-black">
+              Content Management System
+            </h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Manage website page content.
+            </p>
+          </div>
+
+          <Link
+            href="/admin"
+            className="rounded-xl border border-slate-300 bg-white px-4 py-3 font-bold hover:bg-slate-50"
+          >
+            ← Back to Admin
+          </Link>
+        </div>
+      </header>
+
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <section className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+          <strong>Draft mode:</strong> This version stores edits in
+          this browser only. It does not update the live pages or
+          Supabase. Do not treat the sample legal text as final legal
+          advice.
+        </section>
+
+        {notice && (
+          <div
+            role="status"
+            className="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900"
+          >
+            {notice}
+          </div>
+        )}
+
+        <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+          <aside className="h-fit rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <h2 className="mb-4 text-lg font-black">
+              Website Pages
+            </h2>
+
+            <div className="space-y-2">
+              {pages.map((page) => (
+                <button
+                  key={page.slug}
+                  type="button"
+                  onClick={() => {
+                    setSelectedSlug(page.slug);
+                    setNotice("");
+                  }}
+                  className={`w-full rounded-xl border p-3 text-left ${
+                    selectedSlug === page.slug
+                      ? "border-blue-700 bg-blue-50 text-blue-900"
+                      : "border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  <span className="block font-bold">
+                    {page.title}
+                  </span>
+                  <span className="mt-1 block text-xs text-slate-500">
+                    /{page.slug === "home" ? "" : page.slug}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </aside>
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-bold uppercase tracking-wider text-blue-700">
+                  Page editor
+                </p>
+                <h2 className="mt-1 text-2xl font-black">
+                  {selectedPage.title}
+                </h2>
+              </div>
+
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-bold ${
+                  selectedPage.published
+                    ? "bg-green-100 text-green-800"
+                    : "bg-slate-100 text-slate-600"
+                }`}
+              >
+                {selectedPage.published
+                  ? "Marked Published"
+                  : "Marked Unpublished"}
+              </span>
+            </div>
+
+            <div className="mt-6 space-y-5">
+              <div>
+                <label
+                  htmlFor="page-title"
+                  className="mb-2 block text-sm font-bold"
+                >
+                  Page title
+                </label>
+                <input
+                  id="page-title"
+                  value={selectedPage.title}
+                  onChange={(event) =>
+                    updateSelected("title", event.target.value)
+                  }
+                  maxLength={150}
+                  className="w-full rounded-xl border border-slate-300 p-3 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="page-slug"
+                  className="mb-2 block text-sm font-bold"
+                >
+                  Page address
+                </label>
+                <input
+                  id="page-slug"
+                  value={`/${selectedPage.slug === "home" ? "" : selectedPage.slug}`}
+                  readOnly
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-slate-500"
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  The address is read-only in this first version.
+                </p>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="page-content"
+                  className="mb-2 block text-sm font-bold"
+                >
+                  Page content
+                </label>
+                <textarea
+                  id="page-content"
+                  value={selectedPage.content}
+                  onChange={(event) =>
+                    updateSelected("content", event.target.value)
+                  }
+                  rows={14}
+                  maxLength={30000}
+                  placeholder="Enter the content for this page..."
+                  className="w-full rounded-xl border border-slate-300 p-3 leading-7 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  {selectedPage.content.length} / 30,000 characters
+                </p>
+              </div>
+
+              <label className="flex items-start gap-3 rounded-xl border border-slate-200 p-4">
+                <input
+                  type="checkbox"
+                  checked={selectedPage.published}
+                  onChange={(event) =>
+                    updateSelected("published", event.target.checked)
+                  }
+                  className="mt-1 h-4 w-4"
+                />
+                <span>
+                  <span className="block font-bold">
+                    Mark as published
+                  </span>
+                  <span className="mt-1 block text-sm text-slate-500">
+                    This is only a local status indicator. It will not
+                    publish the page on the live website.
+                  </span>
+                </span>
+              </label>
+            </div>
+
+            <div className="mt-6 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={saveDrafts}
+                className="rounded-xl bg-blue-700 px-5 py-3 font-bold text-white hover:bg-blue-800"
+              >
+                Save Browser Draft
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setNotice("");
+                  window.print();
+                }}
+                className="rounded-xl border border-slate-300 px-5 py-3 font-bold hover:bg-slate-50"
+              >
+                Print / Preview
+              </button>
+
+              <button
+                type="button"
+                onClick={resetDrafts}
+                className="rounded-xl border border-red-200 px-5 py-3 font-bold text-red-700 hover:bg-red-50"
+              >
+                Reset Drafts
+              </button>
+            </div>
+
+            <div className="mt-8 border-t border-slate-200 pt-6">
+              <h3 className="text-lg font-black">
+                Content Preview
+              </h3>
+
+              <article className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-5">
+                <h4 className="text-2xl font-black">
+                  {selectedPage.title}
+                </h4>
+                <div className="mt-4 whitespace-pre-wrap break-words leading-7 text-slate-700">
+                  {selectedPage.content}
+                </div>
+              </article>
+            </div>
+          </section>
+        </div>
+
+        <footer className="mt-10 border-t border-slate-200 py-6 text-center text-sm text-slate-500">
+          BEST SALES GHANA — CONTENT MANAGEMENT
+          <p className="mt-2">
+            © {new Date().getFullYear()} All Prominent Ghana Limited.
+          </p>
+        </footer>
+      </div>
+    </main>
+  );
+}
