@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -18,8 +19,6 @@ type Listing = {
   status: string | null;
   featured: boolean | null;
   created_at: string | null;
-
-  // Phase 7 location fields
   item_region: string | null;
   item_city: string | null;
   item_area: string | null;
@@ -49,6 +48,11 @@ type GhanaLocation = {
   location_type: "city" | "town" | "area";
   parent_name: string | null;
   sort_order: number;
+};
+
+type ListingImage = {
+  listing_id: number;
+  image_url: string;
 };
 
 const CATEGORY_OPTIONS = [
@@ -151,6 +155,47 @@ const SUBCATEGORY_OPTIONS: Record<string, string[]> = {
   ],
 };
 
+const CATEGORY_KEYWORDS: Record<string, string[]> = {
+  "Printing Equipment": [
+    "printer",
+    "printing",
+    "dtf",
+    "eco solvent",
+    "uv printer",
+    "screen printing",
+  ],
+  Machinery: [
+    "machine",
+    "machinery",
+    "printer",
+    "industrial",
+    "equipment",
+  ],
+  "Construction Equipment": [
+    "excavator",
+    "loader",
+    "concrete",
+    "generator",
+    "construction",
+    "bulldozer",
+  ],
+  Electronics: [
+    "electronic",
+    "computer",
+    "phone",
+    "tablet",
+    "television",
+    "camera",
+  ],
+  Vehicles: [
+    "vehicle",
+    "car",
+    "truck",
+    "bus",
+    "motorcycle",
+  ],
+};
+
 function formatPrice(
   price: number | null,
   currencyCode: string | null,
@@ -173,33 +218,69 @@ function formatPrice(
   }
 }
 
+function normalise(value: string | null | undefined) {
+  return (value || "").trim().toLowerCase();
+}
+
+function listingMatchesCategory(
+  listing: Listing,
+  category: string,
+) {
+  if (!category || category === "All Categories") {
+    return true;
+  }
+
+  const listingCategory = normalise(listing.category);
+  const listingSubcategory = normalise(listing.subcategory);
+  const selectedCategory = normalise(category);
+
+  if (
+    listingCategory === selectedCategory ||
+    listingSubcategory === selectedCategory
+  ) {
+    return true;
+  }
+
+  const searchable = [
+    listing.title,
+    listing.description,
+    listing.category,
+    listing.subcategory,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  const keywords = CATEGORY_KEYWORDS[category] || [
+    selectedCategory,
+  ];
+
+  return keywords.some((keyword) =>
+    searchable.includes(keyword.toLowerCase()),
+  );
+}
+
 export default function ListingsPage() {
   const [listings, setListings] = useState<Listing[]>([]);
+  const [listingImages, setListingImages] = useState<
+    Record<number, string>
+  >({});
   const [currencies, setCurrencies] = useState<Currency[]>([]);
-
-  // Phase 7
   const [regions, setRegions] = useState<GhanaRegion[]>([]);
   const [locations, setLocations] = useState<GhanaLocation[]>([]);
 
   const [loading, setLoading] = useState(true);
+  const [imageErrors, setImageErrors] = useState<
+    Record<number, boolean>
+  >({});
 
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All Categories");
   const [subcategory, setSubcategory] = useState("");
-
   const [region, setRegion] = useState("");
   const [city, setCity] = useState("");
   const [area, setArea] = useState("");
 
-  const [filteredListings, setFilteredListings] = useState<Listing[]>([]);
-
-  /*
-   * Load search parameters from URL.
-   *
-   * We intentionally use window.location.search instead of
-   * useSearchParams() so this page does not trigger the
-   * Next.js Suspense/prerender problem we previously had.
-   */
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
 
@@ -217,10 +298,9 @@ export default function ListingsPage() {
     setArea(params.get("area") || "");
   }, []);
 
-  /*
-   * Load marketplace data and Phase 7 Ghana locations.
-   */
   useEffect(() => {
+    let cancelled = false;
+
     async function loadData() {
       setLoading(true);
 
@@ -283,13 +363,20 @@ export default function ListingsPage() {
             .order("name", { ascending: true }),
         ]);
 
+        if (cancelled) return;
+
+        let loadedListings: Listing[] = [];
+
         if (listingsResponse.error) {
           console.error(
             "Listings loading error:",
             listingsResponse.error,
           );
         } else {
-          setListings((listingsResponse.data || []) as Listing[]);
+          loadedListings = (listingsResponse.data ||
+            []) as Listing[];
+
+          setListings(loadedListings);
         }
 
         if (currenciesResponse.error) {
@@ -324,19 +411,63 @@ export default function ListingsPage() {
             (locationsResponse.data || []) as GhanaLocation[],
           );
         }
+
+        const listingIds = loadedListings.map(
+          (listing) => listing.id,
+        );
+
+        if (listingIds.length > 0) {
+          const imagesResponse = await db
+            .from("listing_images")
+            .select("listing_id,image_url")
+            .in("listing_id", listingIds);
+
+          if (cancelled) return;
+
+          if (imagesResponse.error) {
+            console.error(
+              "Listing images loading error:",
+              imagesResponse.error,
+            );
+          } else {
+            const imageMap: Record<number, string> = {};
+
+            for (const image of (imagesResponse.data ||
+              []) as ListingImage[]) {
+              const id = Number(image.listing_id);
+              const url =
+                typeof image.image_url === "string"
+                  ? image.image_url.trim()
+                  : "";
+
+              if (
+                Number.isFinite(id) &&
+                url &&
+                !imageMap[id]
+              ) {
+                imageMap[id] = url;
+              }
+            }
+
+            setListingImages(imageMap);
+          }
+        } else {
+          setListingImages({});
+        }
       } catch (error) {
         console.error("Marketplace loading error:", error);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
 
     loadData();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  /*
-   * Locations belonging to the selected region.
-   */
   const regionLocations = useMemo(() => {
     if (!region) return [];
 
@@ -351,9 +482,6 @@ export default function ListingsPage() {
     );
   }, [region, regions, locations]);
 
-  /*
-   * City / Town list.
-   */
   const cities = useMemo(() => {
     return regionLocations
       .filter(
@@ -370,9 +498,6 @@ export default function ListingsPage() {
       });
   }, [regionLocations]);
 
-  /*
-   * Areas belonging to selected city/town.
-   */
   const areas = useMemo(() => {
     if (!city) return [];
 
@@ -391,18 +516,10 @@ export default function ListingsPage() {
       });
   }, [city, regionLocations]);
 
-  /*
-   * If the database currently has no area records for a city,
-   * the Area field remains available for future Phase 7 data.
-   */
+  const filteredListings = useMemo(() => {
+    const q = normalise(search);
 
-  /*
-   * Filter listings.
-   */
-  useEffect(() => {
-    const q = search.trim().toLowerCase();
-
-    const results = listings.filter((listing) => {
+    return listings.filter((listing) => {
       const searchableText = [
         listing.title,
         listing.description,
@@ -412,6 +529,7 @@ export default function ListingsPage() {
         listing.item_region,
         listing.item_city,
         listing.item_area,
+        listing.item_ghana_post_gps,
       ]
         .filter(Boolean)
         .join(" ")
@@ -420,51 +538,36 @@ export default function ListingsPage() {
       const matchesSearch =
         !q || searchableText.includes(q);
 
-      const matchesCategory =
-        category === "All Categories" ||
-        !category ||
-        (listing.category || "").toLowerCase() ===
-          category.toLowerCase();
+      const matchesCategory = listingMatchesCategory(
+        listing,
+        category,
+      );
 
       const matchesSubcategory =
         !subcategory ||
-        (listing.subcategory || "").toLowerCase() ===
-          subcategory.toLowerCase();
+        normalise(listing.subcategory) ===
+          normalise(subcategory) ||
+        normalise(listing.title).includes(
+          normalise(subcategory),
+        );
 
-      const listingRegion = (
-        listing.item_region ||
-        ""
-      ).toLowerCase();
-
-      const listingCity = (
-        listing.item_city ||
-        ""
-      ).toLowerCase();
-
-      const listingArea = (
-        listing.item_area ||
-        ""
-      ).toLowerCase();
-
-      const oldLocation = (
-        listing.location ||
-        ""
-      ).toLowerCase();
+      const oldLocation = normalise(listing.location);
 
       const matchesRegion =
         !region ||
-        listingRegion === region.toLowerCase() ||
-        oldLocation.includes(region.toLowerCase());
+        normalise(listing.item_region) ===
+          normalise(region) ||
+        oldLocation.includes(normalise(region));
 
       const matchesCity =
         !city ||
-        listingCity === city.toLowerCase() ||
-        oldLocation.includes(city.toLowerCase());
+        normalise(listing.item_city) === normalise(city) ||
+        oldLocation.includes(normalise(city));
 
       const matchesArea =
         !area ||
-        listingArea === area.toLowerCase() ||
-        oldLocation.includes(area.toLowerCase());
+        normalise(listing.item_area) === normalise(area) ||
+        oldLocation.includes(normalise(area));
 
       return (
         matchesSearch &&
@@ -475,8 +578,6 @@ export default function ListingsPage() {
         matchesArea
       );
     });
-
-    setFilteredListings(results);
   }, [
     listings,
     search,
@@ -492,109 +593,23 @@ export default function ListingsPage() {
 
     const params = new URLSearchParams();
 
-    if (search.trim()) {
-      params.set("q", search.trim());
-    }
+    if (search.trim()) params.set("q", search.trim());
 
-    if (
-      category &&
-      category !== "All Categories"
-    ) {
+    if (category && category !== "All Categories") {
       params.set("category", category);
     }
 
-    if (subcategory) {
-      params.set("subcategory", subcategory);
-    }
-
-    if (region) {
-      params.set("region", region);
-    }
-
-    if (city) {
-      params.set("city", city);
-    }
-
-    if (area) {
-      params.set("area", area);
-    }
+    if (subcategory) params.set("subcategory", subcategory);
+    if (region) params.set("region", region);
+    if (city) params.set("city", city);
+    if (area) params.set("area", area);
 
     const queryString = params.toString();
 
     window.history.pushState(
       {},
       "",
-      queryString
-        ? `/listings?${queryString}`
-        : "/listings",
-    );
-
-    /*
-     * Re-run browser URL state without reloading the page.
-     */
-    setFilteredListings(
-      listings.filter((listing) => {
-        const q = search.trim().toLowerCase();
-
-        const searchableText = [
-          listing.title,
-          listing.description,
-          listing.category,
-          listing.subcategory,
-          listing.location,
-          listing.item_region,
-          listing.item_city,
-          listing.item_area,
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
-
-        const matchesSearch =
-          !q || searchableText.includes(q);
-
-        const matchesCategory =
-          category === "All Categories" ||
-          !category ||
-          (listing.category || "").toLowerCase() ===
-            category.toLowerCase();
-
-        const matchesSubcategory =
-          !subcategory ||
-          (listing.subcategory || "").toLowerCase() ===
-            subcategory.toLowerCase();
-
-        const oldLocation = (
-          listing.location || ""
-        ).toLowerCase();
-
-        const matchesRegion =
-          !region ||
-          (listing.item_region || "")
-            .toLowerCase() === region.toLowerCase() ||
-          oldLocation.includes(region.toLowerCase());
-
-        const matchesCity =
-          !city ||
-          (listing.item_city || "")
-            .toLowerCase() === city.toLowerCase() ||
-          oldLocation.includes(city.toLowerCase());
-
-        const matchesArea =
-          !area ||
-          (listing.item_area || "")
-            .toLowerCase() === area.toLowerCase() ||
-          oldLocation.includes(area.toLowerCase());
-
-        return (
-          matchesSearch &&
-          matchesCategory &&
-          matchesSubcategory &&
-          matchesRegion &&
-          matchesCity &&
-          matchesArea
-        );
-      }),
+      queryString ? `/listings?${queryString}` : "/listings",
     );
   }
 
@@ -606,13 +621,7 @@ export default function ListingsPage() {
     setCity("");
     setArea("");
 
-    window.history.replaceState(
-      {},
-      "",
-      "/listings",
-    );
-
-    setFilteredListings(listings);
+    window.history.replaceState({}, "", "/listings");
   }
 
   function handleRegionChange(value: string) {
@@ -636,19 +645,13 @@ export default function ListingsPage() {
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        /*
-         * We deliberately do not automatically overwrite
-         * GhanaPost GPS here. GPS integration will be connected
-         * to the delivery system in the next location/delivery phase.
-         */
-        console.log(
-          "GPS:",
-          position.coords.latitude,
-          position.coords.longitude,
-        );
+        console.log("GPS coordinates:", {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
 
         alert(
-          "Your phone location was detected. GhanaPost GPS and delivery matching will be connected in the delivery phase.",
+          "Your phone location was detected. Select your Region, City/Town and Area to filter listings. GhanaPostGPS delivery matching must be connected separately.",
         );
       },
       () => {
@@ -656,12 +659,16 @@ export default function ListingsPage() {
           "Unable to detect your location. Please select your Region, City/Town and Area manually.",
         );
       },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000,
+      },
     );
   }
 
   return (
     <main className="min-h-screen bg-gray-50 text-gray-900">
-      {/* HEADER */}
       <section className="bg-gradient-to-r from-blue-800 via-blue-700 to-sky-500 text-white">
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -694,31 +701,28 @@ export default function ListingsPage() {
         </div>
       </section>
 
-      {/* SEARCH PANEL */}
       <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <form
           onSubmit={performSearch}
           className="rounded-2xl bg-white p-4 shadow-md ring-1 ring-gray-200"
         >
           <div className="grid gap-3 lg:grid-cols-12">
-            {/* SEARCH */}
             <div className="lg:col-span-4">
               <label className="mb-1 block text-sm font-semibold text-gray-700">
-                Search
+                Search products
               </label>
 
               <input
-                type="text"
+                type="search"
                 value={search}
-                onChange={(e) =>
-                  setSearch(e.target.value)
+                onChange={(event) =>
+                  setSearch(event.target.value)
                 }
-                placeholder="What are you looking for?"
-                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                placeholder="Printer, phone, car, location..."
+                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
               />
             </div>
 
-            {/* CATEGORY */}
             <div className="lg:col-span-2">
               <label className="mb-1 block text-sm font-semibold text-gray-700">
                 Category
@@ -726,8 +730,8 @@ export default function ListingsPage() {
 
               <select
                 value={category}
-                onChange={(e) => {
-                  setCategory(e.target.value);
+                onChange={(event) => {
+                  setCategory(event.target.value);
                   setSubcategory("");
                 }}
                 className="w-full rounded-xl border border-gray-300 bg-white px-3 py-3 outline-none focus:border-blue-600"
@@ -740,7 +744,6 @@ export default function ListingsPage() {
               </select>
             </div>
 
-            {/* SUBCATEGORY */}
             <div className="lg:col-span-2">
               <label className="mb-1 block text-sm font-semibold text-gray-700">
                 Subcategory
@@ -748,18 +751,16 @@ export default function ListingsPage() {
 
               <select
                 value={subcategory}
-                onChange={(e) =>
-                  setSubcategory(e.target.value)
+                onChange={(event) =>
+                  setSubcategory(event.target.value)
                 }
-                className="w-full rounded-xl border border-gray-300 bg-white px-3 py-3 outline-none focus:border-blue-600"
                 disabled={
                   category === "All Categories" ||
                   !SUBCATEGORY_OPTIONS[category]
                 }
+                className="w-full rounded-xl border border-gray-300 bg-white px-3 py-3 outline-none focus:border-blue-600 disabled:bg-gray-100"
               >
-                <option value="">
-                  All Subcategories
-                </option>
+                <option value="">All Subcategories</option>
 
                 {(SUBCATEGORY_OPTIONS[category] || []).map(
                   (item) => (
@@ -771,7 +772,6 @@ export default function ListingsPage() {
               </select>
             </div>
 
-            {/* REGION */}
             <div className="lg:col-span-2">
               <label className="mb-1 block text-sm font-semibold text-gray-700">
                 Region
@@ -779,27 +779,21 @@ export default function ListingsPage() {
 
               <select
                 value={region}
-                onChange={(e) =>
-                  handleRegionChange(e.target.value)
+                onChange={(event) =>
+                  handleRegionChange(event.target.value)
                 }
                 className="w-full rounded-xl border border-gray-300 bg-white px-3 py-3 outline-none focus:border-blue-600"
               >
-                <option value="">
-                  All Ghana
-                </option>
+                <option value="">All Ghana</option>
 
                 {regions.map((item) => (
-                  <option
-                    key={item.id}
-                    value={item.name}
-                  >
+                  <option key={item.id} value={item.name}>
                     {item.name}
                   </option>
                 ))}
               </select>
             </div>
 
-            {/* CITY/TOWN */}
             <div className="lg:col-span-2">
               <label className="mb-1 block text-sm font-semibold text-gray-700">
                 City / Town
@@ -807,8 +801,8 @@ export default function ListingsPage() {
 
               <select
                 value={city}
-                onChange={(e) =>
-                  handleCityChange(e.target.value)
+                onChange={(event) =>
+                  handleCityChange(event.target.value)
                 }
                 disabled={!region}
                 className="w-full rounded-xl border border-gray-300 bg-white px-3 py-3 outline-none focus:border-blue-600 disabled:bg-gray-100"
@@ -820,17 +814,13 @@ export default function ListingsPage() {
                 </option>
 
                 {cities.map((item) => (
-                  <option
-                    key={item.id}
-                    value={item.name}
-                  >
+                  <option key={item.id} value={item.name}>
                     {item.name}
                   </option>
                 ))}
               </select>
             </div>
 
-            {/* AREA */}
             <div className="lg:col-span-2">
               <label className="mb-1 block text-sm font-semibold text-gray-700">
                 Area
@@ -838,25 +828,18 @@ export default function ListingsPage() {
 
               <select
                 value={area}
-                onChange={(e) =>
-                  setArea(e.target.value)
+                onChange={(event) =>
+                  setArea(event.target.value)
                 }
                 disabled={!city}
                 className="w-full rounded-xl border border-gray-300 bg-white px-3 py-3 outline-none focus:border-blue-600 disabled:bg-gray-100"
               >
                 <option value="">
-                  {city
-                    ? areas.length > 0
-                      ? "All Areas"
-                      : "All Areas"
-                    : "Select City/Town First"}
+                  {city ? "All Areas" : "Select City/Town First"}
                 </option>
 
                 {areas.map((item) => (
-                  <option
-                    key={item.id}
-                    value={item.name}
-                  >
+                  <option key={item.id} value={item.name}>
                     {item.name}
                   </option>
                 ))}
@@ -864,11 +847,10 @@ export default function ListingsPage() {
             </div>
           </div>
 
-          {/* BUTTONS */}
           <div className="mt-4 flex flex-wrap gap-3">
             <button
               type="submit"
-              className="rounded-xl bg-blue-700 px-6 py-3 font-bold text-white shadow-sm transition hover:bg-blue-800"
+              className="rounded-xl bg-blue-700 px-6 py-3 font-bold text-white hover:bg-blue-800"
             >
               🔍 Search
             </button>
@@ -878,7 +860,7 @@ export default function ListingsPage() {
               onClick={clearFilters}
               className="rounded-xl border border-gray-300 bg-white px-6 py-3 font-semibold text-gray-700 hover:bg-gray-50"
             >
-              Clear
+              Clear Filters
             </button>
 
             <button
@@ -891,49 +873,41 @@ export default function ListingsPage() {
           </div>
         </form>
 
-        {/* LOCATION / DELIVERY INFORMATION */}
         <div className="mt-5 grid gap-4 md:grid-cols-3">
           <div className="rounded-2xl border border-blue-100 bg-blue-50 p-5">
             <div className="text-2xl">📍</div>
-
             <h3 className="mt-2 font-bold text-blue-900">
               Item / Seller Location
             </h3>
-
             <p className="mt-1 text-sm text-blue-800">
-              See where the seller or physical product is
-              located before making your purchase.
+              Check where the seller or product is located
+              before making a purchase.
             </p>
           </div>
 
           <div className="rounded-2xl border border-sky-100 bg-sky-50 p-5">
             <div className="text-2xl">🗺️</div>
-
             <h3 className="mt-2 font-bold text-sky-900">
               GhanaPost GPS
             </h3>
-
             <p className="mt-1 text-sm text-sky-800">
-              Buyer delivery addresses will support GhanaPost
-              GPS digital addresses for accurate delivery.
+              Product listings can display their saved GhanaPostGPS
+              digital address when available.
             </p>
           </div>
 
           <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
             <div className="text-2xl">🚚</div>
-
             <h3 className="mt-2 font-bold text-gray-900">
               Delivery & Tracking
             </h3>
-
             <p className="mt-1 text-sm text-gray-600">
-              Delivery and order tracking will be connected
-              to the marketplace order system.
+              Delivery tracking requires connection to the
+              marketplace order and delivery system.
             </p>
           </div>
         </div>
 
-        {/* RESULTS HEADER */}
         <div className="mt-8 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">
@@ -944,9 +918,7 @@ export default function ListingsPage() {
               {loading
                 ? "Loading listings..."
                 : `${filteredListings.length} listing${
-                    filteredListings.length === 1
-                      ? ""
-                      : "s"
+                    filteredListings.length === 1 ? "" : "s"
                   } found`}
             </p>
           </div>
@@ -963,11 +935,9 @@ export default function ListingsPage() {
           )}
         </div>
 
-        {/* RESULTS */}
         {loading ? (
           <div className="mt-6 rounded-2xl bg-white p-10 text-center shadow-sm">
             <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-blue-200 border-t-blue-700" />
-
             <p className="mt-4 text-gray-600">
               Loading marketplace listings...
             </p>
@@ -981,10 +951,8 @@ export default function ListingsPage() {
             </h3>
 
             <p className="mx-auto mt-2 max-w-lg text-gray-600">
-              Try changing your search, category or
-              location filters. New seller listings will
-              automatically appear here when they are
-              published.
+              Try a different search term or change your category
+              and location filters.
             </p>
 
             <button
@@ -997,96 +965,129 @@ export default function ListingsPage() {
           </div>
         ) : (
           <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {filteredListings.map((listing) => (
-              <article
-                key={listing.id}
-                className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200 transition hover:-translate-y-1 hover:shadow-lg"
-              >
-                {/* IMAGE PLACEHOLDER */}
-                <div className="flex h-48 items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
-                  <span className="text-5xl">🛍️</span>
-                </div>
+            {filteredListings.map((listing) => {
+              const imageUrl = listingImages[listing.id];
+              const showImage =
+                Boolean(imageUrl) && !imageErrors[listing.id];
 
-                <div className="p-4">
-                  {listing.featured && (
-                    <span className="inline-flex rounded-full bg-yellow-100 px-2.5 py-1 text-xs font-bold text-yellow-800">
-                      TOP PRIORITY
-                    </span>
-                  )}
-
-                  <h3 className="mt-2 line-clamp-2 text-lg font-bold text-gray-900">
-                    {listing.title || "Untitled Listing"}
-                  </h3>
-
-                  <p className="mt-2 line-clamp-2 text-sm text-gray-600">
-                    {listing.description ||
-                      "No description provided."}
-                  </p>
-
-                  <div className="mt-3 text-xl font-bold text-blue-700">
-                    {formatPrice(
-                      listing.price,
-                      listing.currency_code,
-                      listing.currency,
-                    )}
-                  </div>
-
-                  <div className="mt-3 space-y-1 text-sm text-gray-500">
-                    {(listing.item_region ||
-                      listing.location) && (
-                      <div>
-                        📍{" "}
-                        {[
-                          listing.item_area,
-                          listing.item_city,
-                          listing.item_region,
-                        ]
-                          .filter(Boolean)
-                          .join(", ") ||
-                          listing.location}
-                      </div>
-                    )}
-
-                    {listing.category && (
-                      <div>
-                        🏷️ {listing.category}
-                        {listing.subcategory
-                          ? ` • ${listing.subcategory}`
-                          : ""}
+              return (
+                <article
+                  key={listing.id}
+                  className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200 transition hover:-translate-y-1 hover:shadow-lg"
+                >
+                  <div className="relative flex h-48 items-center justify-center overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
+                    {showImage ? (
+                      <img
+                        src={imageUrl}
+                        alt={listing.title || "Marketplace product"}
+                        loading="lazy"
+                        className="h-full w-full object-contain"
+                        onError={() =>
+                          setImageErrors((previous) => ({
+                            ...previous,
+                            [listing.id]: true,
+                          }))
+                        }
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center gap-2 text-gray-400">
+                        <span className="text-5xl">🛍️</span>
+                        <span className="text-xs">
+                          Product image unavailable
+                        </span>
                       </div>
                     )}
                   </div>
 
-                  <div className="mt-4 grid grid-cols-2 gap-2">
-                    <Link
-                      href={`/listings/${listing.id}`}
-                      className="rounded-xl bg-blue-700 px-3 py-2.5 text-center text-sm font-bold text-white hover:bg-blue-800"
-                    >
-                      View Listing
-                    </Link>
+                  <div className="p-4">
+                    {listing.featured && (
+                      <span className="inline-flex rounded-full bg-yellow-100 px-2.5 py-1 text-xs font-bold text-yellow-800">
+                        TOP PRIORITY
+                      </span>
+                    )}
 
-                    <Link
-                      href={`/chat?listing=${listing.id}`}
-                      className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5 text-center text-sm font-bold text-blue-800 hover:bg-blue-100"
-                    >
-                      Chat Seller
-                    </Link>
+                    <h3 className="mt-2 line-clamp-2 text-lg font-bold text-gray-900">
+                      {listing.title || "Untitled Listing"}
+                    </h3>
+
+                    <p className="mt-2 line-clamp-2 text-sm text-gray-600">
+                      {listing.description ||
+                        "No description provided."}
+                    </p>
+
+                    <div className="mt-3 text-xl font-bold text-blue-700">
+                      {formatPrice(
+                        listing.price,
+                        listing.currency_code,
+                        listing.currency,
+                      )}
+                    </div>
+
+                    <div className="mt-3 space-y-1 text-sm text-gray-500">
+                      {(listing.item_region ||
+                        listing.item_city ||
+                        listing.item_area ||
+                        listing.location) && (
+                        <div>
+                          📍{" "}
+                          {[
+                            listing.item_area,
+                            listing.item_city,
+                            listing.item_region,
+                          ]
+                            .filter(Boolean)
+                            .join(", ") || listing.location}
+                        </div>
+                      )}
+
+                      {(listing.category || listing.subcategory) && (
+                        <div>
+                          🏷️{" "}
+                          {listing.category || listing.subcategory}
+                          {listing.category && listing.subcategory
+                            ? ` • ${listing.subcategory}`
+                            : ""}
+                        </div>
+                      )}
+
+                      {listing.item_ghana_post_gps && (
+                        <div className="break-words">
+                          📮 GhanaPostGPS:{" "}
+                          {listing.item_ghana_post_gps}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                      <Link
+                        href={`/listings/${listing.id}`}
+                        className="rounded-xl bg-blue-700 px-3 py-2.5 text-center text-sm font-bold text-white hover:bg-blue-800"
+                      >
+                        View Listing
+                      </Link>
+
+                      <Link
+                        href={`/chat?listing=${listing.id}`}
+                        className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5 text-center text-sm font-bold text-blue-800 hover:bg-blue-100"
+                      >
+                        Chat Seller
+                      </Link>
+                    </div>
                   </div>
-                </div>
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </div>
         )}
 
-        {/* SUPPORTED SEARCH CATEGORIES */}
         <section className="mt-12 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
           <h2 className="text-xl font-bold text-gray-900">
             Search across BEST SALES GHANA
           </h2>
 
           <p className="mt-2 text-gray-600">
-            One central search system for the entire
-            marketplace.
+            Find listings across the marketplace using one search
+            page.
           </p>
 
           <div className="mt-5 flex flex-wrap gap-2">
@@ -1097,7 +1098,6 @@ export default function ListingsPage() {
                 onClick={() => {
                   setCategory(item);
                   setSubcategory("");
-                  setSearch("");
                   window.scrollTo({
                     top: 0,
                     behavior: "smooth",
