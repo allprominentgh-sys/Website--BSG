@@ -64,15 +64,14 @@ const adminSections = [
   {
     title: "Advertising",
     description:
-      "Configure individual seller promotions, company advertising packages and advertising limits.",
+      "Configure seller promotions, company advertising packages and advertising limits.",
     icon: "📢",
     href: "/admin/advertising",
     action: "Manage Advertising",
   },
   {
     title: "Refund Policy",
-    description:
-      "Manage refund conditions and customer refund requests.",
+    description: "Manage refund conditions and customer refund requests.",
     icon: "↩️",
     href: "/admin/refund-policy",
     action: "Manage Refunds",
@@ -80,10 +79,18 @@ const adminSections = [
   {
     title: "Customer Service",
     description:
-      "View customer enquiries, respond to complaints and manage support tickets.",
+      "View customer enquiries, respond to complaints and manage support tickets and staff.",
     icon: "🎧",
     href: "/admin/support",
     action: "Open Customer Service",
+  },
+  {
+    title: "Content Management (CMS)",
+    description:
+      "Create, edit and publish About Us, Contact Us, Privacy Policy, Terms and Conditions, and Help Centre pages.",
+    icon: "📝",
+    href: "/admin/cms",
+    action: "Manage Website Content",
   },
   {
     title: "Settings",
@@ -139,25 +146,39 @@ export default function AdminDashboardPage() {
           <p className="text-sm font-black uppercase tracking-widest text-cyan-100">
             Administration
           </p>
+
           <h1 className="mt-3 text-3xl font-black sm:text-5xl">
             Admin Dashboard
           </h1>
+
           <p className="mt-4 max-w-3xl leading-7 text-white/90">
-            Manage Best Sales Ghana marketplace operations, products,
-            sellers, customers, orders, payments, advertising, refunds,
-            customer service and settings.
+            Manage BestSalesGH marketplace operations, products, sellers,
+            customers, orders, payments, advertising, refunds, customer
+            service, website content and settings.
           </p>
 
-          <Link
-            href="/admin/settings"
-            className="mt-6 inline-flex rounded-xl bg-white px-5 py-3 font-black text-blue-800 hover:bg-blue-50"
-          >
-            ⚙️ Open Settings →
-          </Link>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link
+              href="/admin/settings"
+              className="inline-flex rounded-xl bg-white px-5 py-3 font-black text-blue-800 hover:bg-blue-50"
+            >
+              ⚙️ Open Settings →
+            </Link>
+
+            <Link
+              href="/admin/cms"
+              className="inline-flex rounded-xl border border-white/60 px-5 py-3 font-black text-white hover:bg-white/10"
+            >
+              📝 Open CMS →
+            </Link>
+          </div>
         </section>
 
         <section className="mt-8">
-          <h2 className="text-2xl font-black">Marketplace Administration</h2>
+          <h2 className="text-2xl font-black">
+            Marketplace Administration
+          </h2>
+
           <p className="mt-2 text-slate-500">
             Select a section to open its management page.
           </p>
@@ -195,6 +216,7 @@ export default function AdminDashboardPage() {
           <p className="font-bold text-slate-700">
             BEST SALES GHANA — ADMINISTRATION
           </p>
+
           <p className="mt-2">
             © {new Date().getFullYear()} All Prominent Ghana Limited.
             All rights reserved.
