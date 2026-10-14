@@ -1,5 +1,5 @@
 
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual, randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -38,6 +38,17 @@ type BannerInput = {
   display_order?: unknown;
   start_at?: unknown;
   end_at?: unknown;
+};
+
+type BannerData = {
+  title: string;
+  description: string | null;
+  destination_url: string | null;
+  placement: string;
+  status: string;
+  display_order: number;
+  start_at: string | null;
+  end_at: string | null;
 };
 
 function jsonError(message: string, status: number) {
@@ -113,22 +124,23 @@ function getSupabaseAdmin() {
 function cleanText(
   value: unknown,
   maxLength: number
-): string | null {
-  if (value === undefined || value === null) return null;
-  if (typeof value !== "string") return null;
+): string | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (typeof value !== "string") return undefined;
 
   const text = value.trim();
 
-  if (text.length > maxLength) return null;
+  if (text.length > maxLength) return undefined;
 
   return text;
 }
 
-function validDate(value: unknown): string | null | undefined {
-  if (value === undefined || value === null || value === "") {
-    return null;
-  }
-
+function validDate(
+  value: unknown
+): string | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
   if (typeof value !== "string") return undefined;
 
   const timestamp = Date.parse(value);
@@ -138,10 +150,11 @@ function validDate(value: unknown): string | null | undefined {
   return new Date(timestamp).toISOString();
 }
 
-function validDestination(value: unknown): string | null | undefined {
-  if (value === undefined || value === null || value === "") {
-    return null;
-  }
+function validDestination(
+  value: unknown
+): string | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
 
   if (typeof value !== "string" || value.length > 2048) {
     return undefined;
@@ -160,21 +173,30 @@ function validDestination(value: unknown): string | null | undefined {
   }
 }
 
-function parseBannerInput(input: BannerInput) {
+function parseBannerInput(input: BannerInput):
+  | { data: BannerData }
+  | { error: string } {
   const title = cleanText(input.title, 150);
   const description = cleanText(input.description, 1000);
   const destinationUrl = validDestination(input.destination_url);
 
-  if (!title || !title.trim()) {
+  if (title === undefined || !title) {
     return { error: "A banner title is required." };
   }
 
-  if (input.description != null && description === null) {
-    return { error: "The description must be text under 1,000 characters." };
+  if (description === undefined && input.description !== undefined) {
+    return {
+      error: "Description must be text under 1,000 characters.",
+    };
   }
 
-  if (input.destination_url != null && destinationUrl === undefined) {
-    return { error: "Enter a valid HTTP or HTTPS destination URL." };
+  if (
+    destinationUrl === undefined &&
+    input.destination_url !== undefined
+  ) {
+    return {
+      error: "Enter a valid HTTP or HTTPS destination URL.",
+    };
   }
 
   const placement =
@@ -206,7 +228,9 @@ function parseBannerInput(input: BannerInput) {
     displayOrder < 0 ||
     displayOrder > 100000
   ) {
-    return { error: "Display order must be a whole number from 0 to 100000." };
+    return {
+      error: "Display order must be a whole number from 0 to 100000.",
+    };
   }
 
   const startAt = validDate(input.start_at);
@@ -222,14 +246,14 @@ function parseBannerInput(input: BannerInput) {
 
   return {
     data: {
-      title: title.trim(),
-      description,
-      destination_url: destinationUrl,
+      title,
+      description: description ?? null,
+      destination_url: destinationUrl ?? null,
       placement,
       status,
       display_order: displayOrder,
-      start_at: startAt,
-      end_at: endAt,
+      start_at: startAt ?? null,
+      end_at: endAt ?? null,
     },
   };
 }
@@ -256,18 +280,18 @@ function getStoragePath(imageUrl: unknown): string | null {
 
     if (index === -1) return null;
 
-    const path = url.pathname.slice(index + marker.length);
+    const encodedPath = url.pathname.slice(index + marker.length);
 
     if (
-      !path ||
-      path.split("/").some(
+      !encodedPath ||
+      encodedPath.split("/").some(
         (part) => part === ".." || part === "." || !part
       )
     ) {
       return null;
     }
 
-    return decodeURIComponent(path);
+    return decodeURIComponent(encodedPath);
   } catch {
     return null;
   }
@@ -329,13 +353,17 @@ export async function POST(request: NextRequest) {
     return jsonError("The image must be between 1 byte and 5 MB.", 400);
   }
 
+  const rawOrder = form.get("display_order");
+  const parsedOrder =
+    rawOrder === null || rawOrder === "" ? 0 : Number(rawOrder);
+
   const parsed = parseBannerInput({
     title: form.get("title"),
     description: form.get("description"),
     destination_url: form.get("destination_url"),
     placement: form.get("placement"),
     status: form.get("status"),
-    display_order: Number(form.get("display_order") ?? 0),
+    display_order: parsedOrder,
     start_at: form.get("start_at") || null,
     end_at: form.get("end_at") || null,
   });
@@ -344,14 +372,17 @@ export async function POST(request: NextRequest) {
     return jsonError(parsed.error, 400);
   }
 
+  if (!("data" in parsed) || !parsed.data) {
+    return jsonError("Invalid banner details.", 400);
+  }
+
   const extensionByType: Record<string, string> = {
     "image/jpeg": "jpg",
     "image/png": "png",
     "image/webp": "webp",
   };
 
-  const imagePath =
-    `${crypto.randomUUID()}.${extensionByType[file.type]}`;
+  const imagePath = `${randomUUID()}.${extensionByType[file.type]}`;
 
   try {
     const supabase = getSupabaseAdmin();
@@ -431,28 +462,37 @@ export async function PATCH(request: NextRequest) {
   if ("title" in input) {
     const title = cleanText(input.title, 150);
 
-    if (!title?.trim()) {
+    if (title === undefined || !title) {
       return jsonError("A valid banner title is required.", 400);
     }
 
-    update.title = title.trim();
+    update.title = title;
   }
 
   if ("description" in input) {
     const description = cleanText(input.description, 1000);
 
-    if (input.description != null && description === null) {
-      return jsonError("Description must be text under 1,000 characters.", 400);
+    if (
+      description === undefined &&
+      input.description !== undefined
+    ) {
+      return jsonError(
+        "Description must be text under 1,000 characters.",
+        400
+      );
     }
 
-    update.description = description;
+    update.description = description ?? null;
   }
 
   if ("destination_url" in input) {
     const destinationUrl = validDestination(input.destination_url);
 
     if (destinationUrl === undefined) {
-      return jsonError("Enter a valid HTTP or HTTPS destination URL.", 400);
+      return jsonError(
+        "Enter a valid HTTP or HTTPS destination URL.",
+        400
+      );
     }
 
     update.destination_url = destinationUrl;
@@ -487,7 +527,10 @@ export async function PATCH(request: NextRequest) {
       input.display_order < 0 ||
       input.display_order > 100000
     ) {
-      return jsonError("Display order must be a whole number from 0 to 100000.", 400);
+      return jsonError(
+        "Display order must be a whole number from 0 to 100000.",
+        400
+      );
     }
 
     update.display_order = input.display_order;
@@ -547,7 +590,10 @@ export async function PATCH(request: NextRequest) {
       endAt &&
       Date.parse(String(startAt)) >= Date.parse(String(endAt))
     ) {
-      return jsonError("The end date must be after the start date.", 400);
+      return jsonError(
+        "The end date must be after the start date.",
+        400
+      );
     }
 
     const { data, error } = await supabase
@@ -636,7 +682,10 @@ export async function DELETE(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { success: true, message: "Banner deleted successfully." },
+      {
+        success: true,
+        message: "Banner deleted successfully.",
+      },
       { headers: { "Cache-Control": "no-store" } }
     );
   } catch (error) {
