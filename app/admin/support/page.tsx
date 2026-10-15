@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { supabaseBrowser } from "@/lib/supabase-browser";
+import { supabaseBrowser } from "../../../lib/supabase";
 
 export default function AdminSupportPage() {
   const [checking, setChecking] = useState(false);
@@ -22,9 +22,7 @@ export default function AdminSupportPage() {
       } = await supabase.auth.getSession();
 
       if (error || !session?.access_token) {
-        setMessage(
-          "Please sign in to your administrator account first."
-        );
+        setMessage("Please sign in to your administrator account first.");
         return;
       }
 
@@ -51,9 +49,7 @@ export default function AdminSupportPage() {
       );
     } catch (error) {
       console.error("Admin Support error:", error);
-      setMessage(
-        "Unable to connect to the support service. Please try again."
-      );
+      setMessage("Unable to connect to the support service. Please try again.");
     } finally {
       setChecking(false);
     }
@@ -66,20 +62,20 @@ export default function AdminSupportPage() {
           <p className="text-sm font-semibold uppercase tracking-wider text-blue-700">
             BestSalesGH Administration
           </p>
+
           <h1 className="mt-2 text-3xl font-bold">Admin Support</h1>
+
           <p className="mt-2 text-gray-600">
             Support administration and access verification.
           </p>
         </header>
 
         <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
-          <h2 className="text-xl font-semibold">
-            Administrator access
-          </h2>
+          <h2 className="text-xl font-semibold">Administrator access</h2>
 
           <p className="mt-2 text-sm leading-6 text-gray-600">
-            Check whether your signed-in account has permission to access
-            the support API.
+            Check whether your signed-in account has administrator
+            permission to access the support API.
           </p>
 
           <button
