@@ -1,72 +1,77 @@
-import { NextRequest, NextResponse } from “next/server”;
-import { getSupabaseAdmin } from “@/lib/supabase-admin”;
+import { NextRequest, NextResponse } from "next/server";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
-export const dynamic = “force-dynamic”;
+export const dynamic = "force-dynamic";
 
 async function authorizeAdmin(request: NextRequest) {
-const authorization = request.headers.get(“authorization”);
-const token = authorization?.startsWith(“Bearer “)
-? authorization.slice(7)
-: “”;
+  const authorization = request.headers.get("authorization");
 
-if (!token) {
-return null;
-}
+  const token = authorization?.startsWith("Bearer ")
+    ? authorization.slice(7)
+    : "";
 
-let supabase: ReturnType;
+  if (!token) {
+    return null;
+  }
 
-try {
-supabase = getSupabaseAdmin();
-} catch (error) {
-console.error(
-“Support API: Supabase configuration failed.”,
-error instanceof Error ? error.message : “Unknown error”
-);
-return null;
-}
+  let supabase: ReturnType<typeof getSupabaseAdmin>;
 
-const {
-data: { user },
-error,
-} = await supabase.auth.getUser(token);
+  try {
+    supabase = getSupabaseAdmin();
+  } catch (error) {
+    console.error(
+      "Support API: Supabase configuration failed.",
+      error instanceof Error ? error.message : "Unknown error"
+    );
 
-if (error || !user) {
-return null;
-}
+    return null;
+  }
 
-const { data: profile, error: profileError } = await supabase
-.from(“profiles”)
-.select(“account_type”)
-.eq(“id”, user.id)
-.maybeSingle();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser(token);
 
-if (profileError) {
-console.error(
-“Support API: profile lookup failed.”,
-profileError.message
-);
-return null;
-}
+  if (error || !user) {
+    return null;
+  }
 
-if (!profile || profile.account_type !== “admin”) {
-return null;
-}
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("account_type")
+    .eq("id", user.id)
+    .maybeSingle();
 
-return { supabase, user };
+  if (profileError) {
+    console.error(
+      "Support API: profile lookup failed.",
+      profileError.message
+    );
+
+    return null;
+  }
+
+  if (!profile || profile.account_type !== "admin") {
+    return null;
+  }
+
+  return { supabase, user };
 }
 
 export async function GET(request: NextRequest) {
-const authorization = await authorizeAdmin(request);
+  const authorization = await authorizeAdmin(request);
 
-if (!authorization) {
-return NextResponse.json(
-{ error: “Unauthorized. Administrator access is required.” },
-{ status: 401 }
-);
-}
+  if (!authorization) {
+    return NextResponse.json(
+      {
+        error: "Unauthorized. Administrator access is required.",
+      },
+      { status: 401 }
+    );
+  }
 
-return NextResponse.json({
-success: true,
-message: “Admin support API authorization successful.”,
-});
+  return NextResponse.json({
+    success: true,
+    message: "Admin support API authorization successful.",
+  });
 }
