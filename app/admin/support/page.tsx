@@ -1,22 +1,24 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 async function authorizeAdmin(request: NextRequest) {
   const authorization = request.headers.get("authorization");
+
   const token = authorization?.startsWith("Bearer ")
     ? authorization.slice(7)
     : "";
 
   if (!token) {
-    console.error("Support API auth: missing Bearer token.");
     return null;
   }
 
-  let supabase;
+  let supabase: ReturnType<typeof getSupabaseAdmin>;
 
   try {
     supabase = getSupabaseAdmin();
   } catch (error) {
     console.error(
-      "Support API auth: Supabase server configuration failed.",
+      "Support API: Supabase configuration failed.",
       error instanceof Error ? error.message : "Unknown error"
     );
     return null;
@@ -28,10 +30,6 @@ async function authorizeAdmin(request: NextRequest) {
   } = await supabase.auth.getUser(token);
 
   if (error || !user) {
-    console.error("Support API auth: token validation failed.", {
-      message: error?.message,
-      status: error?.status,
-    });
     return null;
   }
 
@@ -42,21 +40,29 @@ async function authorizeAdmin(request: NextRequest) {
     .maybeSingle();
 
   if (profileError) {
-    console.error("Support API auth: profile lookup failed.", {
-      message: profileError.message,
-      code: profileError.code,
-    });
+    console.error("Support API: profile lookup failed.", profileError.message);
     return null;
   }
 
   if (!profile || profile.account_type !== "admin") {
-    console.error("Support API auth: admin role check failed.", {
-      userId: user.id,
-      accountType: profile?.account_type ?? null,
-      profileFound: Boolean(profile),
-    });
     return null;
   }
 
   return { supabase, user };
+}
+
+export async function GET(request: NextRequest) {
+  const authorization = await authorizeAdmin(request);
+
+  if (!authorization) {
+    return NextResponse.json(
+      { error: "Unauthorized. Administrator access is required." },
+      { status: 401 }
+    );
+  }
+
+  return NextResponse.json({
+    success: true,
+    message: "Admin support API authorization successful.",
+  });
 }
