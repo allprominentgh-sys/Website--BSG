@@ -5,7 +5,6 @@ export const dynamic = "force-dynamic";
 
 async function authorizeAdmin(request: NextRequest) {
   const authorization = request.headers.get("authorization");
-
   const token = authorization?.startsWith("Bearer ")
     ? authorization.slice(7)
     : "";
@@ -20,10 +19,9 @@ async function authorizeAdmin(request: NextRequest) {
     supabase = getSupabaseAdmin();
   } catch (error) {
     console.error(
-      "Support API: Supabase configuration failed.",
+      "Support API configuration error:",
       error instanceof Error ? error.message : "Unknown error"
     );
-
     return null;
   }
 
@@ -43,11 +41,7 @@ async function authorizeAdmin(request: NextRequest) {
     .maybeSingle();
 
   if (profileError) {
-    console.error(
-      "Support API: profile lookup failed.",
-      profileError.message
-    );
-
+    console.error("Support profile lookup failed:", profileError.message);
     return null;
   }
 
@@ -55,7 +49,7 @@ async function authorizeAdmin(request: NextRequest) {
     return null;
   }
 
-  return { supabase, user };
+  return { user };
 }
 
 export async function GET(request: NextRequest) {
@@ -63,9 +57,7 @@ export async function GET(request: NextRequest) {
 
   if (!authorization) {
     return NextResponse.json(
-      {
-        error: "Unauthorized. Administrator access is required.",
-      },
+      { error: "Unauthorized. Administrator access is required." },
       { status: 401 }
     );
   }
