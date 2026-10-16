@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -86,6 +87,8 @@ export default function AdminDeliveryPage() {
 
     async function verifyAdmin() {
       try {
+        setError("");
+
         const supabase = supabaseBrowser();
 
         const {
@@ -93,35 +96,72 @@ export default function AdminDeliveryPage() {
           error: authError,
         } = await supabase.auth.getUser();
 
-        if (authError) throw authError;
+        if (authError) {
+          throw new Error(
+            `Login verification failed: ${authError.message}`
+          );
+        }
 
         if (!user) {
           window.location.href = "/login";
           return;
         }
 
-        const { data: profile, error: profileError } =
-          await supabase
-            .from("profiles")
-            .select("account_type")
-            .eq("id", user.id)
-            .maybeSingle();
+        const {
+          data: profile,
+          error: profileError,
+        } = await supabase
+          .from("profiles")
+          .select("account_type")
+          .eq("id", user.id)
+          .maybeSingle();
 
-        if (profileError) throw profileError;
+        if (profileError) {
+          console.error("Delivery profile query failed:", {
+            code: profileError.code,
+            message: profileError.message,
+          });
 
-        const role = (profile?.account_type ?? "").toLowerCase();
-
-        if (!["admin", "administrator"].includes(role)) {
-          if (active) {
-            setError("Administrator access is required.");
-            setAuthorized(false);
-          }
-          return;
+          throw new Error(
+            `Could not verify your administrator profile. Database error: ${profileError.message}`
+          );
         }
 
-        if (active) setAuthorized(true);
+        const role = String(
+          profile?.account_type ?? ""
+        )
+          .trim()
+          .toLowerCase();
+
+        if (!profile) {
+          console.error(
+            "Delivery authorization failed: no readable profile row for the authenticated user.",
+            { userId: user.id }
+          );
+
+          throw new Error(
+            "No readable profile was found for your current login. Please check that your profiles.id matches your authenticated user ID and that profile access permissions allow this lookup."
+          );
+        }
+
+        if (!["admin", "administrator"].includes(role)) {
+          console.warn("Delivery administrator access denied:", {
+            role,
+            userId: user.id,
+          });
+
+          throw new Error(
+            `Your current account role is "${role || "empty"}". Only authorized administrators can access Delivery Operations.`
+          );
+        }
+
+        if (active) {
+          setAuthorized(true);
+          setError("");
+        }
       } catch (err) {
         if (active) {
+          setAuthorized(false);
           setError(
             err instanceof Error
               ? err.message
@@ -129,7 +169,9 @@ export default function AdminDeliveryPage() {
           );
         }
       } finally {
-        if (active) setLoading(false);
+        if (active) {
+          setLoading(false);
+        }
       }
     }
 
@@ -171,6 +213,7 @@ export default function AdminDeliveryPage() {
   }, [deliveries, search, statusFilter]);
 
   function openNewDelivery() {
+    setError("");
     setEditingId("");
     setForm({
       ...emptyDelivery,
@@ -180,13 +223,17 @@ export default function AdminDeliveryPage() {
   }
 
   function editDelivery(delivery: Delivery) {
+    setError("");
     setEditingId(delivery.id);
     setForm({ ...delivery });
     setShowForm(true);
   }
 
-  function saveDelivery(event: React.FormEvent<HTMLFormElement>) {
+  function saveDelivery(
+    event: React.FormEvent<HTMLFormElement>
+  ) {
     event.preventDefault();
+    setError("");
 
     if (!form.orderNumber.trim() || !form.customer.trim()) {
       setError("Order number and customer name are required.");
@@ -196,20 +243,26 @@ export default function AdminDeliveryPage() {
     if (editingId) {
       setDeliveries((current) =>
         current.map((item) =>
-          item.id === editingId ? { ...form, id: editingId } : item
+          item.id === editingId
+            ? { ...form, id: editingId }
+            : item
         )
       );
     } else {
       setDeliveries((current) => [
-        { ...form, id: form.id || `BSG-${Date.now()}` },
+        {
+          ...form,
+          id: form.id || `BSG-${Date.now()}`,
+        },
         ...current,
       ]);
     }
 
-    setError(
-      "This record currently exists only in this page's temporary state. It has not been saved to the database."
-    );
     setShowForm(false);
+
+    setError(
+      "Demo only: this delivery has not been saved to Supabase. Database integration is still required."
+    );
   }
 
   const count = (status: DeliveryStatus) =>
@@ -228,14 +281,22 @@ export default function AdminDeliveryPage() {
   if (!authorized) {
     return (
       <main className="min-h-screen bg-slate-100 p-6">
-        <section className="mx-auto max-w-xl rounded-2xl border border-red-200 bg-white p-6">
-          <h1 className="text-2xl font-black">Access Restricted</h1>
-          <p className="mt-3 text-red-700">
+        <section className="mx-auto max-w-xl rounded-2xl border border-red-200 bg-white p-6 shadow-sm">
+          <h1 className="text-2xl font-black text-slate-900">
+            Access Restricted
+          </h1>
+
+          <p className="mt-3 break-words text-red-700">
             {error || "Administrator access is required."}
           </p>
+
+          <p className="mt-3 text-sm text-slate-500">
+            Your account permissions have not been changed.
+          </p>
+
           <Link
             href="/admin"
-            className="mt-5 inline-block rounded-xl bg-blue-700 px-4 py-3 font-bold text-white"
+            className="mt-5 inline-block rounded-xl bg-blue-700 px-5 py-3 font-bold text-white hover:bg-blue-800"
           >
             Back to Admin
           </Link>
@@ -252,11 +313,14 @@ export default function AdminDeliveryPage() {
             <p className="text-sm font-black text-blue-700">
               BEST SALES GHANA
             </p>
+
             <h1 className="mt-2 text-3xl font-black">
               BSG Delivery Service
             </h1>
+
             <p className="mt-2 text-slate-600">
-              Monitor orders, sellers, customers, destinations and delivery personnel.
+              Monitor orders, sellers, customers, destinations
+              and delivery personnel.
             </p>
           </div>
 
@@ -279,7 +343,9 @@ export default function AdminDeliveryPage() {
               Issue deliveries and monitor their progress.
             </p>
           </div>
+
           <button
+            type="button"
             onClick={openNewDelivery}
             className="rounded-xl bg-white px-5 py-3 font-black text-blue-800 hover:bg-blue-50"
           >
@@ -304,13 +370,18 @@ export default function AdminDeliveryPage() {
               <p className="mt-3 text-sm font-semibold text-slate-500">
                 {label}
               </p>
-              <p className="mt-2 text-3xl font-black">{value}</p>
+              <p className="mt-2 text-3xl font-black">
+                {value}
+              </p>
             </article>
           ))}
         </section>
 
         {error && (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <div
+            role="status"
+            className="break-words rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"
+          >
             {error}
           </div>
         )}
@@ -321,6 +392,7 @@ export default function AdminDeliveryPage() {
               <h2 className="text-xl font-black">
                 {editingId ? "Edit Delivery" : "Issue a Delivery"}
               </h2>
+
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
@@ -330,11 +402,15 @@ export default function AdminDeliveryPage() {
               </button>
             </div>
 
-            <form onSubmit={saveDelivery} className="mt-5 space-y-6">
+            <form
+              onSubmit={saveDelivery}
+              className="mt-5 space-y-6"
+            >
               <div>
                 <h3 className="font-black text-blue-800">
                   Order and Seller / Company
                 </h3>
+
                 <div className="mt-3 grid gap-4 sm:grid-cols-2">
                   {[
                     ["orderNumber", "Order number *"],
@@ -343,8 +419,12 @@ export default function AdminDeliveryPage() {
                     ["items", "Items and quantities"],
                     ["fee", "Delivery fee (GH₵)"],
                   ].map(([key, label]) => (
-                    <label key={key} className="text-sm font-semibold">
+                    <label
+                      key={key}
+                      className="text-sm font-semibold"
+                    >
                       {label}
+
                       <input
                         value={form[key as keyof Delivery] as string}
                         onChange={(event) =>
@@ -365,6 +445,7 @@ export default function AdminDeliveryPage() {
                 <h3 className="font-black text-blue-800">
                   Customer and Destination
                 </h3>
+
                 <div className="mt-3 grid gap-4 sm:grid-cols-2">
                   {[
                     ["customer", "Customer name *"],
@@ -372,8 +453,12 @@ export default function AdminDeliveryPage() {
                     ["destination", "Full delivery address"],
                     ["gps", "Ghana Post GPS / coordinates"],
                   ].map(([key, label]) => (
-                    <label key={key} className="text-sm font-semibold">
+                    <label
+                      key={key}
+                      className="text-sm font-semibold"
+                    >
                       {label}
+
                       <input
                         value={form[key as keyof Delivery] as string}
                         onChange={(event) =>
@@ -394,6 +479,7 @@ export default function AdminDeliveryPage() {
                 <h3 className="font-black text-blue-800">
                   Assigned BSG Rider / Driver
                 </h3>
+
                 <div className="mt-3 grid gap-4 sm:grid-cols-2">
                   {[
                     ["rider", "Rider / driver full name"],
@@ -402,8 +488,12 @@ export default function AdminDeliveryPage() {
                     ["vehicle", "Vehicle type"],
                     ["vehicleNumber", "Vehicle registration number"],
                   ].map(([key, label]) => (
-                    <label key={key} className="text-sm font-semibold">
+                    <label
+                      key={key}
+                      className="text-sm font-semibold"
+                    >
                       {label}
+
                       <input
                         value={form[key as keyof Delivery] as string}
                         onChange={(event) =>
@@ -419,6 +509,7 @@ export default function AdminDeliveryPage() {
 
                   <label className="text-sm font-semibold">
                     Delivery status
+
                     <select
                       value={form.status}
                       onChange={(event) =>
@@ -441,6 +532,7 @@ export default function AdminDeliveryPage() {
 
               <label className="block text-sm font-semibold">
                 Internal notes / delivery instructions
+
                 <textarea
                   value={form.notes}
                   onChange={(event) =>
@@ -466,6 +558,7 @@ export default function AdminDeliveryPage() {
 
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-xl font-black">Find a Delivery</h2>
+
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <input
               value={search}
@@ -473,6 +566,7 @@ export default function AdminDeliveryPage() {
               placeholder="Search order, seller, customer, rider..."
               className="rounded-xl border border-slate-300 px-4 py-3"
             />
+
             <select
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value)}
@@ -490,7 +584,9 @@ export default function AdminDeliveryPage() {
 
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b p-5">
-            <h2 className="text-xl font-black">Delivery Register</h2>
+            <h2 className="text-xl font-black">
+              Delivery Register
+            </h2>
             <p className="mt-1 text-sm text-slate-500">
               {filtered.length} record(s) displayed.
             </p>
@@ -503,13 +599,17 @@ export default function AdminDeliveryPage() {
                 No delivery records to display
               </h3>
               <p className="mt-2 text-sm text-slate-500">
-                Issue a delivery to begin. Live orders have not yet been connected.
+                Issue a delivery to begin. Live orders have not
+                yet been connected.
               </p>
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
               {filtered.map((delivery) => (
-                <article key={delivery.id} className="space-y-4 p-5">
+                <article
+                  key={delivery.id}
+                  className="space-y-4 p-5"
+                >
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <h3 className="text-lg font-black">
@@ -519,6 +619,7 @@ export default function AdminDeliveryPage() {
                         Delivery reference: {delivery.id}
                       </p>
                     </div>
+
                     <span
                       className={`rounded-full px-3 py-1 text-xs font-bold ${statusStyles[delivery.status]}`}
                     >
@@ -528,38 +629,57 @@ export default function AdminDeliveryPage() {
 
                   <div className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
                     <div>
-                      <p className="font-bold text-slate-500">Seller / Company</p>
+                      <p className="font-bold text-slate-500">
+                        Seller / Company
+                      </p>
                       <p>{delivery.seller || "Not recorded"}</p>
                       <p className="break-all text-xs text-slate-500">
                         {delivery.sellerId}
                       </p>
                     </div>
+
                     <div>
-                      <p className="font-bold text-slate-500">Items</p>
+                      <p className="font-bold text-slate-500">
+                        Items
+                      </p>
                       <p className="whitespace-pre-wrap">
                         {delivery.items || "Not recorded"}
                       </p>
                     </div>
+
                     <div>
-                      <p className="font-bold text-slate-500">Customer</p>
+                      <p className="font-bold text-slate-500">
+                        Customer
+                      </p>
                       <p>{delivery.customer}</p>
                       <p>{delivery.customerPhone}</p>
                     </div>
+
                     <div>
-                      <p className="font-bold text-slate-500">Destination</p>
+                      <p className="font-bold text-slate-500">
+                        Destination
+                      </p>
                       <p>{delivery.destination || "Not recorded"}</p>
-                      <p className="text-xs text-slate-500">{delivery.gps}</p>
+                      <p className="text-xs text-slate-500">
+                        {delivery.gps}
+                      </p>
                     </div>
+
                     <div>
-                      <p className="font-bold text-slate-500">Assigned Rider / Driver</p>
+                      <p className="font-bold text-slate-500">
+                        Assigned Rider / Driver
+                      </p>
                       <p>{delivery.rider || "Not assigned"}</p>
                       <p>{delivery.riderPhone}</p>
                       <p className="text-xs text-slate-500">
                         ID: {delivery.riderId || "Not assigned"}
                       </p>
                     </div>
+
                     <div>
-                      <p className="font-bold text-slate-500">Vehicle</p>
+                      <p className="font-bold text-slate-500">
+                        Vehicle
+                      </p>
                       <p>{delivery.vehicle || "Not recorded"}</p>
                       <p>{delivery.vehicleNumber}</p>
                     </div>
@@ -569,13 +689,16 @@ export default function AdminDeliveryPage() {
                     <p className="font-bold">
                       Delivery fee: GH₵ {delivery.fee || "0.00"}
                     </p>
+
                     <button
+                      type="button"
                       onClick={() => editDelivery(delivery)}
                       className="rounded-xl border border-blue-700 px-4 py-2 font-bold text-blue-700 hover:bg-blue-50"
                     >
                       Edit Record
                     </button>
                   </div>
+
                   {delivery.notes && (
                     <p className="text-sm text-slate-600">
                       Notes: {delivery.notes}
