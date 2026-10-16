@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { supabaseBrowser } from "../../../lib/supabase";
+import { supabaseBrowser } from "@/supabase-browser";
 
 export default function AdminSupportPage() {
   const [loading, setLoading] = useState(false);
