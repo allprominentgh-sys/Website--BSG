@@ -6,21 +6,11 @@ import { cookies } from "next/headers";
 
 export const dynamic = "force-dynamic";
 
-type AdminContext =
-  | {
-      user: { id: string };
-      db: ReturnType<typeof createClient>;
-    }
-  | {
-      error: string;
-      status: number;
-    };
-
 function jsonError(message: string, status: number) {
   return NextResponse.json({ error: message }, { status });
 }
 
-async function getAdminContext(): Promise<AdminContext> {
+async function getAdminContext() {
   const cookieStore = await cookies();
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -28,7 +18,7 @@ async function getAdminContext(): Promise<AdminContext> {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !anonKey || !serviceKey) {
-    console.error("Required Supabase server environment variables are missing.");
+    console.error("Required Supabase environment variables are missing.");
     return {
       error: "Server configuration is incomplete.",
       status: 500,
@@ -46,7 +36,7 @@ async function getAdminContext(): Promise<AdminContext> {
             cookieStore.set(name, value, options);
           });
         } catch {
-          // Cookie writes may not be available in this context.
+          // Cookie writes may be unavailable in this context.
         }
       },
     },
@@ -188,16 +178,11 @@ export async function POST(request: NextRequest) {
     }
 
     const orderId = body.orderId?.trim();
-
-    if (!orderId) {
-      return jsonError("A checkout order ID is required.", 400);
-    }
-
     const uuidPattern =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-    if (!uuidPattern.test(orderId)) {
-      return jsonError("The checkout order ID is invalid.", 400);
+    if (!orderId || !uuidPattern.test(orderId)) {
+      return jsonError("A valid checkout order ID is required.", 400);
     }
 
     const riderId = body.riderId?.trim() || null;
@@ -274,10 +259,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (existing) {
-      return jsonError(
-        "This order already has a delivery record.",
-        409
-      );
+      return jsonError("This order already has a delivery record.", 409);
     }
 
     const { data: delivery, error: insertError } = await db
