@@ -1,69 +1,81 @@
+
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
 
-async function authorizeAdmin(request: NextRequest) {
-  const authorization = request.headers.get("authorization");
-  const token = authorization?.startsWith("Bearer ")
-    ? authorization.slice(7)
-    : "";
-
-  if (!token) {
-    return null;
-  }
-
-  let supabase: ReturnType<typeof getSupabaseAdmin>;
-
-  try {
-    supabase = getSupabaseAdmin();
-  } catch (error) {
-    console.error(
-      "Support API configuration error:",
-      error instanceof Error ? error.message : "Unknown error"
-    );
-    return null;
-  }
-
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser(token);
-
-  if (error || !user) {
-    return null;
-  }
-
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("account_type")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (profileError) {
-    console.error("Support profile lookup failed:", profileError.message);
-    return null;
-  }
-
-  if (!profile || profile.account_type !== "admin") {
-    return null;
-  }
-
-  return { user };
+function jsonError(message: string, status: number) {
+  return NextResponse.json({ error: message }, { status });
 }
 
 export async function GET(request: NextRequest) {
-  const authorization = await authorizeAdmin(request);
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!authorization) {
-    return NextResponse.json(
-      { error: "Unauthorized. Administrator access is required." },
-      { status: 401 }
-    );
+    if (!supabaseUrl || !anonKey || !serviceKey) {
+      console.error("Admin support API environment configuration is incomplete.");
+      return jsonError("Server configuration is incomplete.", 500);
+    }
+
+    const authorization = request.headers.get("authorization");
+    const token = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
+
+    if (!token) {
+      return jsonError("Please sign in to continue.", 401);
+    }
+
+    // Verify the supplied token with Supabase Auth.
+    const authClient = createClient(supabaseUrl, anonKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
+
+    const {
+      data: { user },
+      error: authError,
+    } = await authClient.auth.getUser(token);
+
+    if (authError || !user) {
+      return jsonError("Your session is invalid or expired. Please sign in again.", 401);
+    }
+
+    // Check the user's actual database role. Never trust a client-supplied role.
+    const adminDb = createClient(supabaseUrl, serviceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
+
+    const { data: profile, error: profileError } = await adminDb
+      .from("profiles")
+      .select("account_type")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error("Admin support profile lookup failed:", profileError.message);
+      return jsonError("Unable to verify administrator permissions.", 500);
+    }
+
+    const role = String(profile?.account_type ?? "")
+      .trim()
+      .toLowerCase();
+
+    if (!["admin", "administrator"].includes(role)) {
+      return jsonError("Administrator access is required.", 403);
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "Administrator access verified successfully.",
+    });
+  } catch (error) {
+    console.error("Admin support access check failed:", error);
+    return jsonError("Unexpected server error.", 500);
   }
-
-  return NextResponse.json({
-    success: true,
-    message: "Admin support API authorization successful.",
-  });
 }
