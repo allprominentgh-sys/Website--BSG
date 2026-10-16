@@ -6,6 +6,12 @@ import { cookies } from "next/headers";
 
 export const dynamic = "force-dynamic";
 
+type DeliveryMethod =
+  | "BSG_DELIVERY"
+  | "SELLER_DELIVERY"
+  | "SELF_PICKUP"
+  | "THIRD_PARTY_REQUEST";
+
 function jsonError(message: string, status: number) {
   return NextResponse.json({ error: message }, { status });
 }
@@ -13,30 +19,28 @@ function jsonError(message: string, status: number) {
 async function getAdminContext() {
   const cookieStore = await cookies();
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!supabaseUrl || !anonKey || !serviceKey) {
-    console.error("Required Supabase environment variables are missing.");
+  if (!url || !anonKey || !serviceKey) {
     return {
+      ok: false as const,
       error: "Server configuration is incomplete.",
       status: 500,
     };
   }
 
-  const authClient = createServerClient(supabaseUrl, anonKey, {
+  const authClient = createServerClient(url, anonKey, {
     cookies: {
-      getAll() {
-        return cookieStore.getAll();
-      },
-      setAll(cookiesToSet) {
+      getAll: () => cookieStore.getAll(),
+      setAll: (values) => {
         try {
-          cookiesToSet.forEach(({ name, value, options }) => {
+          values.forEach(({ name, value, options }) => {
             cookieStore.set(name, value, options);
           });
         } catch {
-          // Cookie writes may be unavailable in this context.
+          // Cookie writes may not be available in this context.
         }
       },
     },
@@ -49,6 +53,7 @@ async function getAdminContext() {
 
   if (authError || !user) {
     return {
+      ok: false as const,
       error: "Please sign in to continue.",
       status: 401,
     };
@@ -61,12 +66,9 @@ async function getAdminContext() {
     .maybeSingle();
 
   if (profileError) {
-    console.error(
-      "Administrator profile verification failed:",
-      profileError.message
-    );
-
+    console.error("Admin profile check failed:", profileError.message);
     return {
+      ok: false as const,
       error: "Unable to verify administrator permissions.",
       status: 500,
     };
@@ -78,26 +80,41 @@ async function getAdminContext() {
 
   if (!["admin", "administrator"].includes(role)) {
     return {
+      ok: false as const,
       error: "Administrator access is required.",
       status: 403,
     };
   }
 
-  const db = createClient(supabaseUrl, serviceKey, {
+  const db = createClient(url, serviceKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
     },
   });
 
-  return { user: { id: user.id }, db };
+  return { ok: true as const, userId: user.id, db };
+}
+
+function isDeliveryMethod(value: unknown): value is DeliveryMethod {
+  return [
+    "BSG_DELIVERY",
+    "SELLER_DELIVERY",
+    "SELF_PICKUP",
+    "THIRD_PARTY_REQUEST",
+  ].includes(String(value));
+}
+
+function makeTrackingNumber() {
+  const random = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
+  return `BSG-${random.toUpperCase()}`;
 }
 
 export async function GET() {
   try {
     const context = await getAdminContext();
 
-    if ("error" in context) {
+    if (!context.ok) {
       return jsonError(context.error, context.status);
     }
 
@@ -114,33 +131,24 @@ export async function GET() {
 
     if (ordersError) {
       console.error("Paid order lookup failed:", ordersError.message);
-      return jsonError("Could not load paid checkout orders.", 500);
+      return jsonError("Could not load paid orders.", 500);
     }
 
     const orderIds = (orders ?? []).map((order) => order.id);
 
     if (orderIds.length === 0) {
-      return NextResponse.json({
-        orders: [],
-        deliveries: [],
-      });
+      return NextResponse.json({ orders: [], deliveries: [] });
     }
 
-    const { data: deliveries, error: deliveriesError } = await db
+    const { data: deliveries, error: deliveryError } = await db
       .from("bsg_deliveries")
       .select("*")
-      .in("order_id", orderIds);
+      .in("order_id", orderIds)
+      .order("created_at", { ascending: false });
 
-    if (deliveriesError) {
-      console.error(
-        "Delivery record lookup failed:",
-        deliveriesError.message
-      );
-
-      return jsonError(
-        "Could not load delivery assignments. Confirm that the bsg_deliveries table exists.",
-        500
-      );
+    if (deliveryError) {
+      console.error("Delivery lookup failed:", deliveryError.message);
+      return jsonError("Could not load delivery records.", 500);
     }
 
     return NextResponse.json({
@@ -157,15 +165,16 @@ export async function POST(request: NextRequest) {
   try {
     const context = await getAdminContext();
 
-    if ("error" in context) {
+    if (!context.ok) {
       return jsonError(context.error, context.status);
     }
 
-    const { db, user } = context;
+    const { db, userId } = context;
 
     let body: {
       orderId?: string;
-      riderId?: string | null;
+      deliveryMethod?: DeliveryMethod;
+      thirdPartyProvider?: string;
       vehicleType?: string;
       vehicleNumber?: string;
       notes?: string;
@@ -174,10 +183,11 @@ export async function POST(request: NextRequest) {
     try {
       body = await request.json();
     } catch {
-      return jsonError("The request body must contain valid JSON.", 400);
+      return jsonError("A valid JSON request body is required.", 400);
     }
 
     const orderId = body.orderId?.trim();
+
     const uuidPattern =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -185,10 +195,20 @@ export async function POST(request: NextRequest) {
       return jsonError("A valid checkout order ID is required.", 400);
     }
 
-    const riderId = body.riderId?.trim() || null;
+    const method = body.deliveryMethod ?? "BSG_DELIVERY";
 
-    if (riderId && !uuidPattern.test(riderId)) {
-      return jsonError("The rider ID is invalid.", 400);
+    if (!isDeliveryMethod(method)) {
+      return jsonError("The delivery method is invalid.", 400);
+    }
+
+    if (
+      method === "THIRD_PARTY_REQUEST" &&
+      !body.thirdPartyProvider?.trim()
+    ) {
+      return jsonError(
+        "Enter the requested third-party delivery provider.",
+        400
+      );
     }
 
     const { data: order, error: orderError } = await db
@@ -198,8 +218,8 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     if (orderError) {
-      console.error("Checkout order verification failed:", orderError.message);
-      return jsonError("Could not verify the checkout order.", 500);
+      console.error("Order verification failed:", orderError.message);
+      return jsonError("Could not verify the order.", 500);
     }
 
     if (!order) {
@@ -208,36 +228,9 @@ export async function POST(request: NextRequest) {
 
     if (order.payment_status !== "PAID") {
       return jsonError(
-        "Only verified paid checkout orders can be assigned for delivery.",
+        "Only verified paid orders can be entered into delivery operations.",
         409
       );
-    }
-
-    if (riderId) {
-      const { data: rider, error: riderError } = await db
-        .from("profiles")
-        .select("id, account_type")
-        .eq("id", riderId)
-        .maybeSingle();
-
-      if (riderError) {
-        console.error("Rider verification failed:", riderError.message);
-        return jsonError("Could not verify the selected rider.", 500);
-      }
-
-      const riderRole = String(rider?.account_type ?? "")
-        .trim()
-        .toLowerCase();
-
-      if (
-        !rider ||
-        !["delivery", "delivery_staff", "rider", "driver"].includes(riderRole)
-      ) {
-        return jsonError(
-          "The selected user does not have an approved delivery role.",
-          400
-        );
-      }
     }
 
     const { data: existing, error: existingError } = await db
@@ -247,31 +240,40 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     if (existingError) {
-      console.error(
-        "Existing delivery lookup failed:",
-        existingError.message
-      );
-
-      return jsonError(
-        "Could not check existing delivery records. Confirm the bsg_deliveries table exists.",
-        500
-      );
+      console.error("Duplicate check failed:", existingError.message);
+      return jsonError("Could not check existing delivery records.", 500);
     }
 
     if (existing) {
-      return jsonError("This order already has a delivery record.", 409);
+      return jsonError(
+        "A delivery record already exists for this order.",
+        409
+      );
     }
+
+    const status =
+      method === "SELF_PICKUP"
+        ? "Ready for Pickup"
+        : method === "THIRD_PARTY_REQUEST"
+          ? "Awaiting Quote"
+          : "Pending Assignment";
 
     const { data: delivery, error: insertError } = await db
       .from("bsg_deliveries")
       .insert({
         order_id: orderId,
-        rider_id: riderId,
-        status: riderId ? "Assigned" : "Pending Assignment",
+        delivery_method: method,
+        third_party_provider:
+          method === "THIRD_PARTY_REQUEST"
+            ? body.thirdPartyProvider?.trim()
+            : null,
         vehicle_type: body.vehicleType?.trim() || null,
         vehicle_number: body.vehicleNumber?.trim() || null,
+        tracking_number:
+          method === "BSG_DELIVERY" ? makeTrackingNumber() : null,
+        status,
         notes: body.notes?.trim() || null,
-        assigned_by: user.id,
+        assigned_by: userId,
       })
       .select("*")
       .single();
