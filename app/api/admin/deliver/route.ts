@@ -1,10 +1,13 @@
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import { createHmac, timingSafeEqual, randomUUID } from "crypto";
 
 export const dynamic = "force-dynamic";
+
+const ADMIN_EMAIL = "admin@bestsalesgh.com";
+const COOKIE_NAME = "bsg_admin_session";
 
 type DeliveryMethod =
   | "BSG_DELIVERY"
@@ -13,17 +16,63 @@ type DeliveryMethod =
   | "THIRD_PARTY_REQUEST";
 
 function jsonError(message: string, status: number) {
-  return NextResponse.json({ error: message }, { status });
+  return NextResponse.json(
+    { error: message },
+    {
+      status,
+      headers: { "Cache-Control": "no-store" },
+    }
+  );
+}
+
+function verifyAdminToken(token: string, secret: string): boolean {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 2) return false;
+
+    const [payload, suppliedSignature] = parts;
+    if (!payload || !suppliedSignature) return false;
+
+    const expectedSignature = createHmac("sha256", secret)
+      .update(payload)
+      .digest("base64url");
+
+    const supplied = Buffer.from(suppliedSignature, "utf8");
+    const expected = Buffer.from(expectedSignature, "utf8");
+
+    if (
+      supplied.length !== expected.length ||
+      !timingSafeEqual(supplied, expected)
+    ) {
+      return false;
+    }
+
+    const session = JSON.parse(
+      Buffer.from(payload, "base64url").toString("utf8")
+    ) as {
+      email?: string;
+      expiresAt?: number;
+    };
+
+    return (
+      session.email === ADMIN_EMAIL &&
+      typeof session.expiresAt === "number" &&
+      Number.isFinite(session.expiresAt) &&
+      session.expiresAt > Date.now()
+    );
+  } catch {
+    return false;
+  }
 }
 
 async function getAdminContext() {
   const cookieStore = await cookies();
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const sessionSecret = process.env.ADMIN_SESSION_SECRET;
 
-  if (!url || !anonKey || !serviceKey) {
+  if (!url || !serviceKey || !sessionSecret) {
     return {
       ok: false as const,
       error: "Server configuration is incomplete.",
@@ -31,58 +80,13 @@ async function getAdminContext() {
     };
   }
 
-  const authClient = createServerClient(url, anonKey, {
-    cookies: {
-      getAll: () => cookieStore.getAll(),
-      setAll: (values) => {
-        try {
-          values.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options);
-          });
-        } catch {
-          // Cookie writes may not be available in this context.
-        }
-      },
-    },
-  });
+  const token = cookieStore.get(COOKIE_NAME)?.value;
 
-  const {
-    data: { user },
-    error: authError,
-  } = await authClient.auth.getUser();
-
-  if (authError || !user) {
+  if (!token || !verifyAdminToken(token, sessionSecret)) {
     return {
       ok: false as const,
-      error: "Please sign in to continue.",
+      error: "Your administrator session is invalid or expired. Please sign in again.",
       status: 401,
-    };
-  }
-
-  const { data: profile, error: profileError } = await authClient
-    .from("profiles")
-    .select("account_type")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (profileError) {
-    console.error("Admin profile check failed:", profileError.message);
-    return {
-      ok: false as const,
-      error: "Unable to verify administrator permissions.",
-      status: 500,
-    };
-  }
-
-  const role = String(profile?.account_type ?? "")
-    .trim()
-    .toLowerCase();
-
-  if (!["admin", "administrator"].includes(role)) {
-    return {
-      ok: false as const,
-      error: "Administrator access is required.",
-      status: 403,
     };
   }
 
@@ -93,7 +97,11 @@ async function getAdminContext() {
     },
   });
 
-  return { ok: true as const, userId: user.id, db };
+  return {
+    ok: true as const,
+    userId: ADMIN_EMAIL,
+    db,
+  };
 }
 
 function isDeliveryMethod(value: unknown): value is DeliveryMethod {
@@ -106,8 +114,7 @@ function isDeliveryMethod(value: unknown): value is DeliveryMethod {
 }
 
 function makeTrackingNumber() {
-  const random = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
-  return `BSG-${random.toUpperCase()}`;
+  return `BSG-${randomUUID().replace(/-/g, "").slice(0, 12).toUpperCase()}`;
 }
 
 export async function GET() {
@@ -137,7 +144,10 @@ export async function GET() {
     const orderIds = (orders ?? []).map((order) => order.id);
 
     if (orderIds.length === 0) {
-      return NextResponse.json({ orders: [], deliveries: [] });
+      return NextResponse.json(
+        { orders: [], deliveries: [] },
+        { headers: { "Cache-Control": "no-store" } }
+      );
     }
 
     const { data: deliveries, error: deliveryError } = await db
@@ -151,10 +161,13 @@ export async function GET() {
       return jsonError("Could not load delivery records.", 500);
     }
 
-    return NextResponse.json({
-      orders: orders ?? [],
-      deliveries: deliveries ?? [],
-    });
+    return NextResponse.json(
+      {
+        orders: orders ?? [],
+        deliveries: deliveries ?? [],
+      },
+      { headers: { "Cache-Control": "no-store" } }
+    );
   } catch (error) {
     console.error("Admin delivery GET error:", error);
     return jsonError("Unexpected server error.", 500);
@@ -186,7 +199,8 @@ export async function POST(request: NextRequest) {
       return jsonError("A valid JSON request body is required.", 400);
     }
 
-    const orderId = body.orderId?.trim();
+    const orderId =
+      typeof body.orderId === "string" ? body.orderId.trim() : "";
 
     const uuidPattern =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -203,7 +217,8 @@ export async function POST(request: NextRequest) {
 
     if (
       method === "THIRD_PARTY_REQUEST" &&
-      !body.thirdPartyProvider?.trim()
+      (typeof body.thirdPartyProvider !== "string" ||
+        !body.thirdPartyProvider.trim())
     ) {
       return jsonError(
         "Enter the requested third-party delivery provider.",
@@ -237,6 +252,7 @@ export async function POST(request: NextRequest) {
       .from("bsg_deliveries")
       .select("id")
       .eq("order_id", orderId)
+      .limit(1)
       .maybeSingle();
 
     if (existingError) {
@@ -265,15 +281,24 @@ export async function POST(request: NextRequest) {
         delivery_method: method,
         third_party_provider:
           method === "THIRD_PARTY_REQUEST"
-            ? body.thirdPartyProvider?.trim()
+            ? body.thirdPartyProvider!.trim().slice(0, 200)
             : null,
-        vehicle_type: body.vehicleType?.trim() || null,
-        vehicle_number: body.vehicleNumber?.trim() || null,
+        vehicle_type:
+          typeof body.vehicleType === "string"
+            ? body.vehicleType.trim().slice(0, 100) || null
+            : null,
+        vehicle_number:
+          typeof body.vehicleNumber === "string"
+            ? body.vehicleNumber.trim().slice(0, 100) || null
+            : null,
         tracking_number:
           method === "BSG_DELIVERY" ? makeTrackingNumber() : null,
         status,
-        notes: body.notes?.trim() || null,
-        assigned_by: userId,
+        notes:
+          typeof body.notes === "string"
+            ? body.notes.trim().slice(0, 2000) || null
+            : null,
+        assigned_by: null,
       })
       .select("*")
       .single();
