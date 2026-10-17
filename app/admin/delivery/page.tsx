@@ -1,653 +1,644 @@
 
 "use client";
 
-import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { supabaseBrowser } from "@/supabase-browser";
+import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
-type DeliveryStatus =
-  | "Pending Assignment"
-  | "Assigned"
-  | "Collected"
-  | "In Transit"
-  | "Delivered"
-  | "Failed";
+type Order = {
+  id: string;
+  order_number?: string | null;
+  customer_name?: string | null;
+  customer_email?: string | null;
+  customer_phone?: string | null;
+  delivery_address?: string | null;
+  delivery_city?: string | null;
+  delivery_region?: string | null;
+  currency?: string | null;
+  delivery_fee?: number | string | null;
+  payment_status?: string | null;
+};
 
 type Delivery = {
   id: string;
-  orderNumber: string;
-  seller: string;
-  sellerId: string;
-  items: string;
-  customer: string;
-  customerPhone: string;
-  destination: string;
-  gps: string;
-  rider: string;
-  riderId: string;
-  riderPhone: string;
-  vehicle: string;
-  vehicleNumber: string;
-  status: DeliveryStatus;
-  fee: string;
-  notes: string;
+  order_id: string;
+  status?: string | null;
+  delivery_method?: string | null;
+  tracking_number?: string | null;
+  third_party_provider?: string | null;
+  vehicle_type?: string | null;
+  vehicle_number?: string | null;
+  delivery_fee?: number | string | null;
+  notes?: string | null;
+  created_at?: string | null;
 };
 
-const statuses: DeliveryStatus[] = [
-  "Pending Assignment",
-  "Assigned",
-  "Collected",
-  "In Transit",
-  "Delivered",
-  "Failed",
+const DELIVERY_METHODS = [
+  { value: "BSG_DELIVERY", label: "BestSalesGH Delivery" },
+  { value: "SELLER_DELIVERY", label: "Seller Delivery" },
+  { value: "SELF_PICKUP", label: "Customer Self-Pickup" },
+  { value: "THIRD_PARTY_REQUEST", label: "Third-Party Delivery" },
 ];
 
-const statusStyles: Record<DeliveryStatus, string> = {
-  "Pending Assignment": "bg-amber-100 text-amber-800",
-  Assigned: "bg-blue-100 text-blue-800",
-  Collected: "bg-indigo-100 text-indigo-800",
-  "In Transit": "bg-purple-100 text-purple-800",
-  Delivered: "bg-green-100 text-green-800",
-  Failed: "bg-red-100 text-red-800",
-};
+function money(value: number | string | null | undefined, currency?: string | null) {
+  const amount = Number(value ?? 0);
 
-const emptyDelivery: Delivery = {
-  id: "",
-  orderNumber: "",
-  seller: "",
-  sellerId: "",
-  items: "",
-  customer: "",
-  customerPhone: "",
-  destination: "",
-  gps: "",
-  rider: "",
-  riderId: "",
-  riderPhone: "",
-  vehicle: "",
-  vehicleNumber: "",
-  status: "Pending Assignment",
-  fee: "",
-  notes: "",
-};
+  if (!Number.isFinite(amount)) return "—";
+
+  return `${currency || "GHS"} ${amount.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function readable(value?: string | null) {
+  if (!value) return "Not set";
+
+  return value
+    .replaceAll("_", " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
 
 export default function AdminDeliveryPage() {
-  const [authorized, setAuthorized] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("All");
+  const router = useRouter();
+
+  const [checking, setChecking] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
-  const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState("");
-  const [form, setForm] = useState<Delivery>(emptyDelivery);
+  const [selectedOrderId, setSelectedOrderId] = useState("");
+  const [method, setMethod] = useState("BSG_DELIVERY");
+  const [provider, setProvider] = useState("");
+  const [vehicleType, setVehicleType] = useState("");
+  const [vehicleNumber, setVehicleNumber] = useState("");
+  const [deliveryFee, setDeliveryFee] = useState("");
+  const [notes, setNotes] = useState("");
+  const [search, setSearch] = useState("");
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  const selectedOrder = orders.find(
+    (order) => order.id === selectedOrderId
+  );
+
+  const loadDeliveries = useCallback(async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/admin/deliver", {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+      });
+
+      const result = await response.json().catch(() => ({}));
+
+      if (response.status === 401 || response.status === 403) {
+        router.replace("/admin/login");
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          result.error || result.message || "Could not load delivery records."
+        );
+      }
+
+      const loadedOrders = Array.isArray(result.orders)
+        ? result.orders
+        : Array.isArray(result.data?.orders)
+          ? result.data.orders
+          : [];
+
+      const loadedDeliveries = Array.isArray(result.deliveries)
+        ? result.deliveries
+        : Array.isArray(result.data?.deliveries)
+          ? result.data.deliveries
+          : [];
+
+      setOrders(loadedOrders);
+      setDeliveries(loadedDeliveries);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "An unexpected error occurred while loading deliveries."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [router]);
 
   useEffect(() => {
     let active = true;
 
-    async function verifyAdmin() {
+    async function checkAdminSession() {
+      setChecking(true);
+
       try {
-        const supabase = supabaseBrowser();
+        const response = await fetch("/api/admin/session", {
+          method: "GET",
+          credentials: "include",
+          cache: "no-store",
+        });
 
-        const {
-          data: { user },
-          error: authError,
-        } = await supabase.auth.getUser();
+        const result = await response.json().catch(() => ({}));
 
-        if (authError) {
-          throw new Error(
-            `Login verification failed: ${authError.message}`
-          );
-        }
+        if (!active) return;
 
-        if (!user) {
-          window.location.href = "/login";
+        if (!response.ok || result.authenticated !== true) {
+          router.replace("/admin/login");
           return;
         }
 
-        const {
-          data: profile,
-          error: profileError,
-        } = await supabase
-          .from("profiles")
-          .select("id, account_type")
-          .eq("id", user.id)
-          .maybeSingle();
-
-        if (profileError) {
-          console.error("Delivery profile query failed:", {
-            code: profileError.code,
-            message: profileError.message,
-          });
-
-          throw new Error(
-            `Could not verify your profile: ${profileError.message}`
-          );
-        }
-
-        const role = String(profile?.account_type ?? "")
-          .trim()
-          .toLowerCase();
-
-        // Diagnostic information for troubleshooting.
-        // Do not log passwords, cookies, or access tokens.
-        console.info("Delivery access diagnostic:", {
-          authenticatedUserId: user.id,
-          profileFound: Boolean(profile),
-          profileId: profile?.id ?? null,
-          profileRole: role || "empty",
-        });
-
-        if (!profile) {
-          throw new Error(
-            "No readable profile matches your current login. Check that profiles.id matches your authenticated user ID and that your profile permissions allow this lookup."
-          );
-        }
-
-        if (!["admin", "administrator"].includes(role)) {
-          throw new Error(
-            `This page is using the account role "${role}". Only authorized administrator accounts can access Delivery Operations. Please verify that you signed in with your administrator account.`
-          );
-        }
-
+        setChecking(false);
+        await loadDeliveries();
+      } catch {
         if (active) {
-          setAuthorized(true);
-          setError("");
-        }
-      } catch (err) {
-        if (active) {
-          setAuthorized(false);
-          setError(
-            err instanceof Error
-              ? err.message
-              : "Unable to verify administrator access."
-          );
+          router.replace("/admin/login");
         }
       } finally {
-        if (active) {
-          setLoading(false);
-        }
+        if (active) setChecking(false);
       }
     }
 
-    void verifyAdmin();
+    checkAdminSession();
 
     return () => {
       active = false;
     };
-  }, []);
+  }, [router, loadDeliveries]);
 
-  const filtered = useMemo(() => {
-    const term = search.toLowerCase().trim();
-
-    return deliveries.filter((delivery) => {
-      const matchesStatus =
-        statusFilter === "All" ||
-        delivery.status === statusFilter;
-
-      const searchable = [
-        delivery.id,
-        delivery.orderNumber,
-        delivery.seller,
-        delivery.sellerId,
-        delivery.items,
-        delivery.customer,
-        delivery.customerPhone,
-        delivery.destination,
-        delivery.gps,
-        delivery.rider,
-        delivery.riderId,
-        delivery.riderPhone,
-        delivery.vehicleNumber,
-      ]
-        .join(" ")
-        .toLowerCase();
-
-      return matchesStatus && searchable.includes(term);
-    });
-  }, [deliveries, search, statusFilter]);
-
-  function openNewDelivery() {
-    setError("");
-    setEditingId("");
-    setForm({
-      ...emptyDelivery,
-      id: `BSG-${Date.now().toString().slice(-8)}`,
-    });
-    setShowForm(true);
-  }
-
-  function editDelivery(delivery: Delivery) {
-    setError("");
-    setEditingId(delivery.id);
-    setForm({ ...delivery });
-    setShowForm(true);
-  }
-
-  function saveDelivery(
-    event: React.FormEvent<HTMLFormElement>
-  ) {
+  async function createDelivery(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    setNotice("");
 
-    if (!form.orderNumber.trim() || !form.customer.trim()) {
-      setError("Order number and customer name are required.");
+    if (!selectedOrderId) {
+      setError("Please select a paid order.");
       return;
     }
 
-    if (editingId) {
-      setDeliveries((current) =>
-        current.map((item) =>
-          item.id === editingId
-            ? { ...form, id: editingId }
-            : item
-        )
-      );
-    } else {
-      setDeliveries((current) => [
-        {
-          ...form,
-          id: form.id || `BSG-${Date.now()}`,
-        },
-        ...current,
-      ]);
+    if (method === "THIRD_PARTY_REQUEST" && !provider.trim()) {
+      setError("Enter the third-party delivery provider.");
+      return;
     }
 
-    setShowForm(false);
+    if (deliveryFee.trim() && !Number.isFinite(Number(deliveryFee))) {
+      setError("Enter a valid delivery fee.");
+      return;
+    }
 
-    setError(
-      "Demo only: this delivery has not been saved to Supabase. Database integration is still required."
-    );
+    setSaving(true);
+
+    try {
+      const response = await fetch("/api/admin/deliver", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          orderId: selectedOrderId,
+          method,
+          thirdPartyProvider:
+            method === "THIRD_PARTY_REQUEST" ? provider.trim() : null,
+          vehicleType: vehicleType.trim() || null,
+          vehicleNumber: vehicleNumber.trim() || null,
+          deliveryFee:
+            deliveryFee.trim() === "" ? null : Number(deliveryFee),
+          notes: notes.trim() || null,
+        }),
+      });
+
+      const result = await response.json().catch(() => ({}));
+
+      if (response.status === 401 || response.status === 403) {
+        router.replace("/admin/login");
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          result.error || result.message || "Could not create delivery record."
+        );
+      }
+
+      setNotice(result.message || "Delivery record created successfully.");
+      setSelectedOrderId("");
+      setMethod("BSG_DELIVERY");
+      setProvider("");
+      setVehicleType("");
+      setVehicleNumber("");
+      setDeliveryFee("");
+      setNotes("");
+
+      await loadDeliveries();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "An unexpected error occurred while creating the delivery."
+      );
+    } finally {
+      setSaving(false);
+    }
   }
 
-  const count = (status: DeliveryStatus) =>
-    deliveries.filter((item) => item.status === status).length;
+  const filteredDeliveries = deliveries.filter((delivery) => {
+    const order = orders.find((item) => item.id === delivery.order_id);
 
-  if (loading) {
+    const text = [
+      delivery.id,
+      delivery.order_id,
+      delivery.tracking_number,
+      delivery.status,
+      delivery.delivery_method,
+      delivery.third_party_provider,
+      order?.order_number,
+      order?.customer_name,
+      order?.customer_email,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    return text.includes(search.toLowerCase());
+  });
+
+  if (checking) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-100 p-6">
-        <p className="font-semibold text-slate-600">
-          Verifying administrator access...
-        </p>
-      </main>
-    );
-  }
-
-  if (!authorized) {
-    return (
-      <main className="min-h-screen bg-slate-100 p-6">
-        <section className="mx-auto max-w-xl rounded-2xl border border-red-200 bg-white p-6 shadow-sm">
-          <h1 className="text-2xl font-black text-slate-900">
-            Access Restricted
-          </h1>
-
-          <p className="mt-3 break-words text-red-700">
-            {error || "Administrator access is required."}
-          </p>
-
-          <p className="mt-3 text-sm text-slate-500">
-            No account roles or security permissions were changed.
-          </p>
-
-          <Link
-            href="/admin"
-            className="mt-5 inline-block rounded-xl bg-blue-700 px-5 py-3 font-bold text-white hover:bg-blue-800"
-          >
-            Back to Admin
-          </Link>
-        </section>
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
+        <div className="rounded-xl border border-slate-200 bg-white p-6 text-slate-700 shadow-sm">
+          Verifying administrator access…
+        </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-900">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-6 sm:px-6">
+    <main className="min-h-screen bg-slate-50 p-4 text-slate-900 sm:p-8">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
-            <p className="text-sm font-black text-blue-700">
-              BEST SALES GHANA
+            <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
+              BestSalesGH Admin
             </p>
-            <h1 className="mt-2 text-3xl font-black">
-              BSG Delivery Service
-            </h1>
-            <p className="mt-2 text-slate-600">
-              Monitor orders, sellers, customers, destinations and delivery personnel.
+            <h1 className="mt-1 text-3xl font-bold">Delivery & Tracking</h1>
+            <p className="mt-2 text-sm text-slate-600">
+              Manage delivery records for orders whose payments have been
+              confirmed.
             </p>
           </div>
 
-          <Link
-            href="/admin"
-            className="rounded-xl border border-slate-300 px-4 py-3 font-bold hover:bg-slate-50"
-          >
-            ← Admin Dashboard
-          </Link>
-        </div>
-      </header>
-
-      <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6">
-        <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-gradient-to-r from-blue-800 to-cyan-600 p-6 text-white">
-          <div>
-            <h2 className="text-2xl font-black">
-              Delivery Operations
-            </h2>
-            <p className="mt-2 text-sm text-blue-50">
-              Issue deliveries and monitor their progress.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={openNewDelivery}
-            className="rounded-xl bg-white px-5 py-3 font-black text-blue-800 hover:bg-blue-50"
-          >
-            + Issue Delivery
-          </button>
-        </section>
-
-        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {[
-            ["Deliveries Issued", deliveries.length, "📦"],
-            ["Pending Assignment", count("Pending Assignment"), "⏳"],
-            ["In Transit", count("In Transit"), "🚚"],
-            ["Assigned", count("Assigned"), "👤"],
-            ["Delivered", count("Delivered"), "✅"],
-            ["Failed", count("Failed"), "⚠️"],
-          ].map(([label, value, icon]) => (
-            <article
-              key={String(label)}
-              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => router.push("/admin")}
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-100"
             >
-              <p className="text-2xl">{icon}</p>
-              <p className="mt-3 text-sm font-semibold text-slate-500">
-                {label}
-              </p>
-              <p className="mt-2 text-3xl font-black">
-                {value}
-              </p>
-            </article>
-          ))}
+              Admin Dashboard
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void loadDeliveries()}
+              disabled={loading}
+              className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50"
+            >
+              {loading ? "Refreshing…" : "Refresh Records"}
+            </button>
+          </div>
+        </header>
+
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-sm text-slate-500">Paid Orders Available</p>
+            <p className="mt-2 text-3xl font-bold">{orders.length}</p>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-sm text-slate-500">Delivery Records</p>
+            <p className="mt-2 text-3xl font-bold">{deliveries.length}</p>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-sm text-slate-500">Orders Without a Delivery Record</p>
+            <p className="mt-2 text-3xl font-bold">
+              {
+                orders.filter(
+                  (order) =>
+                    !deliveries.some(
+                      (delivery) => delivery.order_id === order.id
+                    )
+                ).length
+              }
+            </p>
+          </div>
         </section>
 
         {error && (
           <div
-            role="status"
-            className="break-words rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"
+            role="alert"
+            className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800"
           >
             {error}
           </div>
         )}
 
-        {showForm && (
-          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-xl font-black">
-                {editingId ? "Edit Delivery" : "Issue a Delivery"}
-              </h2>
-              <button
-                type="button"
-                onClick={() => setShowForm(false)}
-                className="rounded-lg border px-3 py-2 font-bold"
-              >
-                Close
-              </button>
-            </div>
-
-            <form onSubmit={saveDelivery} className="mt-5 space-y-6">
-              <div>
-                <h3 className="font-black text-blue-800">
-                  Order and Seller / Company
-                </h3>
-                <div className="mt-3 grid gap-4 sm:grid-cols-2">
-                  {[
-                    ["orderNumber", "Order number *"],
-                    ["seller", "Seller / Company name"],
-                    ["sellerId", "Seller / Company ID"],
-                    ["items", "Items and quantities"],
-                    ["fee", "Delivery fee (GH₵)"],
-                  ].map(([key, label]) => (
-                    <label key={key} className="text-sm font-semibold">
-                      {label}
-                      <input
-                        value={form[key as keyof Delivery] as string}
-                        onChange={(event) =>
-                          setForm((current) => ({
-                            ...current,
-                            [key]: event.target.value,
-                          }))
-                        }
-                        required={key === "orderNumber"}
-                        className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-3 font-normal"
-                      />
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <h3 className="font-black text-blue-800">
-                  Customer and Destination
-                </h3>
-                <div className="mt-3 grid gap-4 sm:grid-cols-2">
-                  {[
-                    ["customer", "Customer name *"],
-                    ["customerPhone", "Customer phone"],
-                    ["destination", "Full delivery address"],
-                    ["gps", "Ghana Post GPS / coordinates"],
-                  ].map(([key, label]) => (
-                    <label key={key} className="text-sm font-semibold">
-                      {label}
-                      <input
-                        value={form[key as keyof Delivery] as string}
-                        onChange={(event) =>
-                          setForm((current) => ({
-                            ...current,
-                            [key]: event.target.value,
-                          }))
-                        }
-                        required={key === "customer"}
-                        className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-3 font-normal"
-                      />
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <h3 className="font-black text-blue-800">
-                  Assigned BSG Rider / Driver
-                </h3>
-                <div className="mt-3 grid gap-4 sm:grid-cols-2">
-                  {[
-                    ["rider", "Rider / driver full name"],
-                    ["riderId", "Staff / Rider ID"],
-                    ["riderPhone", "Rider / driver phone"],
-                    ["vehicle", "Vehicle type"],
-                    ["vehicleNumber", "Vehicle registration number"],
-                  ].map(([key, label]) => (
-                    <label key={key} className="text-sm font-semibold">
-                      {label}
-                      <input
-                        value={form[key as keyof Delivery] as string}
-                        onChange={(event) =>
-                          setForm((current) => ({
-                            ...current,
-                            [key]: event.target.value,
-                          }))
-                        }
-                        className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-3 font-normal"
-                      />
-                    </label>
-                  ))}
-
-                  <label className="text-sm font-semibold">
-                    Delivery status
-                    <select
-                      value={form.status}
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          status: event.target.value as DeliveryStatus,
-                        }))
-                      }
-                      className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-3"
-                    >
-                      {statuses.map((status) => (
-                        <option key={status} value={status}>
-                          {status}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-              </div>
-
-              <label className="block text-sm font-semibold">
-                Internal notes / delivery instructions
-                <textarea
-                  value={form.notes}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      notes: event.target.value,
-                    }))
-                  }
-                  rows={3}
-                  className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-3 font-normal"
-                />
-              </label>
-
-              <button
-                type="submit"
-                className="rounded-xl bg-blue-700 px-6 py-3 font-black text-white hover:bg-blue-800"
-              >
-                Save Delivery Record
-              </button>
-            </form>
-          </section>
+        {notice && (
+          <div
+            role="status"
+            className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800"
+          >
+            {notice}
+          </div>
         )}
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-xl font-black">Find a Delivery</h2>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <h2 className="text-xl font-bold">Create Delivery Record</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Only orders returned by the server as paid can be selected.
+          </p>
+
+          <form onSubmit={createDelivery} className="mt-5 space-y-5">
+            <div>
+              <label
+                htmlFor="order"
+                className="mb-2 block text-sm font-semibold"
+              >
+                Paid Order
+              </label>
+
+              <select
+                id="order"
+                value={selectedOrderId}
+                onChange={(event) => setSelectedOrderId(event.target.value)}
+                required
+                className="w-full rounded-lg border border-slate-300 bg-white p-3 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+              >
+                <option value="">Select a paid order</option>
+                {orders.map((order) => (
+                  <option key={order.id} value={order.id}>
+                    {order.order_number || order.id} —{" "}
+                    {order.customer_name || order.customer_email || "Customer"}
+                    {order.delivery_city ? ` — ${order.delivery_city}` : ""}
+                  </option>
+                ))}
+              </select>
+
+              {orders.length === 0 && !loading && (
+                <p className="mt-2 text-sm text-amber-700">
+                  No paid orders were returned. Check payment records and the
+                  delivery API if you expected orders here.
+                </p>
+              )}
+            </div>
+
+            {selectedOrder && (
+              <div className="rounded-lg bg-slate-50 p-4 text-sm">
+                <h3 className="font-semibold">Selected Order Details</h3>
+                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <p>
+                    <span className="text-slate-500">Customer: </span>
+                    {selectedOrder.customer_name ||
+                      selectedOrder.customer_email ||
+                      "Not provided"}
+                  </p>
+                  <p>
+                    <span className="text-slate-500">Phone: </span>
+                    {selectedOrder.customer_phone || "Not provided"}
+                  </p>
+                  <p>
+                    <span className="text-slate-500">Region: </span>
+                    {selectedOrder.delivery_region || "Not provided"}
+                  </p>
+                  <p>
+                    <span className="text-slate-500">City: </span>
+                    {selectedOrder.delivery_city || "Not provided"}
+                  </p>
+                  <p className="sm:col-span-2">
+                    <span className="text-slate-500">Address: </span>
+                    {selectedOrder.delivery_address || "Not provided"}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label
+                  htmlFor="method"
+                  className="mb-2 block text-sm font-semibold"
+                >
+                  Delivery Method
+                </label>
+                <select
+                  id="method"
+                  value={method}
+                  onChange={(event) => setMethod(event.target.value)}
+                  className="w-full rounded-lg border border-slate-300 bg-white p-3 text-sm"
+                >
+                  {DELIVERY_METHODS.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {method === "THIRD_PARTY_REQUEST" && (
+                <div>
+                  <label
+                    htmlFor="provider"
+                    className="mb-2 block text-sm font-semibold"
+                  >
+                    Third-Party Provider
+                  </label>
+                  <input
+                    id="provider"
+                    value={provider}
+                    onChange={(event) => setProvider(event.target.value)}
+                    required
+                    maxLength={120}
+                    placeholder="Enter provider name"
+                    className="w-full rounded-lg border border-slate-300 p-3 text-sm"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label
+                  htmlFor="vehicleType"
+                  className="mb-2 block text-sm font-semibold"
+                >
+                  Vehicle Type (optional)
+                </label>
+                <input
+                  id="vehicleType"
+                  value={vehicleType}
+                  onChange={(event) => setVehicleType(event.target.value)}
+                  maxLength={80}
+                  placeholder="e.g. Motorcycle, van"
+                  className="w-full rounded-lg border border-slate-300 p-3 text-sm"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="vehicleNumber"
+                  className="mb-2 block text-sm font-semibold"
+                >
+                  Vehicle Number (optional)
+                </label>
+                <input
+                  id="vehicleNumber"
+                  value={vehicleNumber}
+                  onChange={(event) => setVehicleNumber(event.target.value)}
+                  maxLength={40}
+                  placeholder="Enter vehicle registration"
+                  className="w-full rounded-lg border border-slate-300 p-3 text-sm"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="deliveryFee"
+                  className="mb-2 block text-sm font-semibold"
+                >
+                  Delivery Fee (optional)
+                </label>
+                <input
+                  id="deliveryFee"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={deliveryFee}
+                  onChange={(event) => setDeliveryFee(event.target.value)}
+                  placeholder="0.00"
+                  className="w-full rounded-lg border border-slate-300 p-3 text-sm"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="notes"
+                  className="mb-2 block text-sm font-semibold"
+                >
+                  Delivery Notes (optional)
+                </label>
+                <input
+                  id="notes"
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                  maxLength={1000}
+                  placeholder="Instructions or additional details"
+                  className="w-full rounded-lg border border-slate-300 p-3 text-sm"
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={saving || loading || orders.length === 0}
+              className="w-full rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+            >
+              {saving ? "Saving…" : "Create Delivery Record"}
+            </button>
+          </form>
+        </section>
+
+        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+            <div>
+              <h2 className="text-xl font-bold">Delivery Records</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Records returned by the delivery API.
+              </p>
+            </div>
+
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search order, seller, customer, rider..."
-              className="rounded-xl border border-slate-300 px-4 py-3"
+              placeholder="Search order or tracking number"
+              aria-label="Search delivery records"
+              className="w-full rounded-lg border border-slate-300 p-3 text-sm sm:max-w-sm"
             />
-            <select
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
-              className="rounded-xl border border-slate-300 bg-white px-4 py-3"
-            >
-              <option value="All">All statuses</option>
-              {statuses.map((status) => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
-              ))}
-            </select>
           </div>
-        </section>
 
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b p-5">
-            <h2 className="text-xl font-black">Delivery Register</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              {filtered.length} record(s) displayed.
+          {loading ? (
+            <p className="py-8 text-center text-sm text-slate-500">
+              Loading delivery records…
             </p>
-          </div>
-
-          {filtered.length === 0 ? (
-            <div className="p-8 text-center">
-              <p className="text-3xl">🚚</p>
-              <h3 className="mt-3 font-black">
-                No delivery records to display
-              </h3>
-              <p className="mt-2 text-sm text-slate-500">
-                Issue a delivery to begin. Live orders have not yet been connected.
-              </p>
-            </div>
+          ) : filteredDeliveries.length === 0 ? (
+            <p className="py-8 text-center text-sm text-slate-500">
+              No delivery records match your search.
+            </p>
           ) : (
-            <div className="divide-y divide-slate-100">
-              {filtered.map((delivery) => (
-                <article key={delivery.id} className="space-y-4 p-5">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <h3 className="text-lg font-black">
-                        {delivery.orderNumber}
-                      </h3>
-                      <p className="text-xs text-slate-500">
-                        Delivery reference: {delivery.id}
-                      </p>
-                    </div>
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-bold ${statusStyles[delivery.status]}`}
-                    >
-                      {delivery.status}
-                    </span>
-                  </div>
+            <div className="mt-5 overflow-x-auto">
+              <table className="w-full min-w-[850px] border-collapse text-left text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50">
+                    <th className="p-3 font-semibold">Order</th>
+                    <th className="p-3 font-semibold">Customer</th>
+                    <th className="p-3 font-semibold">Method</th>
+                    <th className="p-3 font-semibold">Tracking Number</th>
+                    <th className="p-3 font-semibold">Status</th>
+                    <th className="p-3 font-semibold">Fee</th>
+                    <th className="p-3 font-semibold">Created</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredDeliveries.map((delivery) => {
+                    const order = orders.find(
+                      (item) => item.id === delivery.order_id
+                    );
 
-                  <div className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
-                    <div>
-                      <p className="font-bold text-slate-500">Seller / Company</p>
-                      <p>{delivery.seller || "Not recorded"}</p>
-                      <p className="break-all text-xs text-slate-500">
-                        {delivery.sellerId}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="font-bold text-slate-500">Items</p>
-                      <p className="whitespace-pre-wrap">
-                        {delivery.items || "Not recorded"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="font-bold text-slate-500">Customer</p>
-                      <p>{delivery.customer}</p>
-                      <p>{delivery.customerPhone}</p>
-                    </div>
-                    <div>
-                      <p className="font-bold text-slate-500">Destination</p>
-                      <p>{delivery.destination || "Not recorded"}</p>
-                      <p className="text-xs text-slate-500">{delivery.gps}</p>
-                    </div>
-                    <div>
-                      <p className="font-bold text-slate-500">Assigned Rider / Driver</p>
-                      <p>{delivery.rider || "Not assigned"}</p>
-                      <p>{delivery.riderPhone}</p>
-                      <p className="text-xs text-slate-500">
-                        ID: {delivery.riderId || "Not assigned"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="font-bold text-slate-500">Vehicle</p>
-                      <p>{delivery.vehicle || "Not recorded"}</p>
-                      <p>{delivery.vehicleNumber}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
-                    <p className="font-bold">
-                      Delivery fee: GH₵ {delivery.fee || "0.00"}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => editDelivery(delivery)}
-                      className="rounded-xl border border-blue-700 px-4 py-2 font-bold text-blue-700 hover:bg-blue-50"
-                    >
-                      Edit Record
-                    </button>
-                  </div>
-
-                  {delivery.notes && (
-                    <p className="text-sm text-slate-600">
-                      Notes: {delivery.notes}
-                    </p>
-                  )}
-                </article>
-              ))}
+                    return (
+                      <tr
+                        key={delivery.id}
+                        className="border-b border-slate-100 last:border-0"
+                      >
+                        <td className="p-3">
+                          {order?.order_number || delivery.order_id}
+                        </td>
+                        <td className="p-3">
+                          {order?.customer_name ||
+                            order?.customer_email ||
+                            "Not available"}
+                        </td>
+                        <td className="p-3">
+                          {readable(delivery.delivery_method)}
+                          {delivery.third_party_provider
+                            ? ` (${delivery.third_party_provider})`
+                            : ""}
+                        </td>
+                        <td className="p-3">
+                          {delivery.tracking_number || "Not assigned"}
+                        </td>
+                        <td className="p-3">
+                          <span className="inline-block rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold">
+                            {readable(delivery.status)}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          {money(
+                            delivery.delivery_fee,
+                            order?.currency
+                          )}
+                        </td>
+                        <td className="p-3">
+                          {delivery.created_at
+                            ? new Date(delivery.created_at).toLocaleDateString()
+                            : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </section>
