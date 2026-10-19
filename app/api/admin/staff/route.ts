@@ -1,6 +1,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { randomUUID } from "crypto";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,6 +34,33 @@ const STAFF_FIELDS = [
   "notes",
 ] as const;
 
+type StaffData = {
+  staff_number: string;
+  full_name: string;
+  department: string;
+  job_title: string;
+  phone: string | null;
+  email: string | null;
+  start_date: string | null;
+  status: string;
+  notes: string | null;
+  updated_at: string;
+};
+
+type ValidationResult =
+  | { data: StaffData }
+  | { error: string };
+
+type AdminContext =
+  | {
+      db: ReturnType<typeof createClient>;
+      user: { id: string };
+    }
+  | {
+      error: string;
+      status: 401 | 403;
+    };
+
 function jsonError(message: string, status: number) {
   return NextResponse.json(
     { error: message },
@@ -49,7 +77,9 @@ function cleanText(value: unknown): string | null {
   return cleaned ? cleaned : null;
 }
 
-async function getAdminContext(request: NextRequest) {
+async function getAdminContext(
+  request: NextRequest
+): Promise<AdminContext> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -62,7 +92,10 @@ async function getAdminContext(request: NextRequest) {
   const token = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
 
   if (!token) {
-    return { error: "Please sign in to continue.", status: 401 as const };
+    return {
+      error: "Please sign in to continue.",
+      status: 401,
+    };
   }
 
   const authClient = createClient(url, anonKey, {
@@ -80,7 +113,7 @@ async function getAdminContext(request: NextRequest) {
   if (authError || !user) {
     return {
       error: "Your session is invalid or expired. Please sign in again.",
-      status: 401 as const,
+      status: 401,
     };
   }
 
@@ -98,7 +131,10 @@ async function getAdminContext(request: NextRequest) {
     .maybeSingle();
 
   if (profileError) {
-    console.error("Staff admin permission lookup failed:", profileError.message);
+    console.error(
+      "Staff admin permission lookup failed:",
+      profileError.message
+    );
     throw new Error("PROFILE_LOOKUP");
   }
 
@@ -109,7 +145,7 @@ async function getAdminContext(request: NextRequest) {
   if (!["admin", "administrator"].includes(role)) {
     return {
       error: "Administrator access is required.",
-      status: 403 as const,
+      status: 403,
     };
   }
 
@@ -117,25 +153,28 @@ async function getAdminContext(request: NextRequest) {
 }
 
 function isAuthError(
-  value: unknown
+  value: AdminContext
 ): value is { error: string; status: 401 | 403 } {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "error" in value &&
-    "status" in value
-  );
+  return "error" in value;
 }
 
 function buildStaffNumber(department: string) {
   const prefix = DEPARTMENT_PREFIXES[department] || "OTH";
-  const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-  const suffix = crypto.randomUUID().replace(/-/g, "").slice(0, 6).toUpperCase();
+  const date = new Date()
+    .toISOString()
+    .slice(0, 10)
+    .replace(/-/g, "");
+  const suffix = randomUUID()
+    .replace(/-/g, "")
+    .slice(0, 6)
+    .toUpperCase();
 
   return `BSG-${prefix}-${date}-${suffix}`;
 }
 
-function validateStaff(body: Record<string, unknown>) {
+function validateStaff(
+  body: Record<string, unknown>
+): ValidationResult {
   const fullName = cleanText(body.full_name);
   const department = cleanText(body.department);
   const jobTitle = cleanText(body.job_title);
@@ -147,11 +186,15 @@ function validateStaff(body: Record<string, unknown>) {
   const startDate = cleanText(body.start_date);
 
   if (!fullName || !department || !jobTitle) {
-    return { error: "Full name, department and job title are required." };
+    return {
+      error: "Full name, department and job title are required.",
+    };
   }
 
   if (fullName.length > 150 || jobTitle.length > 150) {
-    return { error: "Name and job title must be 150 characters or fewer." };
+    return {
+      error: "Name and job title must be 150 characters or fewer.",
+    };
   }
 
   if (department.length > 100) {
@@ -159,7 +202,9 @@ function validateStaff(body: Record<string, unknown>) {
   }
 
   if (staffNumber && staffNumber.length > 60) {
-    return { error: "Staff number must be 60 characters or fewer." };
+    return {
+      error: "Staff number must be 60 characters or fewer.",
+    };
   }
 
   if (!ALLOWED_STATUSES.includes(status)) {
@@ -175,17 +220,27 @@ function validateStaff(body: Record<string, unknown>) {
   }
 
   if (notes && notes.length > 5000) {
-    return { error: "Notes must be 5000 characters or fewer." };
+    return {
+      error: "Notes must be 5000 characters or fewer.",
+    };
   }
 
-  if (startDate && !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+  if (
+    startDate &&
+    (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) ||
+      Number.isNaN(Date.parse(`${startDate}T00:00:00Z`)) ||
+      new Date(`${startDate}T00:00:00Z`)
+        .toISOString()
+        .slice(0, 10) !== startDate)
+  ) {
     return { error: "Enter a valid start date." };
   }
 
   return {
     data: {
       staff_number:
-        staffNumber?.toUpperCase() || buildStaffNumber(department),
+        staffNumber?.toUpperCase() ||
+        buildStaffNumber(department),
       full_name: fullName,
       department,
       job_title: jobTitle,
@@ -197,6 +252,12 @@ function validateStaff(body: Record<string, unknown>) {
       updated_at: new Date().toISOString(),
     },
   };
+}
+
+function isValidationError(
+  result: ValidationResult
+): result is { error: string } {
+  return "error" in result;
 }
 
 export async function GET(request: NextRequest) {
@@ -226,8 +287,10 @@ export async function GET(request: NextRequest) {
     );
   } catch (error) {
     console.error("Staff GET failed:", error);
+
     return jsonError(
-      error instanceof Error && error.message === "SERVER_CONFIGURATION"
+      error instanceof Error &&
+        error.message === "SERVER_CONFIGURATION"
         ? "Server configuration is incomplete."
         : "Unable to load staff records.",
       500
@@ -246,25 +309,39 @@ export async function POST(request: NextRequest) {
     let body: Record<string, unknown>;
 
     try {
-      body = await request.json();
+      const parsed: unknown = await request.json();
+
+      if (
+        !parsed ||
+        typeof parsed !== "object" ||
+        Array.isArray(parsed)
+      ) {
+        return jsonError("Invalid request body.", 400);
+      }
+
+      body = parsed as Record<string, unknown>;
     } catch {
       return jsonError("Invalid request body.", 400);
     }
 
     const validated = validateStaff(body);
 
-    if ("error" in validated) {
+    if (isValidationError(validated)) {
       return jsonError(validated.error, 400);
     }
 
-    const { data: existing, error: duplicateError } = await context.db
-      .from("staff_members")
-      .select("id")
-      .eq("staff_number", validated.data.staff_number)
-      .maybeSingle();
+    const { data: existing, error: duplicateError } =
+      await context.db
+        .from("staff_members")
+        .select("id")
+        .eq("staff_number", validated.data.staff_number)
+        .maybeSingle();
 
     if (duplicateError) {
-      console.error("Staff duplicate check failed:", duplicateError.message);
+      console.error(
+        "Staff duplicate check failed:",
+        duplicateError.message
+      );
       return jsonError("Unable to verify staff number.", 500);
     }
 
@@ -297,13 +374,22 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { success: true, message: "Staff member registered successfully.", staff },
-      { status: 201, headers: { "Cache-Control": "no-store" } }
+      {
+        success: true,
+        message: "Staff member registered successfully.",
+        staff,
+      },
+      {
+        status: 201,
+        headers: { "Cache-Control": "no-store" },
+      }
     );
   } catch (error) {
     console.error("Staff POST failed:", error);
+
     return jsonError(
-      error instanceof Error && error.message === "SERVER_CONFIGURATION"
+      error instanceof Error &&
+        error.message === "SERVER_CONFIGURATION"
         ? "Server configuration is incomplete."
         : "Unable to register staff member.",
       500
@@ -322,23 +408,44 @@ export async function PATCH(request: NextRequest) {
     let body: Record<string, unknown>;
 
     try {
-      body = await request.json();
+      const parsed: unknown = await request.json();
+
+      if (
+        !parsed ||
+        typeof parsed !== "object" ||
+        Array.isArray(parsed)
+      ) {
+        return jsonError("Invalid request body.", 400);
+      }
+
+      body = parsed as Record<string, unknown>;
     } catch {
       return jsonError("Invalid request body.", 400);
     }
 
     const id = cleanText(body.id);
 
-    if (!id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
-      return jsonError("A valid staff record ID is required.", 400);
+    if (
+      !id ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        id
+      )
+    ) {
+      return jsonError(
+        "A valid staff record ID is required.",
+        400
+      );
     }
 
     const updates: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
     };
 
-    // Status-only updates are supported by the existing dashboard.
-    if (Object.keys(body).length === 2 && "status" in body && "id" in body) {
+    if (
+      Object.keys(body).length === 2 &&
+      "status" in body &&
+      "id" in body
+    ) {
       const status = cleanText(body.status);
 
       if (!status || !ALLOWED_STATUSES.includes(status)) {
@@ -349,7 +456,7 @@ export async function PATCH(request: NextRequest) {
     } else {
       const validated = validateStaff(body);
 
-      if ("error" in validated) {
+      if (isValidationError(validated)) {
         return jsonError(validated.error, 400);
       }
 
@@ -359,20 +466,27 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (typeof updates.staff_number === "string") {
-      const { data: duplicate, error: duplicateError } = await context.db
-        .from("staff_members")
-        .select("id")
-        .eq("staff_number", updates.staff_number)
-        .neq("id", id)
-        .maybeSingle();
+      const { data: duplicate, error: duplicateError } =
+        await context.db
+          .from("staff_members")
+          .select("id")
+          .eq("staff_number", updates.staff_number)
+          .neq("id", id)
+          .maybeSingle();
 
       if (duplicateError) {
-        console.error("Staff number check failed:", duplicateError.message);
+        console.error(
+          "Staff number check failed:",
+          duplicateError.message
+        );
         return jsonError("Unable to verify staff number.", 500);
       }
 
       if (duplicate) {
-        return jsonError("That staff number belongs to another employee.", 409);
+        return jsonError(
+          "That staff number belongs to another employee.",
+          409
+        );
       }
     }
 
@@ -389,7 +503,10 @@ export async function PATCH(request: NextRequest) {
       console.error("Staff update failed:", error.message);
 
       if (error.code === "23505") {
-        return jsonError("That staff number already exists.", 409);
+        return jsonError(
+          "That staff number already exists.",
+          409
+        );
       }
 
       return jsonError("Unable to update staff record.", 500);
@@ -400,13 +517,19 @@ export async function PATCH(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { success: true, message: "Staff record updated successfully.", staff },
+      {
+        success: true,
+        message: "Staff record updated successfully.",
+        staff,
+      },
       { headers: { "Cache-Control": "no-store" } }
     );
   } catch (error) {
     console.error("Staff PATCH failed:", error);
+
     return jsonError(
-      error instanceof Error && error.message === "SERVER_CONFIGURATION"
+      error instanceof Error &&
+        error.message === "SERVER_CONFIGURATION"
         ? "Server configuration is incomplete."
         : "Unable to update staff record.",
       500
