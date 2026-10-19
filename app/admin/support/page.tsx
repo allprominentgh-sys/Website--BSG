@@ -1,122 +1,110 @@
-"use client";
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
-import { useState } from "react";
-import { supabaseBrowser } from "@/supabase-browser";
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-export default function AdminSupportPage() {
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
-  const [isSuccess, setIsSuccess] = useState(false);
-
-  async function checkAdminAccess() {
-    setLoading(true);
-    setMessage("");
-    setIsSuccess(false);
-
-    try {
-      const supabase = supabaseBrowser();
-
-      const {
-        data: { session },
-        error: sessionError,
-      } = await supabase.auth.getSession();
-
-      if (sessionError) {
-        setMessage("Unable to check your login. Please sign in again.");
-        return;
-      }
-
-      if (!session?.access_token) {
-        setMessage(
-          "You are not signed in. Please sign in with your administrator account."
-        );
-        return;
-      }
-
-      const response = await fetch("/api/admin/support", {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        cache: "no-store",
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        setMessage(
-          result.error || "Administrator access could not be verified."
-        );
-        return;
-      }
-
-      setIsSuccess(true);
-      setMessage(
-        result.message || "Administrator access verified successfully."
-      );
-    } catch (error) {
-      console.error("Admin Support access check failed:", error);
-      setMessage(
-        "Could not connect to the support service. Please try again."
-      );
-    } finally {
-      setLoading(false);
+function jsonError(message: string, status: number) {
+  return NextResponse.json(
+    { success: false, error: message },
+    {
+      status,
+      headers: { "Cache-Control": "no-store" },
     }
-  }
-
-  return (
-    <main className="min-h-screen bg-gray-100 px-4 py-8 text-gray-900 sm:px-8">
-      <div className="mx-auto max-w-5xl">
-        <header className="mb-8">
-          <p className="text-sm font-semibold uppercase tracking-wider text-blue-700">
-            BestSalesGH Administration
-          </p>
-
-          <h1 className="mt-2 text-3xl font-bold">Admin Support</h1>
-
-          <p className="mt-2 text-gray-600">
-            Administrator access and support service.
-          </p>
-        </header>
-
-        <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
-          <h2 className="text-xl font-semibold">
-            Support administration
-          </h2>
-
-          <p className="mt-3 leading-7 text-gray-600">
-            Verify that your signed-in account has administrator
-            permission to access the support service.
-          </p>
-
-          <button
-            type="button"
-            onClick={checkAdminAccess}
-            disabled={loading}
-            className="mt-6 rounded-lg bg-blue-700 px-6 py-3 font-semibold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {loading ? "Checking access..." : "Check Admin Access"}
-          </button>
-
-          {message && (
-            <div
-              role="status"
-              aria-live="polite"
-              className={`mt-5 rounded-lg border p-4 text-sm ${
-                isSuccess
-                  ? "border-green-200 bg-green-50 text-green-800"
-                  : "border-gray-200 bg-gray-50 text-gray-800"
-              }`}
-            >
-              {message}
-            </div>
-          )}
-        </section>
-
-        <footer className="mt-8 text-sm text-gray-500">
-          BestSalesGH Admin Portal
-        </footer>
-      </div>
-    </main>
   );
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !anonKey || !serviceKey) {
+      console.error("Admin support: required environment variables are missing.");
+      return jsonError("Server configuration is incomplete.", 500);
+    }
+
+    const authorization = request.headers.get("authorization");
+    const token = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
+
+    if (!token) {
+      return jsonError("Please sign in again.", 401);
+    }
+
+    // Verify the actual Supabase access token.
+    const authClient = createClient(supabaseUrl, anonKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
+
+    const {
+      data: { user },
+      error: authError,
+    } = await authClient.auth.getUser(token);
+
+    if (authError || !user) {
+      console.error("Admin support: Supabase user verification failed.");
+      return jsonError(
+        "Your login has expired or is invalid. Please sign out and sign in again.",
+        401
+      );
+    }
+
+    // Use the service-role client only on the server to check the user's role.
+    const adminDb = createClient(supabaseUrl, serviceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
+
+    const { data: profile, error: profileError } = await adminDb
+      .from("profiles")
+      .select("id, account_type")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error(
+        "Admin support: profile lookup failed:",
+        profileError.message
+      );
+      return jsonError("Unable to verify administrator permissions.", 500);
+    }
+
+    if (!profile) {
+      console.error("Admin support: no profile found for authenticated user.");
+      return jsonError(
+        "Your signed-in account has no matching profile. Please contact the administrator.",
+        403
+      );
+    }
+
+    const role = String(profile.account_type ?? "")
+      .trim()
+      .toLowerCase();
+
+    if (role !== "admin" && role !== "administrator") {
+      console.error("Admin support: authenticated user does not have admin role.");
+      return jsonError("Administrator access is required.", 403);
+    }
+
+    return NextResponse.json(
+      {
+        success: true,
+        message: "Administrator access verified successfully.",
+      },
+      {
+        status: 200,
+        headers: { "Cache-Control": "no-store" },
+      }
+    );
+  } catch (error) {
+    console.error("Admin support access check failed:", error);
+
+    return jsonError("Unexpected server error while checking administrator access.", 500);
+  }
 }
