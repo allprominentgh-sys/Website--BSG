@@ -1,6 +1,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import {
+  createClient,
+  type SupabaseClient,
+} from "@supabase/supabase-js";
 import { randomUUID } from "crypto";
 
 export const runtime = "nodejs";
@@ -53,7 +56,7 @@ type ValidationResult =
 
 type AdminContext =
   | {
-      db: ReturnType<typeof createClient>;
+      db: SupabaseClient<any, "public", any, any>;
       user: { id: string };
     }
   | {
@@ -73,8 +76,9 @@ function jsonError(message: string, status: number) {
 
 function cleanText(value: unknown): string | null {
   if (typeof value !== "string") return null;
+
   const cleaned = value.trim();
-  return cleaned ? cleaned : null;
+  return cleaned || null;
 }
 
 async function getAdminContext(
@@ -117,12 +121,13 @@ async function getAdminContext(
     };
   }
 
-  const db = createClient(url, serviceKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
+  const db: SupabaseClient<any, "public", any, any> =
+    createClient(url, serviceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
 
   const { data: profile, error: profileError } = await db
     .from("profiles")
@@ -158,12 +163,14 @@ function isAuthError(
   return "error" in value;
 }
 
-function buildStaffNumber(department: string) {
+function buildStaffNumber(department: string): string {
   const prefix = DEPARTMENT_PREFIXES[department] || "OTH";
+
   const date = new Date()
     .toISOString()
     .slice(0, 10)
     .replace(/-/g, "");
+
   const suffix = randomUUID()
     .replace(/-/g, "")
     .slice(0, 6)
