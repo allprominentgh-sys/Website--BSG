@@ -11,10 +11,20 @@ export default function AdminLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+
+  const isLoginPage = pathname === "/admin/login";
+
   const [checking, setChecking] = useState(true);
   const [authorized, setAuthorized] = useState(false);
 
   useEffect(() => {
+    // The login page must remain accessible without a session.
+    if (isLoginPage) {
+      setChecking(false);
+      setAuthorized(false);
+      return;
+    }
+
     let active = true;
 
     async function verifyAdminSession() {
@@ -33,9 +43,8 @@ export default function AdminLayout({
         if (response.ok) {
           const data = await response.json();
 
-          if (data?.authenticated === true) {
+          if (active && data?.authenticated === true) {
             setAuthorized(true);
-            setChecking(false);
             return;
           }
         }
@@ -57,7 +66,12 @@ export default function AdminLayout({
     return () => {
       active = false;
     };
-  }, [pathname, router]);
+  }, [isLoginPage, pathname, router]);
+
+  // Never block the login page behind its own authentication check.
+  if (isLoginPage) {
+    return <>{children}</>;
+  }
 
   if (checking || !authorized) {
     return (
