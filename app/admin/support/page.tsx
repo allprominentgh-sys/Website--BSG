@@ -1,110 +1,171 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+"use client";
 
-function jsonError(message: string, status: number) {
-  return NextResponse.json(
-    { success: false, error: message },
-    {
-      status,
-      headers: { "Cache-Control": "no-store" },
-    }
+import { useCallback, useEffect, useState } from "react";
+
+type SupportCheckResult = {
+  success?: boolean;
+  message?: string;
+  error?: string;
+};
+
+export default function AdminSupportPage() {
+  const [checking, setChecking] = useState(true);
+  const [authorized, setAuthorized] = useState(false);
+  const [message, setMessage] = useState(
+    "Verifying administrator access..."
   );
-}
 
-export async function GET(request: NextRequest) {
-  try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const checkAccess = useCallback(async () => {
+    setChecking(true);
+    setMessage("Verifying administrator access...");
 
-    if (!supabaseUrl || !anonKey || !serviceKey) {
-      console.error("Admin support: required environment variables are missing.");
-      return jsonError("Server configuration is incomplete.", 500);
-    }
+    try {
+      // Get the current Supabase session from the existing login.
+      const { supabaseBrowser } = await import("@/supabase-browser");
+      const supabase = supabaseBrowser();
 
-    const authorization = request.headers.get("authorization");
-    const token = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
 
-    if (!token) {
-      return jsonError("Please sign in again.", 401);
-    }
-
-    // Verify the actual Supabase access token.
-    const authClient = createClient(supabaseUrl, anonKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    });
-
-    const {
-      data: { user },
-      error: authError,
-    } = await authClient.auth.getUser(token);
-
-    if (authError || !user) {
-      console.error("Admin support: Supabase user verification failed.");
-      return jsonError(
-        "Your login has expired or is invalid. Please sign out and sign in again.",
-        401
-      );
-    }
-
-    // Use the service-role client only on the server to check the user's role.
-    const adminDb = createClient(supabaseUrl, serviceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    });
-
-    const { data: profile, error: profileError } = await adminDb
-      .from("profiles")
-      .select("id, account_type")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    if (profileError) {
-      console.error(
-        "Admin support: profile lookup failed:",
-        profileError.message
-      );
-      return jsonError("Unable to verify administrator permissions.", 500);
-    }
-
-    if (!profile) {
-      console.error("Admin support: no profile found for authenticated user.");
-      return jsonError(
-        "Your signed-in account has no matching profile. Please contact the administrator.",
-        403
-      );
-    }
-
-    const role = String(profile.account_type ?? "")
-      .trim()
-      .toLowerCase();
-
-    if (role !== "admin" && role !== "administrator") {
-      console.error("Admin support: authenticated user does not have admin role.");
-      return jsonError("Administrator access is required.", 403);
-    }
-
-    return NextResponse.json(
-      {
-        success: true,
-        message: "Administrator access verified successfully.",
-      },
-      {
-        status: 200,
-        headers: { "Cache-Control": "no-store" },
+      if (sessionError || !session?.access_token) {
+        setAuthorized(false);
+        setMessage("Your session has expired. Please sign in again.");
+        return;
       }
-    );
-  } catch (error) {
-    console.error("Admin support access check failed:", error);
 
-    return jsonError("Unexpected server error while checking administrator access.", 500);
-  }
+      const response = await fetch("/api/admin/support", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        cache: "no-store",
+        credentials: "same-origin",
+      });
+
+      const result =
+        (await response.json()) as SupportCheckResult;
+
+      if (!response.ok || result.success !== true) {
+        setAuthorized(false);
+        setMessage(
+          result.error ||
+            "Administrator access could not be verified."
+        );
+        return;
+      }
+
+      setAuthorized(true);
+      setMessage(
+        result.message || "Administrator access verified."
+      );
+    } catch (error) {
+      console.error("Support Centre access check failed:", error);
+      setAuthorized(false);
+      setMessage(
+        "Unable to connect to the Support Centre. Please try again."
+      );
+    } finally {
+      setChecking(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void checkAccess();
+  }, [checkAccess]);
+
+  return (
+    <main className="min-h-screen bg-slate-50 p-4 text-slate-800 sm:p-8">
+      <div className="mx-auto max-w-4xl">
+        <header className="rounded-2xl bg-blue-900 p-6 text-white shadow">
+          <p className="text-sm font-semibold uppercase tracking-wider text-blue-200">
+            BEST SALES GHANA
+          </p>
+          <h1 className="mt-2 text-3xl font-bold">
+            Support Centre
+          </h1>
+          <p className="mt-2 text-sm text-blue-100">
+            Administrator access and customer support management.
+          </p>
+        </header>
+
+        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-bold text-slate-900">
+            Administrator verification
+          </h2>
+
+          <div
+            className={`mt-4 rounded-xl border p-4 ${
+              checking
+                ? "border-blue-200 bg-blue-50 text-blue-900"
+                : authorized
+                  ? "border-green-200 bg-green-50 text-green-900"
+                  : "border-amber-200 bg-amber-50 text-amber-900"
+            }`}
+            role="status"
+            aria-live="polite"
+          >
+            {checking && (
+              <p className="font-semibold">
+                Checking your session...
+              </p>
+            )}
+
+            <p className="mt-1 text-sm">{message}</p>
+          </div>
+
+          {!checking && !authorized && (
+            <div className="mt-5 flex flex-wrap gap-3">
+              <a
+                href="/login"
+                className="rounded-lg bg-blue-800 px-5 py-3 font-semibold text-white hover:bg-blue-900"
+              >
+                Sign in
+              </a>
+
+              <button
+                type="button"
+                onClick={() => void checkAccess()}
+                className="rounded-lg border border-slate-300 px-5 py-3 font-semibold hover:bg-slate-50"
+              >
+                Try again
+              </button>
+            </div>
+          )}
+
+          {authorized && (
+            <div className="mt-5">
+              <p className="font-semibold text-green-800">
+                Access check successful.
+              </p>
+              <p className="mt-2 text-sm text-slate-600">
+                Your administrator session has been verified.
+                The support management interface can now be connected
+                to your existing support agents and conversations.
+              </p>
+
+              <button
+                type="button"
+                onClick={() => void checkAccess()}
+                className="mt-4 rounded-lg bg-blue-800 px-5 py-3 font-semibold text-white hover:bg-blue-900"
+              >
+                Refresh access check
+              </button>
+            </div>
+          )}
+        </section>
+
+        <div className="mt-6">
+          <a
+            href="/admin"
+            className="font-semibold text-blue-800 hover:underline"
+          >
+            ← Back to admin dashboard
+          </a>
+        </div>
+      </div>
+    </main>
+  );
 }
