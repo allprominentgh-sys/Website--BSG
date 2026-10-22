@@ -15,13 +15,19 @@ export default function AdminSupportPage() {
   const [message, setMessage] = useState(
     "Verifying administrator access..."
   );
+  const [sessionEmail, setSessionEmail] = useState("");
+  const [sessionStatus, setSessionStatus] = useState(
+    "Checking signed-in account..."
+  );
 
   const checkAccess = useCallback(async () => {
     setChecking(true);
+    setAuthorized(false);
     setMessage("Verifying administrator access...");
+    setSessionEmail("");
+    setSessionStatus("Checking signed-in account...");
 
     try {
-      // Get the current Supabase session from the existing login.
       const { supabaseBrowser } = await import("@/supabase-browser");
       const supabase = supabaseBrowser();
 
@@ -30,11 +36,23 @@ export default function AdminSupportPage() {
         error: sessionError,
       } = await supabase.auth.getSession();
 
-      if (sessionError || !session?.access_token) {
-        setAuthorized(false);
-        setMessage("Your session has expired. Please sign in again.");
+      if (sessionError) {
+        setSessionStatus("Unable to read the current session.");
+        setMessage("Could not read your sign-in session. Please try again.");
         return;
       }
+
+      if (!session?.access_token || !session.user) {
+        setSessionStatus("No active Supabase session was found.");
+        setMessage(
+          "No active Supabase login was found. Please sign in and try again."
+        );
+        return;
+      }
+
+      const email = session.user.email ?? "";
+      setSessionEmail(email || "No email returned by Supabase");
+      setSessionStatus("An active Supabase session was found.");
 
       const response = await fetch("/api/admin/support", {
         method: "GET",
@@ -52,17 +70,18 @@ export default function AdminSupportPage() {
         setAuthorized(false);
         setMessage(
           result.error ||
-            "Administrator access could not be verified."
+            `Administrator verification failed (HTTP ${response.status}).`
         );
         return;
       }
 
       setAuthorized(true);
       setMessage(
-        result.message || "Administrator access verified."
+        result.message || "Administrator access verified successfully."
       );
     } catch (error) {
       console.error("Support Centre access check failed:", error);
+      setSessionStatus("The session check could not be completed.");
       setAuthorized(false);
       setMessage(
         "Unable to connect to the Support Centre. Please try again."
@@ -83,9 +102,7 @@ export default function AdminSupportPage() {
           <p className="text-sm font-semibold uppercase tracking-wider text-blue-200">
             BEST SALES GHANA
           </p>
-          <h1 className="mt-2 text-3xl font-bold">
-            Support Centre
-          </h1>
+          <h1 className="mt-2 text-3xl font-bold">Support Centre</h1>
           <p className="mt-2 text-sm text-blue-100">
             Administrator access and customer support management.
           </p>
@@ -95,6 +112,16 @@ export default function AdminSupportPage() {
           <h2 className="text-xl font-bold text-slate-900">
             Administrator verification
           </h2>
+
+          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <p className="font-semibold">Signed-in account</p>
+            <p className="mt-2 break-all text-sm">
+              {sessionEmail || "Not available"}
+            </p>
+            <p className="mt-2 text-sm text-slate-600">
+              {sessionStatus}
+            </p>
+          </div>
 
           <div
             className={`mt-4 rounded-xl border p-4 ${
@@ -112,7 +139,6 @@ export default function AdminSupportPage() {
                 Checking your session...
               </p>
             )}
-
             <p className="mt-1 text-sm">{message}</p>
           </div>
 
@@ -124,7 +150,6 @@ export default function AdminSupportPage() {
               >
                 Sign in
               </a>
-
               <button
                 type="button"
                 onClick={() => void checkAccess()}
@@ -136,24 +161,9 @@ export default function AdminSupportPage() {
           )}
 
           {authorized && (
-            <div className="mt-5">
-              <p className="font-semibold text-green-800">
-                Access check successful.
-              </p>
-              <p className="mt-2 text-sm text-slate-600">
-                Your administrator session has been verified.
-                The support management interface can now be connected
-                to your existing support agents and conversations.
-              </p>
-
-              <button
-                type="button"
-                onClick={() => void checkAccess()}
-                className="mt-4 rounded-lg bg-blue-800 px-5 py-3 font-semibold text-white hover:bg-blue-900"
-              >
-                Refresh access check
-              </button>
-            </div>
+            <p className="mt-5 font-semibold text-green-800">
+              Access check successful.
+            </p>
           )}
         </section>
 
