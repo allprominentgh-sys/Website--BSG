@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -31,6 +30,7 @@ type SupportAgent = {
 type InboxResponse = {
   success?: boolean;
   error?: string;
+  message?: string;
   messages?: SupportMessage[];
   agents?: SupportAgent[];
   count?: number;
@@ -53,11 +53,13 @@ function formatDate(value: string) {
 }
 
 function displayStatus(value: string) {
-  return value
-    .replace(/[_-]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/\b\w/g, (letter) => letter.toUpperCase()) || "Unknown";
+  return (
+    value
+      .replace(/[_-]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/\b\w/g, (letter) => letter.toUpperCase()) || "Unknown"
+  );
 }
 
 export default function AdminSupportPage() {
@@ -81,23 +83,20 @@ export default function AdminSupportPage() {
     setError("");
 
     try {
-      const response = await fetch(
-        "/api/admin/support/inbox?limit=200",
-        {
-          method: "GET",
-          credentials: "same-origin",
-          cache: "no-store",
-          headers: {
-            Accept: "application/json",
-          },
-        }
-      );
+      const response = await fetch("/api/admin/support/inbox?limit=200", {
+        method: "GET",
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: {
+          Accept: "application/json",
+        },
+      });
 
       const result = (await response.json()) as InboxResponse;
 
       if (response.status === 401 || response.status === 403) {
         setError(
-          "Your administrator session is invalid or has expired. Sign in to the administrator account again."
+          "Administrator access was not verified. Please sign in through the main BEST SALES GHANA administrator login and try again."
         );
         return;
       }
@@ -105,6 +104,7 @@ export default function AdminSupportPage() {
       if (!response.ok || result.success !== true) {
         setError(
           result.error ||
+            result.message ||
             `Unable to load the inbox (HTTP ${response.status}).`
         );
         return;
@@ -115,6 +115,7 @@ export default function AdminSupportPage() {
       setLastUpdated(new Date().toLocaleTimeString());
     } catch (err) {
       console.error("Unable to load Support Centre inbox:", err);
+
       setError(
         "Could not connect to the Support Centre. Check your connection and try again."
       );
@@ -148,9 +149,7 @@ export default function AdminSupportPage() {
     const result: Conversation[] = [];
 
     for (const [id, conversationMessages] of grouped.entries()) {
-      const sortedMessages: SupportMessage[] = [
-        ...conversationMessages,
-      ].sort(
+      const sortedMessages = [...conversationMessages].sort(
         (a, b) =>
           new Date(a.created_at).getTime() -
           new Date(b.created_at).getTime()
@@ -193,24 +192,21 @@ export default function AdminSupportPage() {
           message.message.toLowerCase().includes(term)
         );
 
+      const hasAssignment = conversation.messages.some(
+        (message) => Boolean(message.assigned_agent_id)
+      );
+
+      const hasReferral = conversation.messages.some(
+        (message) => message.referred_to_admin
+      );
+
       const matchesStatus =
         statusFilter === "all" ||
-        (statusFilter === "referred" &&
-          conversation.messages.some(
-            (message) => message.referred_to_admin
-          )) ||
-        (statusFilter === "assigned" &&
-          conversation.messages.some(
-            (message) => Boolean(message.assigned_agent_id)
-          )) ||
-        (statusFilter === "unassigned" &&
-          !conversation.messages.some(
-            (message) => Boolean(message.assigned_agent_id)
-          )) ||
+        (statusFilter === "referred" && hasReferral) ||
+        (statusFilter === "assigned" && hasAssignment) ||
+        (statusFilter === "unassigned" && !hasAssignment) ||
         (statusFilter === "open" &&
-          !["closed", "resolved"].includes(
-            latest.status.toLowerCase()
-          ));
+          !["closed", "resolved"].includes(latest.status.toLowerCase()));
 
       return matchesSearch && matchesStatus;
     });
@@ -234,10 +230,11 @@ export default function AdminSupportPage() {
     if (ids.length === 0) return "Unassigned";
 
     return ids
-      .map((id) => {
-        const agent = agents.find((item) => item.id === id);
-        return agent?.display_name ?? "Agent record not found";
-      })
+      .map(
+        (id) =>
+          agents.find((agent) => agent.id === id)?.display_name ??
+          "Agent record not found"
+      )
       .join(", ");
   };
 
@@ -252,8 +249,8 @@ export default function AdminSupportPage() {
           <h1 className="mt-2 text-3xl font-bold">Support Centre</h1>
 
           <p className="mt-2 max-w-2xl text-sm text-blue-100">
-            Administrator inbox for reviewing customer conversations
-            and monitoring support agents.
+            Administrator inbox for reviewing customer conversations and
+            monitoring support agents.
           </p>
 
           <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -390,9 +387,7 @@ export default function AdminSupportPage() {
                   <button
                     type="button"
                     key={conversation.id}
-                    onClick={() =>
-                      setSelectedConversation(conversation.id)
-                    }
+                    onClick={() => setSelectedConversation(conversation.id)}
                     className={`min-w-0 rounded-xl border p-4 text-left transition hover:border-blue-400 hover:bg-blue-50/40 ${
                       selectedConversation === conversation.id
                         ? "border-blue-600 bg-blue-50"
@@ -461,6 +456,7 @@ export default function AdminSupportPage() {
                     <h3 className="font-semibold text-slate-900">
                       {agent.display_name}
                     </h3>
+
                     <span
                       className={`rounded-full px-2 py-1 text-xs font-semibold ${
                         agent.is_active
@@ -538,8 +534,7 @@ export default function AdminSupportPage() {
                       <span>
                         Agent:{" "}
                         {agents.find(
-                          (agent) =>
-                            agent.id === message.assigned_agent_id
+                          (agent) => agent.id === message.assigned_agent_id
                         )?.display_name ?? "Agent record not found"}
                       </span>
                     )}
@@ -549,9 +544,9 @@ export default function AdminSupportPage() {
             </div>
 
             <p className="mt-5 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
-              This view is read-only for now. Replying, assigning agents,
-              changing statuses, and escalating conversations will remain
-              disabled until their server-side permissions are implemented.
+              This view is read-only. Replying, assigning agents, changing
+              statuses, and escalating conversations require separate
+              server-side permission checks.
             </p>
           </section>
         )}
