@@ -69,8 +69,7 @@ export default function AdminSupportPage() {
   const [lastUpdated, setLastUpdated] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [selectedConversation, setSelectedConversation] =
-    useState("");
+  const [selectedConversation, setSelectedConversation] = useState("");
 
   const loadInbox = useCallback(async (manual = false) => {
     if (manual) {
@@ -111,8 +110,8 @@ export default function AdminSupportPage() {
         return;
       }
 
-      setMessages(result.messages ?? []);
-      setAgents(result.agents ?? []);
+      setMessages(Array.isArray(result.messages) ? result.messages : []);
+      setAgents(Array.isArray(result.agents) ? result.agents : []);
       setLastUpdated(new Date().toLocaleTimeString());
     } catch (err) {
       console.error("Unable to load Support Centre inbox:", err);
@@ -128,7 +127,6 @@ export default function AdminSupportPage() {
   useEffect(() => {
     void loadInbox();
 
-    // Refresh the read-only inbox periodically.
     const timer = window.setInterval(() => {
       void loadInbox(true);
     }, 30000);
@@ -136,34 +134,39 @@ export default function AdminSupportPage() {
     return () => window.clearInterval(timer);
   }, [loadInbox]);
 
-  const conversations = useMemo(() => {
+  const conversations = useMemo((): Conversation[] => {
     const grouped = new Map<string, SupportMessage[]>();
 
     for (const message of messages) {
-      const existing = grouped.get(message.conversation_id) ?? [];
+      const existing: SupportMessage[] =
+        grouped.get(message.conversation_id) ?? [];
+
       existing.push(message);
       grouped.set(message.conversation_id, existing);
     }
 
     const result: Conversation[] = [];
 
-    for (const [id, conversationMessages] of grouped) {
-      conversationMessages.sort(
+    for (const [id, conversationMessages] of grouped.entries()) {
+      const sortedMessages: SupportMessage[] = [
+        ...conversationMessages,
+      ].sort(
         (a, b) =>
           new Date(a.created_at).getTime() -
           new Date(b.created_at).getTime()
       );
 
-      const latest =
-        [...conversationMessages].sort(
-          (a, b) =>
-            new Date(b.updated_at).getTime() -
-            new Date(a.updated_at).getTime()
-        )[0];
+      const latest = [...sortedMessages].sort(
+        (a, b) =>
+          new Date(b.updated_at).getTime() -
+          new Date(a.updated_at).getTime()
+      )[0];
+
+      if (!latest) continue;
 
       result.push({
         id,
-        messages: conversationMessages,
+        messages: sortedMessages,
         latest,
       });
     }
@@ -198,11 +201,11 @@ export default function AdminSupportPage() {
           )) ||
         (statusFilter === "assigned" &&
           conversation.messages.some(
-            (message) => message.assigned_agent_id
+            (message) => Boolean(message.assigned_agent_id)
           )) ||
         (statusFilter === "unassigned" &&
           !conversation.messages.some(
-            (message) => message.assigned_agent_id
+            (message) => Boolean(message.assigned_agent_id)
           )) ||
         (statusFilter === "open" &&
           !["closed", "resolved"].includes(
@@ -213,9 +216,7 @@ export default function AdminSupportPage() {
     });
   }, [conversations, search, statusFilter]);
 
-  const activeAgents = agents.filter(
-    (agent) => agent.is_active
-  ).length;
+  const activeAgents = agents.filter((agent) => agent.is_active).length;
 
   const selected = filteredConversations.find(
     (conversation) => conversation.id === selectedConversation
@@ -248,9 +249,7 @@ export default function AdminSupportPage() {
             BEST SALES GHANA
           </p>
 
-          <h1 className="mt-2 text-3xl font-bold">
-            Support Centre
-          </h1>
+          <h1 className="mt-2 text-3xl font-bold">Support Centre</h1>
 
           <p className="mt-2 max-w-2xl text-sm text-blue-100">
             Administrator inbox for reviewing customer conversations
@@ -281,9 +280,7 @@ export default function AdminSupportPage() {
             className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-800"
             role="alert"
           >
-            <h2 className="font-bold">
-              Support Centre could not load
-            </h2>
+            <h2 className="font-bold">Support Centre could not load</h2>
             <p className="mt-1 text-sm">{error}</p>
 
             <button
@@ -298,18 +295,14 @@ export default function AdminSupportPage() {
 
         <section className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm text-slate-500">
-              Conversations loaded
-            </p>
+            <p className="text-sm text-slate-500">Conversations loaded</p>
             <p className="mt-2 text-3xl font-bold text-slate-900">
               {loading ? "—" : conversations.length}
             </p>
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm text-slate-500">
-              Messages loaded
-            </p>
+            <p className="text-sm text-slate-500">Messages loaded</p>
             <p className="mt-2 text-3xl font-bold text-slate-900">
               {loading ? "—" : messages.length}
             </p>
@@ -319,9 +312,7 @@ export default function AdminSupportPage() {
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm text-slate-500">
-              Active support agents
-            </p>
+            <p className="text-sm text-slate-500">Active support agents</p>
             <p className="mt-2 text-3xl font-bold text-slate-900">
               {loading ? "—" : activeAgents}
             </p>
@@ -383,8 +374,8 @@ export default function AdminSupportPage() {
                 No conversations found
               </h3>
               <p className="mt-2 text-sm text-slate-500">
-                There may be no messages in the latest 200 records,
-                or your current search/filter has no matches.
+                There may be no messages in the latest 200 records, or your
+                current search/filter has no matches.
               </p>
             </div>
           ) : (
@@ -427,18 +418,10 @@ export default function AdminSupportPage() {
                     </p>
 
                     <div className="mt-4 space-y-1 border-t border-slate-100 pt-3 text-xs text-slate-500">
-                      <p>
-                        Customer ID: {latest.user_id}
-                      </p>
-                      <p>
-                        Messages: {conversation.messages.length}
-                      </p>
-                      <p>
-                        Assigned: {assignedAgentNames(conversation)}
-                      </p>
-                      <p>
-                        Updated: {formatDate(latest.updated_at)}
-                      </p>
+                      <p>Customer ID: {latest.user_id}</p>
+                      <p>Messages: {conversation.messages.length}</p>
+                      <p>Assigned: {assignedAgentNames(conversation)}</p>
+                      <p>Updated: {formatDate(latest.updated_at)}</p>
 
                       {referred && (
                         <p className="font-semibold text-amber-700">
@@ -454,9 +437,7 @@ export default function AdminSupportPage() {
         </section>
 
         <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-          <h2 className="text-xl font-bold text-slate-900">
-            Support agents
-          </h2>
+          <h2 className="text-xl font-bold text-slate-900">Support agents</h2>
           <p className="mt-1 text-sm text-slate-500">
             Read-only view of existing support agent records.
           </p>
@@ -545,14 +526,14 @@ export default function AdminSupportPage() {
                   </p>
 
                   <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
-                    <span>
-                      Status: {displayStatus(message.status)}
-                    </span>
+                    <span>Status: {displayStatus(message.status)}</span>
+
                     {message.referred_to_admin && (
                       <span className="font-semibold text-amber-700">
                         Referred to admin
                       </span>
                     )}
+
                     {message.assigned_agent_id && (
                       <span>
                         Agent:{" "}
@@ -569,8 +550,8 @@ export default function AdminSupportPage() {
 
             <p className="mt-5 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
               This view is read-only for now. Replying, assigning agents,
-              changing statuses, and escalating conversations will be
-              enabled only after their server-side permissions are added.
+              changing statuses, and escalating conversations will remain
+              disabled until their server-side permissions are implemented.
             </p>
           </section>
         )}
