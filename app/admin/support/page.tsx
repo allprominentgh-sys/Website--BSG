@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
@@ -7,6 +6,7 @@ type SupportCheckResult = {
   success?: boolean;
   message?: string;
   error?: string;
+  authenticationMethod?: string;
 };
 
 export default function AdminSupportPage() {
@@ -15,59 +15,28 @@ export default function AdminSupportPage() {
   const [message, setMessage] = useState(
     "Verifying administrator access..."
   );
-  const [sessionEmail, setSessionEmail] = useState("");
-  const [sessionStatus, setSessionStatus] = useState(
-    "Checking signed-in account..."
-  );
+  const [authenticationMethod, setAuthenticationMethod] = useState("");
 
   const checkAccess = useCallback(async () => {
     setChecking(true);
     setAuthorized(false);
-    setMessage("Verifying administrator access...");
-    setSessionEmail("");
-    setSessionStatus("Checking signed-in account...");
+    setMessage("Verifying your administrator session...");
+    setAuthenticationMethod("");
 
     try {
-      const { supabaseBrowser } = await import("@/supabase-browser");
-      const supabase = supabaseBrowser();
-
-      const {
-        data: { session },
-        error: sessionError,
-      } = await supabase.auth.getSession();
-
-      if (sessionError) {
-        setSessionStatus("Unable to read the current session.");
-        setMessage("Could not read your sign-in session. Please try again.");
-        return;
-      }
-
-      if (!session?.access_token || !session.user) {
-        setSessionStatus("No active Supabase session was found.");
-        setMessage(
-          "No active Supabase login was found. Please sign in and try again."
-        );
-        return;
-      }
-
-      const email = session.user.email ?? "";
-      setSessionEmail(email || "No email returned by Supabase");
-      setSessionStatus("An active Supabase session was found.");
-
       const response = await fetch("/api/admin/support", {
         method: "GET",
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
+        credentials: "include",
         cache: "no-store",
-        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+        },
       });
 
       const result =
         (await response.json()) as SupportCheckResult;
 
       if (!response.ok || result.success !== true) {
-        setAuthorized(false);
         setMessage(
           result.error ||
             `Administrator verification failed (HTTP ${response.status}).`
@@ -76,15 +45,25 @@ export default function AdminSupportPage() {
       }
 
       setAuthorized(true);
+
+      setAuthenticationMethod(
+        result.authenticationMethod === "admin-session"
+          ? "Main administrator session"
+          : "Supabase administrator session"
+      );
+
       setMessage(
-        result.message || "Administrator access verified successfully."
+        result.message ||
+          "Administrator access verified successfully."
       );
     } catch (error) {
-      console.error("Support Centre access check failed:", error);
-      setSessionStatus("The session check could not be completed.");
-      setAuthorized(false);
+      console.error(
+        "Support Centre access check failed:",
+        error
+      );
+
       setMessage(
-        "Unable to connect to the Support Centre. Please try again."
+        "Unable to connect to the Support Centre. Please check your internet connection and try again."
       );
     } finally {
       setChecking(false);
@@ -102,7 +81,11 @@ export default function AdminSupportPage() {
           <p className="text-sm font-semibold uppercase tracking-wider text-blue-200">
             BEST SALES GHANA
           </p>
-          <h1 className="mt-2 text-3xl font-bold">Support Centre</h1>
+
+          <h1 className="mt-2 text-3xl font-bold">
+            Support Centre
+          </h1>
+
           <p className="mt-2 text-sm text-blue-100">
             Administrator access and customer support management.
           </p>
@@ -114,12 +97,18 @@ export default function AdminSupportPage() {
           </h2>
 
           <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <p className="font-semibold">Signed-in account</p>
-            <p className="mt-2 break-all text-sm">
-              {sessionEmail || "Not available"}
+            <p className="font-semibold">
+              Authentication method
             </p>
+
+            <p className="mt-2 text-sm text-slate-700">
+              {authenticationMethod ||
+                "Checking administrator session..."}
+            </p>
+
             <p className="mt-2 text-sm text-slate-600">
-              {sessionStatus}
+              This page verifies your session with the server
+              instead of relying on a separate browser login.
             </p>
           </div>
 
@@ -136,20 +125,22 @@ export default function AdminSupportPage() {
           >
             {checking && (
               <p className="font-semibold">
-                Checking your session...
+                Checking your administrator session...
               </p>
             )}
+
             <p className="mt-1 text-sm">{message}</p>
           </div>
 
           {!checking && !authorized && (
             <div className="mt-5 flex flex-wrap gap-3">
               <a
-                href="/login"
+                href="/admin/login"
                 className="rounded-lg bg-blue-800 px-5 py-3 font-semibold text-white hover:bg-blue-900"
               >
-                Sign in
+                Administrator sign in
               </a>
+
               <button
                 type="button"
                 onClick={() => void checkAccess()}
@@ -161,9 +152,16 @@ export default function AdminSupportPage() {
           )}
 
           {authorized && (
-            <p className="mt-5 font-semibold text-green-800">
-              Access check successful.
-            </p>
+            <div className="mt-5 rounded-xl border border-green-200 bg-green-50 p-4">
+              <p className="font-semibold text-green-900">
+                Administrator access verified.
+              </p>
+
+              <p className="mt-1 text-sm text-green-800">
+                Your administrator session is recognized by
+                the Support Centre.
+              </p>
+            </div>
           )}
         </section>
 
