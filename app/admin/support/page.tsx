@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -42,17 +43,14 @@ type Conversation = {
   latest: SupportMessage;
 };
 
-function formatDate(value: string) {
+function formatDate(value: string): string {
   const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "Date unavailable";
-  }
-
-  return date.toLocaleString();
+  return Number.isNaN(date.getTime())
+    ? "Date unavailable"
+    : date.toLocaleString();
 }
 
-function displayStatus(value: string) {
+function displayStatus(value: string): string {
   return (
     value
       .replace(/[_-]+/g, " ")
@@ -83,14 +81,15 @@ export default function AdminSupportPage() {
     setError("");
 
     try {
-      const response = await fetch("/api/admin/support/inbox?limit=200", {
-        method: "GET",
-        credentials: "same-origin",
-        cache: "no-store",
-        headers: {
-          Accept: "application/json",
-        },
-      });
+      const response = await fetch(
+        "/api/admin/support/inbox?limit=200",
+        {
+          method: "GET",
+          credentials: "same-origin",
+          cache: "no-store",
+          headers: { Accept: "application/json" },
+        }
+      );
 
       const result = (await response.json()) as InboxResponse;
 
@@ -110,12 +109,13 @@ export default function AdminSupportPage() {
         return;
       }
 
-      setMessages(Array.isArray(result.messages) ? result.messages : []);
+      setMessages(
+        Array.isArray(result.messages) ? result.messages : []
+      );
       setAgents(Array.isArray(result.agents) ? result.agents : []);
       setLastUpdated(new Date().toLocaleTimeString());
     } catch (err) {
       console.error("Unable to load Support Centre inbox:", err);
-
       setError(
         "Could not connect to the Support Centre. Check your connection and try again."
       );
@@ -139,7 +139,7 @@ export default function AdminSupportPage() {
     const grouped = new Map<string, SupportMessage[]>();
 
     for (const message of messages) {
-      const existing: SupportMessage[] =
+      const existing =
         grouped.get(message.conversation_id) ?? [];
 
       existing.push(message);
@@ -148,7 +148,8 @@ export default function AdminSupportPage() {
 
     const result: Conversation[] = [];
 
-    for (const [id, conversationMessages] of grouped.entries()) {
+    // Map.forEach avoids the Map iterator compilation error.
+    grouped.forEach((conversationMessages, id) => {
       const sortedMessages = [...conversationMessages].sort(
         (a, b) =>
           new Date(a.created_at).getTime() -
@@ -161,14 +162,14 @@ export default function AdminSupportPage() {
           new Date(a.updated_at).getTime()
       )[0];
 
-      if (!latest) continue;
-
-      result.push({
-        id,
-        messages: sortedMessages,
-        latest,
-      });
-    }
+      if (latest) {
+        result.push({
+          id,
+          messages: sortedMessages,
+          latest,
+        });
+      }
+    });
 
     return result.sort(
       (a, b) =>
@@ -206,19 +207,23 @@ export default function AdminSupportPage() {
         (statusFilter === "assigned" && hasAssignment) ||
         (statusFilter === "unassigned" && !hasAssignment) ||
         (statusFilter === "open" &&
-          !["closed", "resolved"].includes(latest.status.toLowerCase()));
+          !["closed", "resolved"].includes(
+            latest.status.toLowerCase()
+          ));
 
       return matchesSearch && matchesStatus;
     });
   }, [conversations, search, statusFilter]);
 
-  const activeAgents = agents.filter((agent) => agent.is_active).length;
+  const activeAgents = agents.filter(
+    (agent) => agent.is_active
+  ).length;
 
   const selected = filteredConversations.find(
     (conversation) => conversation.id === selectedConversation
   );
 
-  const assignedAgentNames = (conversation: Conversation) => {
+  function assignedAgentNames(conversation: Conversation): string {
     const ids = Array.from(
       new Set(
         conversation.messages
@@ -236,7 +241,7 @@ export default function AdminSupportPage() {
           "Agent record not found"
       )
       .join(", ");
-  };
+  }
 
   return (
     <main className="min-h-screen bg-slate-50 p-4 text-slate-800 sm:p-8">
@@ -246,11 +251,13 @@ export default function AdminSupportPage() {
             BEST SALES GHANA
           </p>
 
-          <h1 className="mt-2 text-3xl font-bold">Support Centre</h1>
+          <h1 className="mt-2 text-3xl font-bold">
+            Support Centre
+          </h1>
 
           <p className="mt-2 max-w-2xl text-sm text-blue-100">
-            Administrator inbox for reviewing customer conversations and
-            monitoring support agents.
+            Administrator inbox for reviewing customer conversations
+            and monitoring support agents.
           </p>
 
           <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -277,7 +284,10 @@ export default function AdminSupportPage() {
             className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-800"
             role="alert"
           >
-            <h2 className="font-bold">Support Centre could not load</h2>
+            <h2 className="font-bold">
+              Support Centre could not load
+            </h2>
+
             <p className="mt-1 text-sm">{error}</p>
 
             <button
@@ -292,7 +302,9 @@ export default function AdminSupportPage() {
 
         <section className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm text-slate-500">Conversations loaded</p>
+            <p className="text-sm text-slate-500">
+              Conversations loaded
+            </p>
             <p className="mt-2 text-3xl font-bold text-slate-900">
               {loading ? "—" : conversations.length}
             </p>
@@ -309,7 +321,9 @@ export default function AdminSupportPage() {
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm text-slate-500">Active support agents</p>
+            <p className="text-sm text-slate-500">
+              Active support agents
+            </p>
             <p className="mt-2 text-3xl font-bold text-slate-900">
               {loading ? "—" : activeAgents}
             </p>
@@ -371,8 +385,8 @@ export default function AdminSupportPage() {
                 No conversations found
               </h3>
               <p className="mt-2 text-sm text-slate-500">
-                There may be no messages in the latest 200 records, or your
-                current search/filter has no matches.
+                There may be no messages in the latest 200 records,
+                or your current search/filter has no matches.
               </p>
             </div>
           ) : (
@@ -387,7 +401,9 @@ export default function AdminSupportPage() {
                   <button
                     type="button"
                     key={conversation.id}
-                    onClick={() => setSelectedConversation(conversation.id)}
+                    onClick={() =>
+                      setSelectedConversation(conversation.id)
+                    }
                     className={`min-w-0 rounded-xl border p-4 text-left transition hover:border-blue-400 hover:bg-blue-50/40 ${
                       selectedConversation === conversation.id
                         ? "border-blue-600 bg-blue-50"
@@ -415,7 +431,9 @@ export default function AdminSupportPage() {
                     <div className="mt-4 space-y-1 border-t border-slate-100 pt-3 text-xs text-slate-500">
                       <p>Customer ID: {latest.user_id}</p>
                       <p>Messages: {conversation.messages.length}</p>
-                      <p>Assigned: {assignedAgentNames(conversation)}</p>
+                      <p>
+                        Assigned: {assignedAgentNames(conversation)}
+                      </p>
                       <p>Updated: {formatDate(latest.updated_at)}</p>
 
                       {referred && (
@@ -432,7 +450,10 @@ export default function AdminSupportPage() {
         </section>
 
         <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-          <h2 className="text-xl font-bold text-slate-900">Support agents</h2>
+          <h2 className="text-xl font-bold text-slate-900">
+            Support agents
+          </h2>
+
           <p className="mt-1 text-sm text-slate-500">
             Read-only view of existing support agent records.
           </p>
@@ -522,7 +543,9 @@ export default function AdminSupportPage() {
                   </p>
 
                   <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
-                    <span>Status: {displayStatus(message.status)}</span>
+                    <span>
+                      Status: {displayStatus(message.status)}
+                    </span>
 
                     {message.referred_to_admin && (
                       <span className="font-semibold text-amber-700">
@@ -534,7 +557,8 @@ export default function AdminSupportPage() {
                       <span>
                         Agent:{" "}
                         {agents.find(
-                          (agent) => agent.id === message.assigned_agent_id
+                          (agent) =>
+                            agent.id === message.assigned_agent_id
                         )?.display_name ?? "Agent record not found"}
                       </span>
                     )}
@@ -544,9 +568,9 @@ export default function AdminSupportPage() {
             </div>
 
             <p className="mt-5 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
-              This view is read-only. Replying, assigning agents, changing
-              statuses, and escalating conversations require separate
-              server-side permission checks.
+              This view is read-only. Replying, assigning agents,
+              changing statuses, and escalating conversations require
+              separate server-side permission checks.
             </p>
           </section>
         )}
