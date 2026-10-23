@@ -1,176 +1,179 @@
+"use client";
 
-import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { createHmac, timingSafeEqual } from "crypto";
+import { useCallback, useEffect, useState } from "react";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+type SupportCheckResult = {
+  success?: boolean;
+  message?: string;
+  error?: string;
+  authenticationMethod?: string;
+};
 
-const ADMIN_EMAIL = "admin@bestsalesgh.com";
-const COOKIE_NAME = "bsg_admin_session";
-
-function jsonError(message: string, status: number) {
-  return NextResponse.json(
-    { success: false, error: message },
-    {
-      status,
-      headers: { "Cache-Control": "no-store" },
-    }
+export default function AdminSupportPage() {
+  const [checking, setChecking] = useState(true);
+  const [authorized, setAuthorized] = useState(false);
+  const [message, setMessage] = useState(
+    "Verifying administrator access..."
   );
-}
+  const [authenticationMethod, setAuthenticationMethod] = useState("");
 
-function verifyAdminCookie(token: string, secret: string): boolean {
-  const parts = token.split(".");
-  if (parts.length !== 2) return false;
+  const checkAccess = useCallback(async () => {
+    setChecking(true);
+    setAuthorized(false);
+    setMessage("Verifying your administrator session...");
+    setAuthenticationMethod("");
 
-  const [payload, suppliedSignature] = parts;
-  const expectedSignature = createHmac("sha256", secret)
-    .update(payload)
-    .digest("base64url");
+    try {
+      const response = await fetch("/api/admin/support", {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+        headers: {
+          Accept: "application/json",
+        },
+      });
 
-  const supplied = Buffer.from(suppliedSignature);
-  const expected = Buffer.from(expectedSignature);
+      const result =
+        (await response.json()) as SupportCheckResult;
 
-  if (
-    supplied.length !== expected.length ||
-    !timingSafeEqual(supplied, expected)
-  ) {
-    return false;
-  }
-
-  try {
-    const decoded = JSON.parse(
-      Buffer.from(payload, "base64url").toString("utf8")
-    );
-
-    return (
-      decoded.email === ADMIN_EMAIL &&
-      typeof decoded.expiresAt === "number" &&
-      decoded.expiresAt > Date.now()
-    );
-  } catch {
-    return false;
-  }
-}
-
-export async function GET(request: NextRequest) {
-  try {
-    // First: recognize the administrator session used by the admin dashboard.
-    const sessionSecret = process.env.ADMIN_SESSION_SECRET;
-    const adminCookie = request.cookies.get(COOKIE_NAME)?.value;
-
-    if (sessionSecret && adminCookie) {
-      if (verifyAdminCookie(adminCookie, sessionSecret)) {
-        return NextResponse.json(
-          {
-            success: true,
-            message: "Administrator access verified successfully.",
-            authenticationMethod: "admin-session",
-          },
-          {
-            status: 200,
-            headers: { "Cache-Control": "no-store" },
-          }
+      if (!response.ok || result.success !== true) {
+        setMessage(
+          result.error ||
+            `Administrator verification failed (HTTP ${response.status}).`
         );
+        return;
       }
-    }
 
-    // Fallback: retain the existing Supabase Auth administrator check.
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      setAuthorized(true);
 
-    if (!supabaseUrl || !anonKey || !serviceKey) {
+      setAuthenticationMethod(
+        result.authenticationMethod === "admin-session"
+          ? "Main administrator session"
+          : "Supabase administrator session"
+      );
+
+      setMessage(
+        result.message ||
+          "Administrator access verified successfully."
+      );
+    } catch (error) {
       console.error(
-        "Admin support: required Supabase environment variables are missing."
+        "Support Centre access check failed:",
+        error
       );
-      return jsonError("Server configuration is incomplete.", 500);
-    }
 
-    const authorization = request.headers.get("authorization");
-    const token = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
-
-    if (!token) {
-      return jsonError(
-        "Administrator session is missing or invalid. Please sign in again.",
-        401
+      setMessage(
+        "Unable to connect to the Support Centre. Please check your internet connection and try again."
       );
+    } finally {
+      setChecking(false);
     }
+  }, []);
 
-    const authClient = createClient(supabaseUrl, anonKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    });
+  useEffect(() => {
+    void checkAccess();
+  }, [checkAccess]);
 
-    const {
-      data: { user },
-      error: authError,
-    } = await authClient.auth.getUser(token);
+  return (
+    <main className="min-h-screen bg-slate-50 p-4 text-slate-800 sm:p-8">
+      <div className="mx-auto max-w-4xl">
+        <header className="rounded-2xl bg-blue-900 p-6 text-white shadow">
+          <p className="text-sm font-semibold uppercase tracking-wider text-blue-200">
+            BEST SALES GHANA
+          </p>
 
-    if (authError || !user) {
-      return jsonError(
-        "Your login has expired or is invalid. Please sign in again.",
-        401
-      );
-    }
+          <h1 className="mt-2 text-3xl font-bold">
+            Support Centre
+          </h1>
 
-    const adminDb = createClient(supabaseUrl, serviceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    });
+          <p className="mt-2 text-sm text-blue-100">
+            Administrator access and customer support management.
+          </p>
+        </header>
 
-    const { data: profile, error: profileError } = await adminDb
-      .from("profiles")
-      .select("id, account_type")
-      .eq("id", user.id)
-      .maybeSingle();
+        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-bold text-slate-900">
+            Administrator verification
+          </h2>
 
-    if (profileError) {
-      console.error(
-        "Admin support: profile lookup failed:",
-        profileError.message
-      );
-      return jsonError(
-        "Unable to verify administrator permissions.",
-        500
-      );
-    }
+          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <p className="font-semibold">
+              Authentication method
+            </p>
 
-    if (!profile) {
-      return jsonError(
-        "Your signed-in account has no matching profile.",
-        403
-      );
-    }
+            <p className="mt-2 text-sm text-slate-700">
+              {authenticationMethod ||
+                "Checking administrator session..."}
+            </p>
 
-    const role = String(profile.account_type ?? "")
-      .trim()
-      .toLowerCase();
+            <p className="mt-2 text-sm text-slate-600">
+              This page verifies your session with the server
+              instead of relying on a separate browser login.
+            </p>
+          </div>
 
-    if (role !== "admin" && role !== "administrator") {
-      return jsonError("Administrator access is required.", 403);
-    }
+          <div
+            className={`mt-4 rounded-xl border p-4 ${
+              checking
+                ? "border-blue-200 bg-blue-50 text-blue-900"
+                : authorized
+                  ? "border-green-200 bg-green-50 text-green-900"
+                  : "border-amber-200 bg-amber-50 text-amber-900"
+            }`}
+            role="status"
+            aria-live="polite"
+          >
+            {checking && (
+              <p className="font-semibold">
+                Checking your administrator session...
+              </p>
+            )}
 
-    return NextResponse.json(
-      {
-        success: true,
-        message: "Administrator access verified successfully.",
-        authenticationMethod: "supabase-auth",
-      },
-      {
-        status: 200,
-        headers: { "Cache-Control": "no-store" },
-      }
-    );
-  } catch (error) {
-    console.error("Admin support access check failed:", error);
-    return jsonError(
-      "Unexpected server error while checking administrator access.",
-      500
-    );
-  }
+            <p className="mt-1 text-sm">{message}</p>
+          </div>
+
+          {!checking && !authorized && (
+            <div className="mt-5 flex flex-wrap gap-3">
+              <a
+                href="/admin/login"
+                className="rounded-lg bg-blue-800 px-5 py-3 font-semibold text-white hover:bg-blue-900"
+              >
+                Administrator sign in
+              </a>
+
+              <button
+                type="button"
+                onClick={() => void checkAccess()}
+                className="rounded-lg border border-slate-300 px-5 py-3 font-semibold hover:bg-slate-50"
+              >
+                Try again
+              </button>
+            </div>
+          )}
+
+          {authorized && (
+            <div className="mt-5 rounded-xl border border-green-200 bg-green-50 p-4">
+              <p className="font-semibold text-green-900">
+                Administrator access verified.
+              </p>
+
+              <p className="mt-1 text-sm text-green-800">
+                Your administrator session is recognized by
+                the Support Centre.
+              </p>
+            </div>
+          )}
+        </section>
+
+        <div className="mt-6">
+          <a
+            href="/admin"
+            className="font-semibold text-blue-800 hover:underline"
+          >
+            ← Back to admin dashboard
+          </a>
+        </div>
+      </div>
+    </main>
+  );
 }
