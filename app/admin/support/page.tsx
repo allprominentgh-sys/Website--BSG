@@ -1,82 +1,248 @@
+
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-type SupportCheckResult = {
-  success?: boolean;
-  message?: string;
-  error?: string;
-  authenticationMethod?: string;
+type SupportMessage = {
+  id: string;
+  user_id: string;
+  sender_role: string;
+  message: string;
+  created_at: string;
+  subject: string | null;
+  status: string;
+  conversation_id: string;
+  assigned_agent_id: string | null;
+  referred_to_admin: boolean;
+  referred_at: string | null;
+  updated_at: string;
 };
 
-export default function AdminSupportPage() {
-  const [checking, setChecking] = useState(true);
-  const [authorized, setAuthorized] = useState(false);
-  const [message, setMessage] = useState(
-    "Verifying administrator access..."
-  );
-  const [authenticationMethod, setAuthenticationMethod] = useState("");
+type SupportAgent = {
+  id: string;
+  slot_number: number | null;
+  display_name: string;
+  user_id: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
 
-  const checkAccess = useCallback(async () => {
-    setChecking(true);
-    setAuthorized(false);
-    setMessage("Verifying your administrator session...");
-    setAuthenticationMethod("");
+type InboxResponse = {
+  success?: boolean;
+  error?: string;
+  messages?: SupportMessage[];
+  agents?: SupportAgent[];
+  count?: number;
+};
+
+type Conversation = {
+  id: string;
+  messages: SupportMessage[];
+  latest: SupportMessage;
+};
+
+function formatDate(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Date unavailable";
+  }
+
+  return date.toLocaleString();
+}
+
+function displayStatus(value: string) {
+  return value
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase()) || "Unknown";
+}
+
+export default function AdminSupportPage() {
+  const [messages, setMessages] = useState<SupportMessage[]>([]);
+  const [agents, setAgents] = useState<SupportAgent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState("");
+  const [lastUpdated, setLastUpdated] = useState("");
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedConversation, setSelectedConversation] =
+    useState("");
+
+  const loadInbox = useCallback(async (manual = false) => {
+    if (manual) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+
+    setError("");
 
     try {
-      const response = await fetch("/api/admin/support", {
-        method: "GET",
-        credentials: "include",
-        cache: "no-store",
-        headers: {
-          Accept: "application/json",
-        },
-      });
+      const response = await fetch(
+        "/api/admin/support/inbox?limit=200",
+        {
+          method: "GET",
+          credentials: "same-origin",
+          cache: "no-store",
+          headers: {
+            Accept: "application/json",
+          },
+        }
+      );
 
-      const result =
-        (await response.json()) as SupportCheckResult;
+      const result = (await response.json()) as InboxResponse;
 
-      if (!response.ok || result.success !== true) {
-        setMessage(
-          result.error ||
-            `Administrator verification failed (HTTP ${response.status}).`
+      if (response.status === 401 || response.status === 403) {
+        setError(
+          "Your administrator session is invalid or has expired. Sign in to the administrator account again."
         );
         return;
       }
 
-      setAuthorized(true);
+      if (!response.ok || result.success !== true) {
+        setError(
+          result.error ||
+            `Unable to load the inbox (HTTP ${response.status}).`
+        );
+        return;
+      }
 
-      setAuthenticationMethod(
-        result.authenticationMethod === "admin-session"
-          ? "Main administrator session"
-          : "Supabase administrator session"
-      );
-
-      setMessage(
-        result.message ||
-          "Administrator access verified successfully."
-      );
-    } catch (error) {
-      console.error(
-        "Support Centre access check failed:",
-        error
-      );
-
-      setMessage(
-        "Unable to connect to the Support Centre. Please check your internet connection and try again."
+      setMessages(result.messages ?? []);
+      setAgents(result.agents ?? []);
+      setLastUpdated(new Date().toLocaleTimeString());
+    } catch (err) {
+      console.error("Unable to load Support Centre inbox:", err);
+      setError(
+        "Could not connect to the Support Centre. Check your connection and try again."
       );
     } finally {
-      setChecking(false);
+      setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
-    void checkAccess();
-  }, [checkAccess]);
+    void loadInbox();
+
+    // Refresh the read-only inbox periodically.
+    const timer = window.setInterval(() => {
+      void loadInbox(true);
+    }, 30000);
+
+    return () => window.clearInterval(timer);
+  }, [loadInbox]);
+
+  const conversations = useMemo(() => {
+    const grouped = new Map<string, SupportMessage[]>();
+
+    for (const message of messages) {
+      const existing = grouped.get(message.conversation_id) ?? [];
+      existing.push(message);
+      grouped.set(message.conversation_id, existing);
+    }
+
+    const result: Conversation[] = [];
+
+    for (const [id, conversationMessages] of grouped) {
+      conversationMessages.sort(
+        (a, b) =>
+          new Date(a.created_at).getTime() -
+          new Date(b.created_at).getTime()
+      );
+
+      const latest =
+        [...conversationMessages].sort(
+          (a, b) =>
+            new Date(b.updated_at).getTime() -
+            new Date(a.updated_at).getTime()
+        )[0];
+
+      result.push({
+        id,
+        messages: conversationMessages,
+        latest,
+      });
+    }
+
+    return result.sort(
+      (a, b) =>
+        new Date(b.latest.updated_at).getTime() -
+        new Date(a.latest.updated_at).getTime()
+    );
+  }, [messages]);
+
+  const filteredConversations = useMemo(() => {
+    const term = search.trim().toLowerCase();
+
+    return conversations.filter((conversation) => {
+      const latest = conversation.latest;
+
+      const matchesSearch =
+        !term ||
+        conversation.id.toLowerCase().includes(term) ||
+        latest.user_id.toLowerCase().includes(term) ||
+        (latest.subject ?? "").toLowerCase().includes(term) ||
+        conversation.messages.some((message) =>
+          message.message.toLowerCase().includes(term)
+        );
+
+      const matchesStatus =
+        statusFilter === "all" ||
+        (statusFilter === "referred" &&
+          conversation.messages.some(
+            (message) => message.referred_to_admin
+          )) ||
+        (statusFilter === "assigned" &&
+          conversation.messages.some(
+            (message) => message.assigned_agent_id
+          )) ||
+        (statusFilter === "unassigned" &&
+          !conversation.messages.some(
+            (message) => message.assigned_agent_id
+          )) ||
+        (statusFilter === "open" &&
+          !["closed", "resolved"].includes(
+            latest.status.toLowerCase()
+          ));
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [conversations, search, statusFilter]);
+
+  const activeAgents = agents.filter(
+    (agent) => agent.is_active
+  ).length;
+
+  const selected = filteredConversations.find(
+    (conversation) => conversation.id === selectedConversation
+  );
+
+  const assignedAgentNames = (conversation: Conversation) => {
+    const ids = Array.from(
+      new Set(
+        conversation.messages
+          .map((message) => message.assigned_agent_id)
+          .filter((id): id is string => Boolean(id))
+      )
+    );
+
+    if (ids.length === 0) return "Unassigned";
+
+    return ids
+      .map((id) => {
+        const agent = agents.find((item) => item.id === id);
+        return agent?.display_name ?? "Agent record not found";
+      })
+      .join(", ");
+  };
 
   return (
     <main className="min-h-screen bg-slate-50 p-4 text-slate-800 sm:p-8">
-      <div className="mx-auto max-w-4xl">
+      <div className="mx-auto max-w-7xl">
         <header className="rounded-2xl bg-blue-900 p-6 text-white shadow">
           <p className="text-sm font-semibold uppercase tracking-wider text-blue-200">
             BEST SALES GHANA
@@ -86,93 +252,332 @@ export default function AdminSupportPage() {
             Support Centre
           </h1>
 
-          <p className="mt-2 text-sm text-blue-100">
-            Administrator access and customer support management.
+          <p className="mt-2 max-w-2xl text-sm text-blue-100">
+            Administrator inbox for reviewing customer conversations
+            and monitoring support agents.
           </p>
+
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <a
+              href="/admin"
+              className="rounded-lg border border-blue-200/40 px-4 py-2 text-sm font-semibold hover:bg-blue-800"
+            >
+              ← Admin dashboard
+            </a>
+
+            <button
+              type="button"
+              onClick={() => void loadInbox(true)}
+              disabled={loading || refreshing}
+              className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-blue-900 hover:bg-blue-50 disabled:opacity-60"
+            >
+              {refreshing ? "Refreshing..." : "Refresh inbox"}
+            </button>
+          </div>
         </header>
 
-        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-bold text-slate-900">
-            Administrator verification
-          </h2>
+        {error && (
+          <section
+            className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-800"
+            role="alert"
+          >
+            <h2 className="font-bold">
+              Support Centre could not load
+            </h2>
+            <p className="mt-1 text-sm">{error}</p>
 
-          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <p className="font-semibold">
-              Authentication method
+            <button
+              type="button"
+              onClick={() => void loadInbox(true)}
+              className="mt-3 rounded-lg border border-red-300 px-4 py-2 text-sm font-semibold hover:bg-red-100"
+            >
+              Try again
+            </button>
+          </section>
+        )}
+
+        <section className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-sm text-slate-500">
+              Conversations loaded
             </p>
-
-            <p className="mt-2 text-sm text-slate-700">
-              {authenticationMethod ||
-                "Checking administrator session..."}
-            </p>
-
-            <p className="mt-2 text-sm text-slate-600">
-              This page verifies your session with the server
-              instead of relying on a separate browser login.
+            <p className="mt-2 text-3xl font-bold text-slate-900">
+              {loading ? "—" : conversations.length}
             </p>
           </div>
 
-          <div
-            className={`mt-4 rounded-xl border p-4 ${
-              checking
-                ? "border-blue-200 bg-blue-50 text-blue-900"
-                : authorized
-                  ? "border-green-200 bg-green-50 text-green-900"
-                  : "border-amber-200 bg-amber-50 text-amber-900"
-            }`}
-            role="status"
-            aria-live="polite"
-          >
-            {checking && (
-              <p className="font-semibold">
-                Checking your administrator session...
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-sm text-slate-500">
+              Messages loaded
+            </p>
+            <p className="mt-2 text-3xl font-bold text-slate-900">
+              {loading ? "—" : messages.length}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Maximum 200 messages per refresh
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-sm text-slate-500">
+              Active support agents
+            </p>
+            <p className="mt-2 text-3xl font-bold text-slate-900">
+              {loading ? "—" : activeAgents}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              {loading ? "" : `${agents.length} agent records`}
+            </p>
+          </div>
+        </section>
+
+        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">
+                Customer conversations
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Select a conversation to inspect its messages.
+              </p>
+            </div>
+
+            {lastUpdated && (
+              <p className="text-xs text-slate-500">
+                Last refreshed: {lastUpdated}
               </p>
             )}
-
-            <p className="mt-1 text-sm">{message}</p>
           </div>
 
-          {!checking && !authorized && (
-            <div className="mt-5 flex flex-wrap gap-3">
-              <a
-                href="/admin/login"
-                className="rounded-lg bg-blue-800 px-5 py-3 font-semibold text-white hover:bg-blue-900"
-              >
-                Administrator sign in
-              </a>
+          <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <input
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search messages, subjects or IDs"
+              aria-label="Search conversations"
+              className="min-w-0 rounded-lg border border-slate-300 px-3 py-3 text-sm outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-100 sm:col-span-2"
+            />
 
-              <button
-                type="button"
-                onClick={() => void checkAccess()}
-                className="rounded-lg border border-slate-300 px-5 py-3 font-semibold hover:bg-slate-50"
-              >
-                Try again
-              </button>
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+              aria-label="Filter conversations"
+              className="rounded-lg border border-slate-300 px-3 py-3 text-sm outline-none focus:border-blue-700"
+            >
+              <option value="all">All conversations</option>
+              <option value="open">Not closed/resolved</option>
+              <option value="assigned">Assigned</option>
+              <option value="unassigned">Unassigned</option>
+              <option value="referred">Referred to admin</option>
+            </select>
+          </div>
+
+          {loading ? (
+            <p className="py-10 text-center text-slate-500">
+              Loading customer conversations...
+            </p>
+          ) : filteredConversations.length === 0 ? (
+            <div className="mt-5 rounded-xl border border-dashed border-slate-300 p-8 text-center">
+              <h3 className="font-semibold text-slate-800">
+                No conversations found
+              </h3>
+              <p className="mt-2 text-sm text-slate-500">
+                There may be no messages in the latest 200 records,
+                or your current search/filter has no matches.
+              </p>
             </div>
-          )}
+          ) : (
+            <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
+              {filteredConversations.map((conversation) => {
+                const latest = conversation.latest;
+                const referred = conversation.messages.some(
+                  (message) => message.referred_to_admin
+                );
 
-          {authorized && (
-            <div className="mt-5 rounded-xl border border-green-200 bg-green-50 p-4">
-              <p className="font-semibold text-green-900">
-                Administrator access verified.
-              </p>
+                return (
+                  <button
+                    type="button"
+                    key={conversation.id}
+                    onClick={() =>
+                      setSelectedConversation(conversation.id)
+                    }
+                    className={`min-w-0 rounded-xl border p-4 text-left transition hover:border-blue-400 hover:bg-blue-50/40 ${
+                      selectedConversation === conversation.id
+                        ? "border-blue-600 bg-blue-50"
+                        : "border-slate-200 bg-white"
+                    }`}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <span className="break-all text-xs font-semibold text-blue-800">
+                        Conversation {conversation.id.slice(0, 8)}
+                      </span>
 
-              <p className="mt-1 text-sm text-green-800">
-                Your administrator session is recognized by
-                the Support Centre.
-              </p>
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                        {displayStatus(latest.status)}
+                      </span>
+                    </div>
+
+                    <h3 className="mt-3 break-words font-bold text-slate-900">
+                      {latest.subject || "Customer support request"}
+                    </h3>
+
+                    <p className="mt-2 line-clamp-3 whitespace-pre-wrap break-words text-sm text-slate-600">
+                      {latest.message}
+                    </p>
+
+                    <div className="mt-4 space-y-1 border-t border-slate-100 pt-3 text-xs text-slate-500">
+                      <p>
+                        Customer ID: {latest.user_id}
+                      </p>
+                      <p>
+                        Messages: {conversation.messages.length}
+                      </p>
+                      <p>
+                        Assigned: {assignedAgentNames(conversation)}
+                      </p>
+                      <p>
+                        Updated: {formatDate(latest.updated_at)}
+                      </p>
+
+                      {referred && (
+                        <p className="font-semibold text-amber-700">
+                          Referred to administrator
+                        </p>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
         </section>
 
-        <div className="mt-6">
-          <a
-            href="/admin"
-            className="font-semibold text-blue-800 hover:underline"
-          >
-            ← Back to admin dashboard
-          </a>
-        </div>
+        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <h2 className="text-xl font-bold text-slate-900">
+            Support agents
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Read-only view of existing support agent records.
+          </p>
+
+          {loading ? (
+            <p className="mt-4 text-sm text-slate-500">
+              Loading agent records...
+            </p>
+          ) : agents.length === 0 ? (
+            <p className="mt-4 rounded-lg bg-slate-50 p-4 text-sm text-slate-600">
+              No support agent records were returned.
+            </p>
+          ) : (
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {agents.map((agent) => (
+                <div
+                  key={agent.id}
+                  className="rounded-xl border border-slate-200 p-4"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="font-semibold text-slate-900">
+                      {agent.display_name}
+                    </h3>
+                    <span
+                      className={`rounded-full px-2 py-1 text-xs font-semibold ${
+                        agent.is_active
+                          ? "bg-green-100 text-green-800"
+                          : "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      {agent.is_active ? "Active" : "Inactive"}
+                    </span>
+                  </div>
+
+                  <p className="mt-2 text-sm text-slate-600">
+                    Slot: {agent.slot_number ?? "Not numbered"}
+                  </p>
+
+                  <p className="mt-1 break-all text-xs text-slate-500">
+                    Agent record: {agent.id}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {selected && (
+          <section className="mt-6 rounded-2xl border border-blue-200 bg-white p-5 shadow-sm sm:p-6">
+            <div className="flex flex-col justify-between gap-2 sm:flex-row">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">
+                  Conversation details
+                </h2>
+                <p className="mt-1 break-all text-xs text-slate-500">
+                  {selected.id}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedConversation("")}
+                className="self-start rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50"
+              >
+                Close details
+              </button>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              {selected.messages.map((message) => (
+                <article
+                  key={message.id}
+                  className="rounded-xl border border-slate-200 p-4"
+                >
+                  <div className="flex flex-wrap justify-between gap-2">
+                    <p className="font-semibold text-slate-900">
+                      {displayStatus(message.sender_role)}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {formatDate(message.created_at)}
+                    </p>
+                  </div>
+
+                  <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">
+                    {message.message}
+                  </p>
+
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
+                    <span>
+                      Status: {displayStatus(message.status)}
+                    </span>
+                    {message.referred_to_admin && (
+                      <span className="font-semibold text-amber-700">
+                        Referred to admin
+                      </span>
+                    )}
+                    {message.assigned_agent_id && (
+                      <span>
+                        Agent:{" "}
+                        {agents.find(
+                          (agent) =>
+                            agent.id === message.assigned_agent_id
+                        )?.display_name ?? "Agent record not found"}
+                      </span>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            <p className="mt-5 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+              This view is read-only for now. Replying, assigning agents,
+              changing statuses, and escalating conversations will be
+              enabled only after their server-side permissions are added.
+            </p>
+          </section>
+        )}
+
+        <footer className="mt-8 pb-6 text-center text-xs text-slate-500">
+          BEST SALES GHANA Support Centre · Administrator view
+        </footer>
       </div>
     </main>
   );
