@@ -11,14 +11,10 @@ function secureSecretMatch(
   supplied: string,
   expected: string
 ): boolean {
-  const suppliedBuffer = Buffer.from(supplied, "utf8");
-  const expectedBuffer = Buffer.from(expected, "utf8");
+  const a = Buffer.from(supplied, "utf8");
+  const b = Buffer.from(expected, "utf8");
 
-  if (suppliedBuffer.length !== expectedBuffer.length) {
-    return false;
-  }
-
-  return timingSafeEqual(suppliedBuffer, expectedBuffer);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 function reply(
@@ -56,7 +52,10 @@ export async function POST(request: NextRequest) {
         : "";
 
     if (!secureSecretMatch(suppliedSecret, setupSecret)) {
-      return reply({ error: "Setup authorization failed." }, 401);
+      return reply(
+        { error: "Setup authorization failed." },
+        401
+      );
     }
 
     const companyId =
@@ -85,11 +84,13 @@ export async function POST(request: NextRequest) {
       return reply(
         {
           error:
-            "Enter Company ID, Staff ID and a password between 12 and 72 characters."
+            "Enter valid IDs and a password between 12 and 72 characters."
         },
         400
       );
     }
+
+    const passwordHash = await bcrypt.hash(password, 12);
 
     const supabase = createClient(
       supabaseUrl,
@@ -102,68 +103,37 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    // Bootstrap is permitted only while cms_staff is empty.
-    const { data: existing, error: lookupError } = await supabase
-      .from("cms_staff")
-      .select("id")
-      .limit(1);
+    const { data, error } = await supabase.rpc(
+      "bootstrap_initial_cms_admin",
+      {
+        p_company_id: companyId,
+        p_staff_id: staffId,
+        p_password_hash: passwordHash
+      }
+    );
 
-    if (lookupError) {
+    if (error || !data || data.length !== 1) {
       console.error(
-        "CMS bootstrap lookup failed:",
-        lookupError.message
-      );
-
-      return reply(
-        { error: "Unable to verify the CMS account state." },
-        500
-      );
-    }
-
-    if (existing && existing.length > 0) {
-      return reply(
-        {
-          error:
-            "Initial setup is closed because a CMS staff account already exists."
-        },
-        409
-      );
-    }
-
-    const passwordHash = await bcrypt.hash(password, 12);
-
-    const { data: created, error: insertError } = await supabase
-      .from("cms_staff")
-      .insert({
-        company_id: companyId,
-        staff_id: staffId,
-        password_hash: passwordHash,
-        role: "admin",
-        is_active: true
-      })
-      .select("id, company_id, staff_id, role")
-      .single();
-
-    if (insertError || !created) {
-      console.error(
-        "CMS bootstrap insert failed:",
-        insertError?.message ?? "No account returned"
+        "CMS bootstrap RPC failed:",
+        error?.message ?? "Unexpected result"
       );
 
       return reply(
         {
           error:
-            "The account was not created. Check whether the IDs already exist and verify the database setup."
+            "Administrator setup failed. Check the SQL function and database configuration."
         },
         500
       );
     }
+
+    const created = data[0];
 
     return reply(
       {
         success: true,
         message:
-          "Initial CMS administrator created. Remove the bootstrap route and setup secret before normal production use.",
+          "Initial CMS administrator created successfully. Disable the bootstrap endpoint and remove its secret after setup.",
         staff: {
           company_id: created.company_id,
           staff_id: created.staff_id,
