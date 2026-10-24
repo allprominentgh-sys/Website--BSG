@@ -2,6 +2,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type { FormEvent, ReactNode } from "react";
 
 type SupportMessage = {
   id: string;
@@ -43,11 +44,100 @@ type Conversation = {
   latest: SupportMessage;
 };
 
+type ManagementOption = {
+  label: string;
+  target: string;
+};
+
+type ManagementCard = {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  color: string;
+  options: ManagementOption[];
+};
+
 const inputClass =
   "w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-3 text-sm outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-100";
 
 const labelClass =
   "mb-1 block text-sm font-semibold text-slate-700";
+
+const navigationCards: ManagementCard[] = [
+  {
+    id: "administrator-controls",
+    title: "Administrator Controls",
+    description: "Administration and access oversight",
+    icon: "🛡️",
+    color: "border-blue-200 bg-blue-50",
+    options: [
+      { label: "Administrator session", target: "administrator-controls" },
+      { label: "Access permissions", target: "administrator-controls" },
+      { label: "Company settings", target: "administrator-controls" },
+    ],
+  },
+  {
+    id: "branch-management",
+    title: "Branch Management",
+    description: "Company IDs, branches and locations",
+    icon: "🏢",
+    color: "border-sky-200 bg-sky-50",
+    options: [
+      { label: "Add a branch", target: "branch-management" },
+      { label: "Branch details", target: "branch-management" },
+      { label: "Branch manager", target: "branch-management" },
+    ],
+  },
+  {
+    id: "staff-departments",
+    title: "Staff & Departments",
+    description: "Staff registration and department setup",
+    icon: "👥",
+    color: "border-indigo-200 bg-indigo-50",
+    options: [
+      { label: "Staff registration", target: "staff-departments" },
+      { label: "Staff ID generator", target: "staff-departments" },
+      { label: "Manage departments", target: "staff-departments" },
+    ],
+  },
+  {
+    id: "support-delivery",
+    title: "Support & Delivery",
+    description: "Support and delivery assignments",
+    icon: "🚚",
+    color: "border-cyan-200 bg-cyan-50",
+    options: [
+      { label: "Support assignments", target: "support-delivery" },
+      { label: "Delivery assignments", target: "support-delivery" },
+      { label: "Track assignments", target: "support-delivery" },
+    ],
+  },
+  {
+    id: "customer-support",
+    title: "Customer Support",
+    description: "Customer conversations and agents",
+    icon: "💬",
+    color: "border-blue-200 bg-blue-50",
+    options: [
+      { label: "View conversations", target: "customer-support" },
+      { label: "Monitor support agents", target: "customer-support" },
+      { label: "Search messages", target: "customer-support" },
+    ],
+  },
+  {
+    id: "audit-monitoring",
+    title: "Audit & Monitoring",
+    description: "Activity and administrative records",
+    icon: "📋",
+    color: "border-slate-200 bg-slate-50",
+    options: [
+      { label: "Activity records", target: "audit-monitoring" },
+      { label: "Assignment history", target: "audit-monitoring" },
+      { label: "Administrative changes", target: "audit-monitoring" },
+    ],
+  },
+];
 
 function formatDate(value: string): string {
   const date = new Date(value);
@@ -67,54 +157,9 @@ function displayStatus(value: string): string {
   );
 }
 
-const navigationCards = [
-  {
-    id: "administrator-controls",
-    title: "Administrator Controls",
-    description: "Administration and access oversight",
-    icon: "🛡️",
-    color: "border-blue-200 bg-blue-50",
-  },
-  {
-    id: "branch-management",
-    title: "Branch Management",
-    description: "Company IDs, branches and locations",
-    icon: "🏢",
-    color: "border-sky-200 bg-sky-50",
-  },
-  {
-    id: "staff-departments",
-    title: "Staff & Departments",
-    description: "Staff registration and department setup",
-    icon: "👥",
-    color: "border-indigo-200 bg-indigo-50",
-  },
-  {
-    id: "support-delivery",
-    title: "Support & Delivery",
-    description: "Support and delivery assignments",
-    icon: "🚚",
-    color: "border-cyan-200 bg-cyan-50",
-  },
-  {
-    id: "customer-support",
-    title: "Customer Support",
-    description: "Customer conversations and agents",
-    icon: "💬",
-    color: "border-blue-200 bg-blue-50",
-  },
-  {
-    id: "audit-monitoring",
-    title: "Audit & Monitoring",
-    description: "Activity and administrative records",
-    icon: "📋",
-    color: "border-slate-200 bg-slate-50",
-  },
-];
-
-function SetupNotice({ children }: { children: React.ReactNode }) {
+function SetupNotice({ children }: { children: ReactNode }) {
   return (
-    <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm leading-6 text-amber-900">
+    <p className="mt-4 rounded-lg bg-amber-50 p-3 text-sm leading-6 text-amber-900">
       {children}
     </p>
   );
@@ -131,7 +176,8 @@ export default function AdminSupportPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedConversation, setSelectedConversation] = useState("");
 
-  // Blank branch form. No database writes are performed.
+  // Branch form fields intentionally start blank.
+  // This UI-only version does not save data to Supabase.
   const [companyId, setCompanyId] = useState("");
   const [branchName, setBranchName] = useState("");
   const [branchCode, setBranchCode] = useState("");
@@ -310,18 +356,18 @@ export default function AdminSupportPage() {
     setBranchNotice("");
   }
 
-  function prepareBranchForm(
-    event: React.FormEvent<HTMLFormElement>
-  ) {
+  function prepareBranchForm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
     setBranchNotice(
-      "Setup preview only. No branch has been created or saved. Database integration is not enabled."
+      "Preview only. No branch has been created or saved. Database integration is not enabled."
     );
   }
 
   return (
     <main className="min-h-screen bg-slate-50 p-4 text-slate-800 sm:p-8">
       <div className="mx-auto max-w-7xl">
+        {/* Page header */}
         <header className="rounded-2xl bg-blue-900 p-6 text-white shadow">
           <p className="text-sm font-semibold uppercase tracking-wider text-blue-200">
             BEST SALES GHANA
@@ -355,40 +401,50 @@ export default function AdminSupportPage() {
           </div>
         </header>
 
-        {/* Clickable thumbnail navigation */}
+        {/* Six cards, each with its own options */}
         <section className="mt-6">
           <div className="mb-4">
             <h2 className="text-xl font-bold text-slate-900">
               Management Dashboard
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Select a thumbnail to jump to that section on this page.
+              Choose an option inside a card to open its section.
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {navigationCards.map((card) => (
-              <a
+              <div
                 key={card.id}
-                href={`#${card.id}`}
-                className={`group flex min-h-36 flex-col rounded-xl border p-4 shadow-sm transition hover:-translate-y-1 hover:border-blue-400 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${card.color}`}
+                className={`rounded-2xl border p-5 shadow-sm ${card.color}`}
               >
-                <span
-                  aria-hidden="true"
-                  className="text-3xl"
-                >
-                  {card.icon}
-                </span>
-                <span className="mt-3 text-sm font-bold text-slate-900">
-                  {card.title}
-                </span>
-                <span className="mt-1 text-xs leading-5 text-slate-600">
-                  {card.description}
-                </span>
-                <span className="mt-auto pt-3 text-xs font-semibold text-blue-800">
-                  Open section →
-                </span>
-              </a>
+                <div className="flex items-start gap-3">
+                  <span aria-hidden="true" className="text-3xl">
+                    {card.icon}
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-slate-900">
+                      {card.title}
+                    </h3>
+                    <p className="mt-1 text-sm leading-5 text-slate-600">
+                      {card.description}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 space-y-2 border-t border-slate-200/80 pt-3">
+                  {card.options.map((option) => (
+                    <a
+                      key={option.label}
+                      href={`#${option.target}`}
+                      className="flex items-center justify-between gap-2 rounded-lg bg-white/90 px-3 py-3 text-sm font-medium text-blue-900 transition hover:bg-white hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <span>{option.label}</span>
+                      <span aria-hidden="true">→</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         </section>
@@ -426,9 +482,9 @@ export default function AdminSupportPage() {
           <div className="mt-4 rounded-xl border border-slate-200 p-4">
             <p className="font-semibold">Administrator session</p>
             <p className="mt-1 text-sm text-slate-600">
-              The existing inbox API continues to verify administrator
-              access. Additional management permissions must be enforced
-              on the server before enabling administrative changes.
+              The existing inbox API verifies administrator access.
+              Additional management permissions must be enforced on the
+              server before administrative changes are enabled.
             </p>
           </div>
         </section>
@@ -442,7 +498,7 @@ export default function AdminSupportPage() {
             Branch Management
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            Enter branch details when you are ready. All fields start blank.
+            Branch fields are blank and ready for future setup.
           </p>
 
           <form
@@ -545,8 +601,8 @@ export default function AdminSupportPage() {
           </form>
 
           <SetupNotice>
-            This form is not connected to the database. Submitting it
-            does not create or save a branch.
+            This form is UI-only. Submitting it does not create or save a
+            branch. Database integration is not enabled.
           </SetupNotice>
         </section>
 
@@ -563,15 +619,18 @@ export default function AdminSupportPage() {
             {[
               {
                 title: "Staff registration",
-                description: "Staff details, job titles and branch membership.",
+                description:
+                  "Staff details, job titles and branch membership.",
               },
               {
                 title: "Staff ID generator",
-                description: "Prepare unique staff identifiers and login setup.",
+                description:
+                  "Prepare unique staff identifiers and login setup.",
               },
               {
                 title: "Department management",
-                description: "Create and maintain departments as the company grows.",
+                description:
+                  "Create and maintain departments as the company grows.",
               },
             ].map((item) => (
               <div
@@ -592,8 +651,8 @@ export default function AdminSupportPage() {
           </div>
 
           <SetupNotice>
-            Creating staff accounts and departments requires protected
-            server APIs and database integration.
+            Staff and department changes require protected server APIs
+            and database integration.
           </SetupNotice>
         </section>
 
@@ -627,7 +686,7 @@ export default function AdminSupportPage() {
           </div>
 
           <SetupNotice>
-            Assignment controls are not active. This page does not change
+            Assignment controls are not active. This page does not modify
             support-message assignments or delivery records.
           </SetupNotice>
         </section>
@@ -656,11 +715,14 @@ export default function AdminSupportPage() {
 
           <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="rounded-xl bg-slate-50 p-4">
-              <p className="text-sm text-slate-500">Conversations loaded</p>
+              <p className="text-sm text-slate-500">
+                Conversations loaded
+              </p>
               <p className="mt-1 text-2xl font-bold">
                 {loading ? "—" : conversations.length}
               </p>
             </div>
+
             <div className="rounded-xl bg-slate-50 p-4">
               <p className="text-sm text-slate-500">Messages loaded</p>
               <p className="mt-1 text-2xl font-bold">
@@ -670,6 +732,7 @@ export default function AdminSupportPage() {
                 Maximum 200 per refresh
               </p>
             </div>
+
             <div className="rounded-xl bg-slate-50 p-4">
               <p className="text-sm text-slate-500">Active agents</p>
               <p className="mt-1 text-2xl font-bold">
@@ -690,6 +753,7 @@ export default function AdminSupportPage() {
               aria-label="Search conversations"
               className={`${inputClass} sm:col-span-2`}
             />
+
             <select
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value)}
@@ -750,6 +814,7 @@ export default function AdminSupportPage() {
                     <h3 className="mt-3 break-words font-bold text-slate-900">
                       {latest.subject || "Customer support request"}
                     </h3>
+
                     <p className="mt-2 line-clamp-3 whitespace-pre-wrap break-words text-sm text-slate-600">
                       {latest.message}
                     </p>
@@ -759,6 +824,7 @@ export default function AdminSupportPage() {
                       <p>Messages: {conversation.messages.length}</p>
                       <p>Assigned: {assignedAgentNames(conversation)}</p>
                       <p>Updated: {formatDate(latest.updated_at)}</p>
+
                       {referred && (
                         <p className="font-semibold text-amber-700">
                           Referred to administrator
@@ -805,6 +871,7 @@ export default function AdminSupportPage() {
                         {agent.is_active ? "Active" : "Inactive"}
                       </span>
                     </div>
+
                     <p className="mt-2 text-sm text-slate-600">
                       Slot: {agent.slot_number ?? "Not numbered"}
                     </p>
@@ -830,6 +897,7 @@ export default function AdminSupportPage() {
                   {selected.id}
                 </p>
               </div>
+
               <button
                 type="button"
                 onClick={() => setSelectedConversation("")}
@@ -860,11 +928,13 @@ export default function AdminSupportPage() {
 
                   <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
                     <span>Status: {displayStatus(message.status)}</span>
+
                     {message.referred_to_admin && (
                       <span className="font-semibold text-amber-700">
                         Referred to admin
                       </span>
                     )}
+
                     {message.assigned_agent_id && (
                       <span>
                         Agent:{" "}
@@ -896,15 +966,16 @@ export default function AdminSupportPage() {
             Audit & Monitoring
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            Planned review area for administrative actions and assignment history.
+            Review area for administrative actions and assignment history.
           </p>
+
           <div className="mt-4 rounded-xl border border-dashed border-slate-300 p-5">
             <p className="font-semibold text-slate-800">
               Audit history integration pending
             </p>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              Connect the existing audit records through a protected
-              administrator API before displaying live audit history.
+              Connect audit records through a protected administrator API
+              before displaying live audit history.
             </p>
           </div>
         </section>
