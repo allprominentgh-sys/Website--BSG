@@ -56,7 +56,22 @@ function displayStatus(value: string): string {
       .replace(/[_-]+/g, " ")
       .replace(/\s+/g, " ")
       .trim()
-      .replace(/\b\w/g, (letter) => letter.toUpperCase()) || "Unknown"
+      .replace(/\b\w/g, (letter) => letter.toUpperCase()) ||
+    "Unknown"
+  );
+}
+
+const inputClass =
+  "w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-3 text-sm text-slate-800 outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-100";
+
+const labelClass =
+  "mb-1 block text-sm font-semibold text-slate-700";
+
+function SetupNotice({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm leading-6 text-amber-900">
+      {children}
+    </p>
   );
 }
 
@@ -70,6 +85,14 @@ export default function AdminSupportPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedConversation, setSelectedConversation] = useState("");
+
+  // Branch fields: blank by default; not connected to the database.
+  const [companyId, setCompanyId] = useState("");
+  const [branchName, setBranchName] = useState("");
+  const [branchCode, setBranchCode] = useState("");
+  const [branchLocation, setBranchLocation] = useState("");
+  const [branchManager, setBranchManager] = useState("");
+  const [branchNotice, setBranchNotice] = useState("");
 
   const loadInbox = useCallback(async (manual = false) => {
     if (manual) {
@@ -139,16 +162,13 @@ export default function AdminSupportPage() {
     const grouped = new Map<string, SupportMessage[]>();
 
     for (const message of messages) {
-      const existing =
-        grouped.get(message.conversation_id) ?? [];
-
+      const existing = grouped.get(message.conversation_id) ?? [];
       existing.push(message);
       grouped.set(message.conversation_id, existing);
     }
 
     const result: Conversation[] = [];
 
-    // Map.forEach avoids the Map iterator compilation error.
     grouped.forEach((conversationMessages, id) => {
       const sortedMessages = [...conversationMessages].sort(
         (a, b) =>
@@ -163,11 +183,7 @@ export default function AdminSupportPage() {
       )[0];
 
       if (latest) {
-        result.push({
-          id,
-          messages: sortedMessages,
-          latest,
-        });
+        result.push({ id, messages: sortedMessages, latest });
       }
     });
 
@@ -193,8 +209,8 @@ export default function AdminSupportPage() {
           message.message.toLowerCase().includes(term)
         );
 
-      const hasAssignment = conversation.messages.some(
-        (message) => Boolean(message.assigned_agent_id)
+      const hasAssignment = conversation.messages.some((message) =>
+        Boolean(message.assigned_agent_id)
       );
 
       const hasReferral = conversation.messages.some(
@@ -243,6 +259,24 @@ export default function AdminSupportPage() {
       .join(", ");
   }
 
+  function clearBranchForm() {
+    setCompanyId("");
+    setBranchName("");
+    setBranchCode("");
+    setBranchLocation("");
+    setBranchManager("");
+    setBranchNotice("");
+  }
+
+  function prepareBranchForm(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    // Intentionally no API or database call.
+    setBranchNotice(
+      "The form is displayed correctly, but saving is not enabled. No branch has been created and no data has been sent to the database."
+    );
+  }
+
   return (
     <main className="min-h-screen bg-slate-50 p-4 text-slate-800 sm:p-8">
       <div className="mx-auto max-w-7xl">
@@ -256,8 +290,8 @@ export default function AdminSupportPage() {
           </h1>
 
           <p className="mt-2 max-w-2xl text-sm text-blue-100">
-            Administrator inbox for reviewing customer conversations
-            and monitoring support agents.
+            Administrator workspace for customer conversations,
+            agent monitoring, branch setup and management tools.
           </p>
 
           <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -287,9 +321,7 @@ export default function AdminSupportPage() {
             <h2 className="font-bold">
               Support Centre could not load
             </h2>
-
             <p className="mt-1 text-sm">{error}</p>
-
             <button
               type="button"
               onClick={() => void loadInbox(true)}
@@ -300,6 +332,7 @@ export default function AdminSupportPage() {
           </section>
         )}
 
+        {/* Overview */}
         <section className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <p className="text-sm text-slate-500">
@@ -333,6 +366,244 @@ export default function AdminSupportPage() {
           </div>
         </section>
 
+        {/* Branch Management */}
+        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-wide text-blue-800">
+                Company administration
+              </p>
+              <h2 className="mt-1 text-xl font-bold text-slate-900">
+                Branch Management
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Prepare branch details as the company expands.
+              </p>
+            </div>
+
+            <span className="w-fit rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+              Setup only
+            </span>
+          </div>
+
+          <form
+            onSubmit={prepareBranchForm}
+            className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2"
+          >
+            <div>
+              <label htmlFor="company-id" className={labelClass}>
+                Company ID
+              </label>
+              <input
+                id="company-id"
+                value={companyId}
+                onChange={(event) => setCompanyId(event.target.value)}
+                placeholder="Enter company ID"
+                className={inputClass}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="branch-name" className={labelClass}>
+                Branch name
+              </label>
+              <input
+                id="branch-name"
+                value={branchName}
+                onChange={(event) => setBranchName(event.target.value)}
+                placeholder="Enter branch name"
+                className={inputClass}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="branch-code" className={labelClass}>
+                Branch code
+              </label>
+              <input
+                id="branch-code"
+                value={branchCode}
+                onChange={(event) => setBranchCode(event.target.value)}
+                placeholder="Enter branch code"
+                className={inputClass}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="branch-location" className={labelClass}>
+                Branch location
+              </label>
+              <input
+                id="branch-location"
+                value={branchLocation}
+                onChange={(event) =>
+                  setBranchLocation(event.target.value)
+                }
+                placeholder="Enter town or full address"
+                className={inputClass}
+              />
+            </div>
+
+            <div className="sm:col-span-2">
+              <label htmlFor="branch-manager" className={labelClass}>
+                Branch manager
+              </label>
+              <input
+                id="branch-manager"
+                value={branchManager}
+                onChange={(event) =>
+                  setBranchManager(event.target.value)
+                }
+                placeholder="Enter manager name when appointed"
+                className={inputClass}
+              />
+            </div>
+
+            <div className="flex flex-wrap gap-3 sm:col-span-2">
+              <button
+                type="submit"
+                className="rounded-lg bg-blue-900 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-800"
+              >
+                Prepare branch
+              </button>
+
+              <button
+                type="button"
+                onClick={clearBranchForm}
+                className="rounded-lg border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Clear fields
+              </button>
+            </div>
+
+            {branchNotice && (
+              <p
+                role="status"
+                className="rounded-lg bg-blue-50 p-3 text-sm text-blue-900 sm:col-span-2"
+              >
+                {branchNotice}
+              </p>
+            )}
+          </form>
+
+          <SetupNotice>
+            This form is not connected to the database yet. Submitting
+            it does not create or save a branch. The fields are blank
+            each time the page is opened.
+          </SetupNotice>
+        </section>
+
+        {/* Staff and Department Management */}
+        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <h2 className="text-xl font-bold text-slate-900">
+            Staff and Department Management
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Planned tools for adding staff, assigning company and staff
+            IDs, and creating departments without editing code.
+          </p>
+
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {[
+              {
+                title: "Staff registration",
+                description: "Staff details, job titles and branch membership.",
+              },
+              {
+                title: "Staff ID generator",
+                description: "Prepare unique staff identifiers and login setup.",
+              },
+              {
+                title: "Department management",
+                description: "Create and maintain company departments.",
+              },
+            ].map((item) => (
+              <div
+                key={item.title}
+                className="rounded-xl border border-slate-200 p-4"
+              >
+                <h3 className="font-semibold text-slate-900">
+                  {item.title}
+                </h3>
+                <p className="mt-2 text-sm leading-5 text-slate-600">
+                  {item.description}
+                </p>
+                <span className="mt-3 inline-block rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                  Not connected
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <SetupNotice>
+            Staff creation and department changes require protected
+            server APIs, permission checks and database integration.
+            Existing staff records will not be changed by this page.
+          </SetupNotice>
+        </section>
+
+        {/* Support and Delivery Assignments */}
+        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <h2 className="text-xl font-bold text-slate-900">
+            Support and Delivery Assignments
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            A future management area for assigning customer conversations
+            and delivery tasks to authorised staff.
+          </p>
+
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-slate-200 p-4">
+              <h3 className="font-semibold text-slate-900">
+                Customer support assignments
+              </h3>
+              <p className="mt-2 text-sm text-slate-600">
+                Assign conversations to support agents and track their
+                status.
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 p-4">
+              <h3 className="font-semibold text-slate-900">
+                Delivery assignments
+              </h3>
+              <p className="mt-2 text-sm text-slate-600">
+                Allocate deliveries to branches and authorised staff.
+              </p>
+            </div>
+          </div>
+
+          <SetupNotice>
+            Assignment controls are not active. This version does not
+            modify support messages, agent assignments or delivery
+            records.
+          </SetupNotice>
+        </section>
+
+        {/* Monitoring and Audit */}
+        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <h2 className="text-xl font-bold text-slate-900">
+            Monitoring and Audit Records
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Planned administrator view for tracking changes, assignments
+            and important staff actions.
+          </p>
+
+          <div className="mt-4 rounded-xl border border-dashed border-slate-300 p-5">
+            <p className="font-semibold text-slate-800">
+              Audit history integration pending
+            </p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              The existing support inbox remains available below.
+              Connecting audit records will require a protected API
+              that reads the existing audit table and checks administrator
+              permissions.
+            </p>
+          </div>
+        </section>
+
+        {/* Customer Conversations */}
         <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
           <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
             <div>
@@ -358,14 +629,14 @@ export default function AdminSupportPage() {
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search messages, subjects or IDs"
               aria-label="Search conversations"
-              className="min-w-0 rounded-lg border border-slate-300 px-3 py-3 text-sm outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-100 sm:col-span-2"
+              className={`${inputClass} sm:col-span-2`}
             />
 
             <select
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value)}
               aria-label="Filter conversations"
-              className="rounded-lg border border-slate-300 px-3 py-3 text-sm outline-none focus:border-blue-700"
+              className={inputClass}
             >
               <option value="all">All conversations</option>
               <option value="open">Not closed/resolved</option>
@@ -449,6 +720,7 @@ export default function AdminSupportPage() {
           )}
         </section>
 
+        {/* Support Agents */}
         <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
           <h2 className="text-xl font-bold text-slate-900">
             Support agents
@@ -502,6 +774,7 @@ export default function AdminSupportPage() {
           )}
         </section>
 
+        {/* Conversation Details */}
         {selected && (
           <section className="mt-6 rounded-2xl border border-blue-200 bg-white p-5 shadow-sm sm:p-6">
             <div className="flex flex-col justify-between gap-2 sm:flex-row">
@@ -567,11 +840,11 @@ export default function AdminSupportPage() {
               ))}
             </div>
 
-            <p className="mt-5 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+            <SetupNotice>
               This view is read-only. Replying, assigning agents,
-              changing statuses, and escalating conversations require
+              changing statuses and escalating conversations require
               separate server-side permission checks.
-            </p>
+            </SetupNotice>
           </section>
         )}
 
