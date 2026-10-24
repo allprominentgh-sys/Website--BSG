@@ -43,6 +43,12 @@ type Conversation = {
   latest: SupportMessage;
 };
 
+const inputClass =
+  "w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-3 text-sm outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-100";
+
+const labelClass =
+  "mb-1 block text-sm font-semibold text-slate-700";
+
 function formatDate(value: string): string {
   const date = new Date(value);
   return Number.isNaN(date.getTime())
@@ -61,11 +67,50 @@ function displayStatus(value: string): string {
   );
 }
 
-const inputClass =
-  "w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-3 text-sm text-slate-800 outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-100";
-
-const labelClass =
-  "mb-1 block text-sm font-semibold text-slate-700";
+const navigationCards = [
+  {
+    id: "administrator-controls",
+    title: "Administrator Controls",
+    description: "Administration and access oversight",
+    icon: "🛡️",
+    color: "border-blue-200 bg-blue-50",
+  },
+  {
+    id: "branch-management",
+    title: "Branch Management",
+    description: "Company IDs, branches and locations",
+    icon: "🏢",
+    color: "border-sky-200 bg-sky-50",
+  },
+  {
+    id: "staff-departments",
+    title: "Staff & Departments",
+    description: "Staff registration and department setup",
+    icon: "👥",
+    color: "border-indigo-200 bg-indigo-50",
+  },
+  {
+    id: "support-delivery",
+    title: "Support & Delivery",
+    description: "Support and delivery assignments",
+    icon: "🚚",
+    color: "border-cyan-200 bg-cyan-50",
+  },
+  {
+    id: "customer-support",
+    title: "Customer Support",
+    description: "Customer conversations and agents",
+    icon: "💬",
+    color: "border-blue-200 bg-blue-50",
+  },
+  {
+    id: "audit-monitoring",
+    title: "Audit & Monitoring",
+    description: "Activity and administrative records",
+    icon: "📋",
+    color: "border-slate-200 bg-slate-50",
+  },
+];
 
 function SetupNotice({ children }: { children: React.ReactNode }) {
   return (
@@ -86,7 +131,7 @@ export default function AdminSupportPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedConversation, setSelectedConversation] = useState("");
 
-  // Branch fields: blank by default; not connected to the database.
+  // Blank branch form. No database writes are performed.
   const [companyId, setCompanyId] = useState("");
   const [branchName, setBranchName] = useState("");
   const [branchCode, setBranchCode] = useState("");
@@ -95,11 +140,8 @@ export default function AdminSupportPage() {
   const [branchNotice, setBranchNotice] = useState("");
 
   const loadInbox = useCallback(async (manual = false) => {
-    if (manual) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
+    if (manual) setRefreshing(true);
+    else setLoading(true);
 
     setError("");
 
@@ -268,12 +310,12 @@ export default function AdminSupportPage() {
     setBranchNotice("");
   }
 
-  function prepareBranchForm(event: React.FormEvent<HTMLFormElement>) {
+  function prepareBranchForm(
+    event: React.FormEvent<HTMLFormElement>
+  ) {
     event.preventDefault();
-
-    // Intentionally no API or database call.
     setBranchNotice(
-      "The form is displayed correctly, but saving is not enabled. No branch has been created and no data has been sent to the database."
+      "Setup preview only. No branch has been created or saved. Database integration is not enabled."
     );
   }
 
@@ -290,8 +332,8 @@ export default function AdminSupportPage() {
           </h1>
 
           <p className="mt-2 max-w-2xl text-sm text-blue-100">
-            Administrator workspace for customer conversations,
-            agent monitoring, branch setup and management tools.
+            Administration, branch setup, staff planning and customer
+            support in one workspace.
           </p>
 
           <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -313,6 +355,44 @@ export default function AdminSupportPage() {
           </div>
         </header>
 
+        {/* Clickable thumbnail navigation */}
+        <section className="mt-6">
+          <div className="mb-4">
+            <h2 className="text-xl font-bold text-slate-900">
+              Management Dashboard
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Select a thumbnail to jump to that section on this page.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            {navigationCards.map((card) => (
+              <a
+                key={card.id}
+                href={`#${card.id}`}
+                className={`group flex min-h-36 flex-col rounded-xl border p-4 shadow-sm transition hover:-translate-y-1 hover:border-blue-400 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${card.color}`}
+              >
+                <span
+                  aria-hidden="true"
+                  className="text-3xl"
+                >
+                  {card.icon}
+                </span>
+                <span className="mt-3 text-sm font-bold text-slate-900">
+                  {card.title}
+                </span>
+                <span className="mt-1 text-xs leading-5 text-slate-600">
+                  {card.description}
+                </span>
+                <span className="mt-auto pt-3 text-xs font-semibold text-blue-800">
+                  Open section →
+                </span>
+              </a>
+            ))}
+          </div>
+        </section>
+
         {error && (
           <section
             className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-800"
@@ -332,59 +412,38 @@ export default function AdminSupportPage() {
           </section>
         )}
 
-        {/* Overview */}
-        <section className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm text-slate-500">
-              Conversations loaded
-            </p>
-            <p className="mt-2 text-3xl font-bold text-slate-900">
-              {loading ? "—" : conversations.length}
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm text-slate-500">Messages loaded</p>
-            <p className="mt-2 text-3xl font-bold text-slate-900">
-              {loading ? "—" : messages.length}
-            </p>
-            <p className="mt-1 text-xs text-slate-500">
-              Maximum 200 messages per refresh
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm text-slate-500">
-              Active support agents
-            </p>
-            <p className="mt-2 text-3xl font-bold text-slate-900">
-              {loading ? "—" : activeAgents}
-            </p>
-            <p className="mt-1 text-xs text-slate-500">
-              {loading ? "" : `${agents.length} agent records`}
+        {/* Administrator Controls */}
+        <section
+          id="administrator-controls"
+          className="mt-6 scroll-mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
+        >
+          <h2 className="text-xl font-bold text-slate-900">
+            Administrator Controls
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Administrator access and oversight.
+          </p>
+          <div className="mt-4 rounded-xl border border-slate-200 p-4">
+            <p className="font-semibold">Administrator session</p>
+            <p className="mt-1 text-sm text-slate-600">
+              The existing inbox API continues to verify administrator
+              access. Additional management permissions must be enforced
+              on the server before enabling administrative changes.
             </p>
           </div>
         </section>
 
         {/* Branch Management */}
-        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-          <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-wide text-blue-800">
-                Company administration
-              </p>
-              <h2 className="mt-1 text-xl font-bold text-slate-900">
-                Branch Management
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Prepare branch details as the company expands.
-              </p>
-            </div>
-
-            <span className="w-fit rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
-              Setup only
-            </span>
-          </div>
+        <section
+          id="branch-management"
+          className="mt-6 scroll-mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
+        >
+          <h2 className="text-xl font-bold text-slate-900">
+            Branch Management
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Enter branch details when you are ready. All fields start blank.
+          </p>
 
           <form
             onSubmit={prepareBranchForm}
@@ -466,11 +525,10 @@ export default function AdminSupportPage() {
               >
                 Prepare branch
               </button>
-
               <button
                 type="button"
                 onClick={clearBranchForm}
-                className="rounded-lg border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                className="rounded-lg border border-slate-300 px-5 py-3 text-sm font-semibold hover:bg-slate-50"
               >
                 Clear fields
               </button>
@@ -487,21 +545,19 @@ export default function AdminSupportPage() {
           </form>
 
           <SetupNotice>
-            This form is not connected to the database yet. Submitting
-            it does not create or save a branch. The fields are blank
-            each time the page is opened.
+            This form is not connected to the database. Submitting it
+            does not create or save a branch.
           </SetupNotice>
         </section>
 
-        {/* Staff and Department Management */}
-        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        {/* Staff and Departments */}
+        <section
+          id="staff-departments"
+          className="mt-6 scroll-mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
+        >
           <h2 className="text-xl font-bold text-slate-900">
-            Staff and Department Management
+            Staff & Departments
           </h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Planned tools for adding staff, assigning company and staff
-            IDs, and creating departments without editing code.
-          </p>
 
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
             {[
@@ -515,7 +571,7 @@ export default function AdminSupportPage() {
               },
               {
                 title: "Department management",
-                description: "Create and maintain company departments.",
+                description: "Create and maintain departments as the company grows.",
               },
             ].map((item) => (
               <div
@@ -525,7 +581,7 @@ export default function AdminSupportPage() {
                 <h3 className="font-semibold text-slate-900">
                   {item.title}
                 </h3>
-                <p className="mt-2 text-sm leading-5 text-slate-600">
+                <p className="mt-2 text-sm text-slate-600">
                   {item.description}
                 </p>
                 <span className="mt-3 inline-block rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
@@ -536,21 +592,19 @@ export default function AdminSupportPage() {
           </div>
 
           <SetupNotice>
-            Staff creation and department changes require protected
-            server APIs, permission checks and database integration.
-            Existing staff records will not be changed by this page.
+            Creating staff accounts and departments requires protected
+            server APIs and database integration.
           </SetupNotice>
         </section>
 
-        {/* Support and Delivery Assignments */}
-        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        {/* Support and Delivery */}
+        <section
+          id="support-delivery"
+          className="mt-6 scroll-mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
+        >
           <h2 className="text-xl font-bold text-slate-900">
-            Support and Delivery Assignments
+            Support & Delivery Assignments
           </h2>
-          <p className="mt-1 text-sm text-slate-500">
-            A future management area for assigning customer conversations
-            and delivery tasks to authorised staff.
-          </p>
 
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="rounded-xl border border-slate-200 p-4">
@@ -558,8 +612,7 @@ export default function AdminSupportPage() {
                 Customer support assignments
               </h3>
               <p className="mt-2 text-sm text-slate-600">
-                Assign conversations to support agents and track their
-                status.
+                Assign conversations to support agents and track status.
               </p>
             </div>
 
@@ -568,50 +621,29 @@ export default function AdminSupportPage() {
                 Delivery assignments
               </h3>
               <p className="mt-2 text-sm text-slate-600">
-                Allocate deliveries to branches and authorised staff.
+                Plan delivery allocations for branches and authorised staff.
               </p>
             </div>
           </div>
 
           <SetupNotice>
-            Assignment controls are not active. This version does not
-            modify support messages, agent assignments or delivery
-            records.
+            Assignment controls are not active. This page does not change
+            support-message assignments or delivery records.
           </SetupNotice>
         </section>
 
-        {/* Monitoring and Audit */}
-        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-          <h2 className="text-xl font-bold text-slate-900">
-            Monitoring and Audit Records
-          </h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Planned administrator view for tracking changes, assignments
-            and important staff actions.
-          </p>
-
-          <div className="mt-4 rounded-xl border border-dashed border-slate-300 p-5">
-            <p className="font-semibold text-slate-800">
-              Audit history integration pending
-            </p>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              The existing support inbox remains available below.
-              Connecting audit records will require a protected API
-              that reads the existing audit table and checks administrator
-              permissions.
-            </p>
-          </div>
-        </section>
-
-        {/* Customer Conversations */}
-        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        {/* Customer Support */}
+        <section
+          id="customer-support"
+          className="mt-6 scroll-mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
+        >
           <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
             <div>
               <h2 className="text-xl font-bold text-slate-900">
-                Customer conversations
+                Customer Support
               </h2>
               <p className="mt-1 text-sm text-slate-500">
-                Select a conversation to inspect its messages.
+                Customer conversations and support agents.
               </p>
             </div>
 
@@ -620,6 +652,33 @@ export default function AdminSupportPage() {
                 Last refreshed: {lastUpdated}
               </p>
             )}
+          </div>
+
+          <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="rounded-xl bg-slate-50 p-4">
+              <p className="text-sm text-slate-500">Conversations loaded</p>
+              <p className="mt-1 text-2xl font-bold">
+                {loading ? "—" : conversations.length}
+              </p>
+            </div>
+            <div className="rounded-xl bg-slate-50 p-4">
+              <p className="text-sm text-slate-500">Messages loaded</p>
+              <p className="mt-1 text-2xl font-bold">
+                {loading ? "—" : messages.length}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                Maximum 200 per refresh
+              </p>
+            </div>
+            <div className="rounded-xl bg-slate-50 p-4">
+              <p className="text-sm text-slate-500">Active agents</p>
+              <p className="mt-1 text-2xl font-bold">
+                {loading ? "—" : activeAgents}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                {loading ? "" : `${agents.length} agent records`}
+              </p>
+            </div>
           </div>
 
           <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -631,7 +690,6 @@ export default function AdminSupportPage() {
               aria-label="Search conversations"
               className={`${inputClass} sm:col-span-2`}
             />
-
             <select
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value)}
@@ -656,8 +714,7 @@ export default function AdminSupportPage() {
                 No conversations found
               </h3>
               <p className="mt-2 text-sm text-slate-500">
-                There may be no messages in the latest 200 records,
-                or your current search/filter has no matches.
+                No messages matched the current search or filter.
               </p>
             </div>
           ) : (
@@ -685,7 +742,6 @@ export default function AdminSupportPage() {
                       <span className="break-all text-xs font-semibold text-blue-800">
                         Conversation {conversation.id.slice(0, 8)}
                       </span>
-
                       <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
                         {displayStatus(latest.status)}
                       </span>
@@ -694,7 +750,6 @@ export default function AdminSupportPage() {
                     <h3 className="mt-3 break-words font-bold text-slate-900">
                       {latest.subject || "Customer support request"}
                     </h3>
-
                     <p className="mt-2 line-clamp-3 whitespace-pre-wrap break-words text-sm text-slate-600">
                       {latest.message}
                     </p>
@@ -702,11 +757,8 @@ export default function AdminSupportPage() {
                     <div className="mt-4 space-y-1 border-t border-slate-100 pt-3 text-xs text-slate-500">
                       <p>Customer ID: {latest.user_id}</p>
                       <p>Messages: {conversation.messages.length}</p>
-                      <p>
-                        Assigned: {assignedAgentNames(conversation)}
-                      </p>
+                      <p>Assigned: {assignedAgentNames(conversation)}</p>
                       <p>Updated: {formatDate(latest.updated_at)}</p>
-
                       {referred && (
                         <p className="font-semibold text-amber-700">
                           Referred to administrator
@@ -718,65 +770,57 @@ export default function AdminSupportPage() {
               })}
             </div>
           )}
-        </section>
 
-        {/* Support Agents */}
-        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-          <h2 className="text-xl font-bold text-slate-900">
-            Support agents
-          </h2>
+          <div className="mt-6 border-t border-slate-200 pt-5">
+            <h3 className="text-lg font-bold text-slate-900">
+              Support agents
+            </h3>
 
-          <p className="mt-1 text-sm text-slate-500">
-            Read-only view of existing support agent records.
-          </p>
-
-          {loading ? (
-            <p className="mt-4 text-sm text-slate-500">
-              Loading agent records...
-            </p>
-          ) : agents.length === 0 ? (
-            <p className="mt-4 rounded-lg bg-slate-50 p-4 text-sm text-slate-600">
-              No support agent records were returned.
-            </p>
-          ) : (
-            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {agents.map((agent) => (
-                <div
-                  key={agent.id}
-                  className="rounded-xl border border-slate-200 p-4"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="font-semibold text-slate-900">
-                      {agent.display_name}
-                    </h3>
-
-                    <span
-                      className={`rounded-full px-2 py-1 text-xs font-semibold ${
-                        agent.is_active
-                          ? "bg-green-100 text-green-800"
-                          : "bg-slate-100 text-slate-600"
-                      }`}
-                    >
-                      {agent.is_active ? "Active" : "Inactive"}
-                    </span>
+            {loading ? (
+              <p className="mt-4 text-sm text-slate-500">
+                Loading agent records...
+              </p>
+            ) : agents.length === 0 ? (
+              <p className="mt-4 rounded-lg bg-slate-50 p-4 text-sm text-slate-600">
+                No support agent records were returned.
+              </p>
+            ) : (
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {agents.map((agent) => (
+                  <div
+                    key={agent.id}
+                    className="rounded-xl border border-slate-200 p-4"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <h4 className="font-semibold text-slate-900">
+                        {agent.display_name}
+                      </h4>
+                      <span
+                        className={`rounded-full px-2 py-1 text-xs font-semibold ${
+                          agent.is_active
+                            ? "bg-green-100 text-green-800"
+                            : "bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        {agent.is_active ? "Active" : "Inactive"}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm text-slate-600">
+                      Slot: {agent.slot_number ?? "Not numbered"}
+                    </p>
+                    <p className="mt-1 break-all text-xs text-slate-500">
+                      Agent record: {agent.id}
+                    </p>
                   </div>
-
-                  <p className="mt-2 text-sm text-slate-600">
-                    Slot: {agent.slot_number ?? "Not numbered"}
-                  </p>
-
-                  <p className="mt-1 break-all text-xs text-slate-500">
-                    Agent record: {agent.id}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
         </section>
 
         {/* Conversation Details */}
         {selected && (
-          <section className="mt-6 rounded-2xl border border-blue-200 bg-white p-5 shadow-sm sm:p-6">
+          <section className="mt-6 scroll-mt-6 rounded-2xl border border-blue-200 bg-white p-5 shadow-sm sm:p-6">
             <div className="flex flex-col justify-between gap-2 sm:flex-row">
               <div>
                 <h2 className="text-xl font-bold text-slate-900">
@@ -786,7 +830,6 @@ export default function AdminSupportPage() {
                   {selected.id}
                 </p>
               </div>
-
               <button
                 type="button"
                 onClick={() => setSelectedConversation("")}
@@ -816,16 +859,12 @@ export default function AdminSupportPage() {
                   </p>
 
                   <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
-                    <span>
-                      Status: {displayStatus(message.status)}
-                    </span>
-
+                    <span>Status: {displayStatus(message.status)}</span>
                     {message.referred_to_admin && (
                       <span className="font-semibold text-amber-700">
                         Referred to admin
                       </span>
                     )}
-
                     {message.assigned_agent_id && (
                       <span>
                         Agent:{" "}
@@ -841,12 +880,34 @@ export default function AdminSupportPage() {
             </div>
 
             <SetupNotice>
-              This view is read-only. Replying, assigning agents,
-              changing statuses and escalating conversations require
-              separate server-side permission checks.
+              This view is read-only. Replying, assigning agents, changing
+              statuses and escalating conversations require separate
+              server-side permission checks.
             </SetupNotice>
           </section>
         )}
+
+        {/* Audit and Monitoring */}
+        <section
+          id="audit-monitoring"
+          className="mt-6 scroll-mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
+        >
+          <h2 className="text-xl font-bold text-slate-900">
+            Audit & Monitoring
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Planned review area for administrative actions and assignment history.
+          </p>
+          <div className="mt-4 rounded-xl border border-dashed border-slate-300 p-5">
+            <p className="font-semibold text-slate-800">
+              Audit history integration pending
+            </p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Connect the existing audit records through a protected
+              administrator API before displaying live audit history.
+            </p>
+          </div>
+        </section>
 
         <footer className="mt-8 pb-6 text-center text-xs text-slate-500">
           BEST SALES GHANA Support Centre · Administrator view
