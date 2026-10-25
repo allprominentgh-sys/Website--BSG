@@ -1,9 +1,13 @@
 
 import { NextRequest, NextResponse } from "next/server";
-import { createHmac, timingSafeEqual } from "crypto";
+import { createHmac } from "crypto";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 const ADMIN_EMAIL = "admin@bestsalesgh.com";
 const COOKIE_NAME = "bsg_admin_session";
+const SESSION_DURATION_MS = 8 * 60 * 60 * 1000;
 
 function signSession(payload: string, secret: string) {
   return createHmac("sha256", secret)
@@ -24,8 +28,6 @@ export async function POST(request: NextRequest) {
       typeof body.password === "string"
         ? body.password
         : "";
-
-    const rememberMe = body.rememberMe === true;
 
     const adminPassword = process.env.ADMIN_PASSWORD;
     const sessionSecret = process.env.ADMIN_SESSION_SECRET;
@@ -52,10 +54,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (
-      email !== ADMIN_EMAIL ||
-      password !== adminPassword
-    ) {
+    if (email !== ADMIN_EMAIL || password !== adminPassword) {
       return NextResponse.json(
         {
           success: false,
@@ -65,21 +64,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const expiresAt =
-      Date.now() +
-      (rememberMe
-        ? 30 * 24 * 60 * 60 * 1000
-        : 8 * 60 * 60 * 1000);
+    const now = Date.now();
+    const expiresAt = now + SESSION_DURATION_MS;
 
     const payload = Buffer.from(
       JSON.stringify({
         email: ADMIN_EMAIL,
+        issuedAt: now,
+        lastActivityAt: now,
         expiresAt,
       })
     ).toString("base64url");
 
     const signature = signSession(payload, sessionSecret);
-
     const sessionValue = `${payload}.${signature}`;
 
     const response = NextResponse.json({
@@ -94,10 +91,10 @@ export async function POST(request: NextRequest) {
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      maxAge: rememberMe
-        ? 60 * 60 * 24 * 30
-        : 60 * 60 * 8,
+      maxAge: SESSION_DURATION_MS / 1000,
     });
+
+    response.headers.set("Cache-Control", "no-store");
 
     return response;
   } catch (error) {
