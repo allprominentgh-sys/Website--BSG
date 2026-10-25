@@ -1,11 +1,12 @@
-
 import { NextRequest, NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "crypto";
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const COOKIE_NAME = "bsg_admin_session";
 const ADMIN_EMAIL = "admin@bestsalesgh.com";
+const IDLE_TIMEOUT_MS = 15 * 60 * 1000;
 
 type SecuritySettings = {
   id: number;
@@ -17,33 +18,41 @@ type SecuritySettings = {
   updated_by: string | null;
 };
 
+function jsonResponse(body: unknown, status = 200) {
+  return NextResponse.json(body, {
+    status,
+    headers: { "Cache-Control": "no-store" },
+  });
+}
+
 function unauthorized() {
-  return NextResponse.json(
+  return jsonResponse(
     { success: false, message: "Administrator access required." },
-    { status: 401, headers: { "Cache-Control": "no-store" } }
+    401
   );
 }
 
 function verifyAdminSession(value: string | undefined): boolean {
   const secret = process.env.ADMIN_SESSION_SECRET;
 
-  if (!value || !secret) return false;
+  if (!value || !secret || value.length > 8192) return false;
 
-  const parts = value.split(".");
-  if (parts.length !== 2) return false;
+  const separator = value.lastIndexOf(".");
+  if (separator <= 0 || separator === value.length - 1) return false;
 
-  const [payload, signature] = parts;
+  const payload = value.slice(0, separator);
+  const signature = value.slice(separator + 1);
 
   try {
     const expected = createHmac("sha256", secret)
       .update(payload)
       .digest("base64url");
 
-    const actualBuffer = Buffer.from(signature);
     const expectedBuffer = Buffer.from(expected);
+    const actualBuffer = Buffer.from(signature);
 
     if (
-      actualBuffer.length !== expectedBuffer.length ||
+      expectedBuffer.length !== actualBuffer.length ||
       !timingSafeEqual(actualBuffer, expectedBuffer)
     ) {
       return false;
@@ -53,38 +62,36 @@ function verifyAdminSession(value: string | undefined): boolean {
       Buffer.from(payload, "base64url").toString("utf8")
     );
 
-    if (
-      session.email !== ADMIN_EMAIL ||
-      typeof session.expiresAt !== "number" ||
-      session.expiresAt <= Date.now()
-    ) {
-      return false;
-    }
+    const now = Date.now();
 
-    // Older sessions without lastActivityAt must sign in again.
-    if (
-      typeof session.lastActivityAt !== "number" ||
-      Date.now() - session.lastActivityAt >= 15 * 60 * 1000
-    ) {
-      return false;
-    }
-
-    return true;
+    return (
+      session.email === ADMIN_EMAIL &&
+      typeof session.expiresAt === "number" &&
+      Number.isFinite(session.expiresAt) &&
+      session.expiresAt > now &&
+      typeof session.lastActivityAt === "number" &&
+      Number.isFinite(session.lastActivityAt) &&
+      session.lastActivityAt <= now &&
+      now - session.lastActivityAt < IDLE_TIMEOUT_MS
+    );
   } catch {
     return false;
   }
 }
 
 function getSupabaseConfig() {
-  const url = process.env.SUPABASE_URL;
+  const url =
+    process.env.SUPABASE_URL ||
+    process.env.NEXT_PUBLIC_SUPABASE_URL;
+
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!url || !key) {
-    throw new Error("Server Supabase environment variables are missing.");
+    throw new Error("Required Supabase server configuration is missing.");
   }
 
   return {
-    url: url.replace(/\/$/, ""),
+    url: url.replace(/\/+$/, ""),
     key,
   };
 }
@@ -92,7 +99,7 @@ function getSupabaseConfig() {
 async function supabaseRequest(
   method: "GET" | "PATCH",
   body?: Record<string, unknown>
-) {
+): Promise<SecuritySettings[]> {
   const { url, key } = getSupabaseConfig();
 
   const response = await fetch(
@@ -103,7 +110,7 @@ async function supabaseRequest(
         apikey: key,
         Authorization: `Bearer ${key}`,
         "Content-Type": "application/json",
-        Prefer: method === "PATCH" ? "return=representation" : "return=representation",
+        Prefer: "return=representation",
       },
       ...(body ? { body: JSON.stringify(body) } : {}),
       cache: "no-store",
@@ -111,17 +118,20 @@ async function supabaseRequest(
   );
 
   if (!response.ok) {
-    throw new Error(`Supabase request failed (${response.status}).`);
+    // Keep database response details in server logs, not the public response.
+    console.error(
+      `Security settings database request failed: HTTP ${response.status}`
+    );
+    throw new Error("Security settings database request failed.");
   }
 
-  return response.json() as Promise<SecuritySettings[]>;
-}
+  const result: unknown = await response.json();
 
-function jsonResponse(body: unknown, status = 200) {
-  return NextResponse.json(body, {
-    status,
-    headers: { "Cache-Control": "no-store" },
-  });
+  if (!Array.isArray(result)) {
+    throw new Error("Unexpected security settings database response.");
+  }
+
+  return result as SecuritySettings[];
 }
 
 export async function GET(request: NextRequest) {
@@ -135,16 +145,28 @@ export async function GET(request: NextRequest) {
 
     if (!settings) {
       return jsonResponse(
-        { success: false, message: "Security settings have not been initialized." },
+        {
+          success: false,
+          message:
+            "Security settings have not been initialized. Check that staff_session_settings contains a row with id 1.",
+        },
         500
       );
     }
 
     return jsonResponse({ success: true, settings });
   } catch (error) {
-    console.error("SECURITY SETTINGS GET ERROR:", error);
+    console.error(
+      "SECURITY SETTINGS GET ERROR:",
+      error instanceof Error ? error.message : "Unknown error"
+    );
+
     return jsonResponse(
-      { success: false, message: "Unable to load security settings." },
+      {
+        success: false,
+        message:
+          "Unable to load security settings. Check the server logs and Supabase configuration.",
+      },
       500
     );
   }
@@ -155,47 +177,57 @@ export async function PATCH(request: NextRequest) {
     return unauthorized();
   }
 
+  let body: Record<string, unknown>;
+
   try {
-    const body = await request.json();
+    const parsed: unknown = await request.json();
 
-    const idle = Number(body.idle_timeout_minutes);
-    const warning = Number(body.warning_minutes);
-    const applyToAll = body.apply_to_all_staff;
-    const allowRemember = body.allow_remember_me_extension;
-
-    if (
-      !Number.isInteger(idle) ||
-      idle < 5 ||
-      idle > 60 ||
-      !Number.isInteger(warning) ||
-      warning < 0 ||
-      warning >= idle ||
-      typeof applyToAll !== "boolean" ||
-      typeof allowRemember !== "boolean"
-    ) {
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
       return jsonResponse(
-        { success: false, message: "Invalid security settings." },
+        { success: false, message: "Invalid settings request." },
         400
       );
     }
 
-    // This application requires the 15-minute policy for all staff.
-    // "Keep me signed in" must never override inactivity logout.
-    if (idle !== 15 || applyToAll !== true || allowRemember !== false) {
-      return jsonResponse(
-        {
-          success: false,
-          message:
-            "The required policy is 15 minutes, applied to all staff, with no inactivity bypass.",
-        },
-        400
-      );
-    }
+    body = parsed as Record<string, unknown>;
+  } catch {
+    return jsonResponse(
+      { success: false, message: "Invalid JSON request." },
+      400
+    );
+  }
 
+  const idle = Number(body.idle_timeout_minutes);
+  const warning = Number(body.warning_minutes);
+  const applyToAll = body.apply_to_all_staff;
+  const allowRemember = body.allow_remember_me_extension;
+
+  if (
+    !Number.isInteger(idle) ||
+    idle !== 15 ||
+    !Number.isInteger(warning) ||
+    warning < 0 ||
+    warning >= idle ||
+    typeof applyToAll !== "boolean" ||
+    applyToAll !== true ||
+    typeof allowRemember !== "boolean" ||
+    allowRemember !== false
+  ) {
+    return jsonResponse(
+      {
+        success: false,
+        message:
+          "Required policy: 15-minute inactivity timeout, applied to all staff, with no inactivity bypass. The warning must be shorter than the timeout.",
+      },
+      400
+    );
+  }
+
+  try {
     const rows = await supabaseRequest("PATCH", {
-      idle_timeout_minutes: idle,
+      idle_timeout_minutes: 15,
       warning_minutes: warning,
-      apply_to_all_staff: applyToAll,
+      apply_to_all_staff: true,
       allow_remember_me_extension: false,
       updated_at: new Date().toISOString(),
       updated_by: ADMIN_EMAIL,
@@ -203,16 +235,27 @@ export async function PATCH(request: NextRequest) {
 
     if (!rows[0]) {
       return jsonResponse(
-        { success: false, message: "No settings row was updated." },
+        {
+          success: false,
+          message:
+            "No security settings row was updated. Check that row id 1 exists.",
+        },
         500
       );
     }
 
     return jsonResponse({ success: true, settings: rows[0] });
   } catch (error) {
-    console.error("SECURITY SETTINGS UPDATE ERROR:", error);
+    console.error(
+      "SECURITY SETTINGS PATCH ERROR:",
+      error instanceof Error ? error.message : "Unknown error"
+    );
+
     return jsonResponse(
-      { success: false, message: "Unable to save security settings." },
+      {
+        success: false,
+        message: "Unable to save security settings. Check the server logs.",
+      },
       500
     );
   }
