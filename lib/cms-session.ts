@@ -5,6 +5,9 @@ import { createClient } from "@supabase/supabase-js";
 
 export const CMS_COOKIE_NAME = "bsg_cms_session";
 
+export const CMS_IDLE_TIMEOUT_MS = 15 * 60 * 1000;
+export const CMS_SESSION_DURATION_MS = 8 * 60 * 60 * 1000;
+
 export type CmsSessionPayload = {
   staffId: string;
   companyId: string;
@@ -12,6 +15,7 @@ export type CmsSessionPayload = {
   role: string;
   issuedAt: number;
   expiresAt: number;
+  sessionId: string;
 };
 
 export type VerifiedCmsStaff = {
@@ -26,23 +30,45 @@ function verifySignature(
   suppliedSignature: string,
   secret: string
 ): boolean {
-  const expected = createHmac("sha256", secret)
-    .update(payload)
-    .digest();
-
-  let supplied: Buffer;
-
   try {
-    supplied = Buffer.from(suppliedSignature, "base64url");
+    const expected = createHmac("sha256", secret)
+      .update(payload)
+      .digest();
+
+    const supplied = Buffer.from(suppliedSignature, "base64url");
+
+    return (
+      supplied.length === expected.length &&
+      timingSafeEqual(expected, supplied)
+    );
   } catch {
     return false;
   }
+}
 
-  if (supplied.length !== expected.length) {
-    return false;
+export function signCmsPayload(
+  payload: string,
+  secret: string
+): string {
+  return createHmac("sha256", secret)
+    .update(payload)
+    .digest("base64url");
+}
+
+export function createCmsSupabaseClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error("CMS server configuration is missing.");
   }
 
-  return timingSafeEqual(expected, supplied);
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
 }
 
 export async function getCmsStaffSession(): Promise<{
@@ -51,11 +77,9 @@ export async function getCmsStaffSession(): Promise<{
 } | null> {
   try {
     const secret = process.env.CMS_SESSION_SECRET;
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    if (!secret || !supabaseUrl || !serviceRoleKey) {
-      console.error("CMS session configuration is missing.");
+    if (!secret) {
+      console.error("CMS_SESSION_SECRET is missing.");
       return null;
     }
 
@@ -75,9 +99,7 @@ export async function getCmsStaffSession(): Promise<{
     const encodedPayload = token.slice(0, separator);
     const signature = token.slice(separator + 1);
 
-    if (
-      !verifySignature(encodedPayload, signature, secret)
-    ) {
+    if (!verifySignature(encodedPayload, signature, secret)) {
       return null;
     }
 
@@ -99,6 +121,10 @@ export async function getCmsStaffSession(): Promise<{
       typeof session.companyId !== "string" ||
       typeof session.employeeId !== "string" ||
       typeof session.role !== "string" ||
+      typeof session.sessionId !== "string" ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        session.sessionId
+      ) ||
       typeof session.issuedAt !== "number" ||
       typeof session.expiresAt !== "number" ||
       !Number.isFinite(session.issuedAt) ||
@@ -106,32 +132,50 @@ export async function getCmsStaffSession(): Promise<{
       session.issuedAt > now + 60_000 ||
       session.expiresAt <= now ||
       session.expiresAt <= session.issuedAt ||
-      session.expiresAt - session.issuedAt > 8 * 60 * 60 * 1000
+      session.expiresAt - session.issuedAt >
+        CMS_SESSION_DURATION_MS
     ) {
       return null;
     }
 
-    const supabase = createClient(
-      supabaseUrl,
-      serviceRoleKey,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    );
+    const supabase = createCmsSupabaseClient();
 
-    const { data: staff, error } = await supabase
+    const { data: activity, error: activityError } = await supabase
+      .from("cms_session_activity")
+      .select("session_id, staff_id, company_id, last_activity_at, expires_at")
+      .eq("session_id", session.sessionId)
+      .eq("staff_id", session.staffId)
+      .eq("company_id", session.companyId)
+      .maybeSingle();
+
+    if (activityError || !activity) {
+      return null;
+    }
+
+    const lastActivityAt = Date.parse(activity.last_activity_at);
+    const storedExpiry = Date.parse(activity.expires_at);
+
+    if (
+      !Number.isFinite(lastActivityAt) ||
+      !Number.isFinite(storedExpiry) ||
+      storedExpiry <= now ||
+      storedExpiry !== session.expiresAt ||
+      lastActivityAt > now + 60_000 ||
+      now - lastActivityAt >= CMS_IDLE_TIMEOUT_MS
+    ) {
+      return null;
+    }
+
+    const { data: staff, error: staffError } = await supabase
       .from("cms_staff")
-      .select("id, company_id, staff_id, role, is_active")
+      .select("id, company_id, staff_id, password_hash, is_active, role")
       .eq("id", session.staffId)
       .eq("company_id", session.companyId)
       .eq("staff_id", session.employeeId)
       .eq("is_active", true)
       .maybeSingle();
 
-    if (error || !staff) {
+    if (staffError || !staff) {
       return null;
     }
 
