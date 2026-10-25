@@ -1,65 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export const runtime = "nodejs";
-
 const COOKIE_NAME = "bsg_admin_session";
 const ADMIN_EMAIL = "admin@bestsalesgh.com";
 const IDLE_TIMEOUT_MS = 15 * 60 * 1000;
 
-type AdminSession = {
-  email: string;
-  expiresAt: number;
-  lastActivityAt: number;
-};
+function base64UrlToBytes(value: string): Uint8Array {
+  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded =
+    base64 + "=".repeat((4 - (base64.length % 4)) % 4);
 
-function verifySignature(
-  payload: string,
-  signature: string,
-  secret: string
-): boolean {
-  try {
-    const crypto = require("crypto") as typeof import("crypto");
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
 
-    const expected = crypto
-      .createHmac("sha256", secret)
-      .update(payload)
-      .digest("base64url");
-
-    const expectedBuffer = Buffer.from(expected);
-    const actualBuffer = Buffer.from(signature);
-
-    if (expectedBuffer.length !== actualBuffer.length) {
-      return false;
-    }
-
-    return crypto.timingSafeEqual(expectedBuffer, actualBuffer);
-  } catch {
-    return false;
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
   }
+
+  return bytes;
 }
 
-function decodePayload(payload: string): AdminSession | null {
-  try {
-    const decoded = JSON.parse(
-      Buffer.from(payload, "base64url").toString("utf8")
-    );
-
-    if (
-      !decoded ||
-      typeof decoded.email !== "string" ||
-      typeof decoded.expiresAt !== "number" ||
-      typeof decoded.lastActivityAt !== "number"
-    ) {
-      return null;
-    }
-
-    return decoded as AdminSession;
-  } catch {
-    return null;
-  }
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return buffer;
 }
 
-function verifySession(value: string | undefined): boolean {
+async function verifySession(
+  value: string | undefined
+): Promise<boolean> {
   const secret = process.env.ADMIN_SESSION_SECRET;
 
   if (!secret || !value || value.length > 8192) {
@@ -75,58 +43,75 @@ function verifySession(value: string | undefined): boolean {
   const payload = value.slice(0, separator);
   const signature = value.slice(separator + 1);
 
-  if (!verifySignature(payload, signature, secret)) {
+  try {
+    const encoder = new TextEncoder();
+
+    const key = await crypto.subtle.importKey(
+      "raw",
+      toArrayBuffer(encoder.encode(secret)),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["verify"]
+    );
+
+    const signatureBytes = base64UrlToBytes(signature);
+    const payloadBytes = encoder.encode(payload);
+
+    const valid = await crypto.subtle.verify(
+      "HMAC",
+      key,
+      toArrayBuffer(signatureBytes),
+      toArrayBuffer(payloadBytes)
+    );
+
+    if (!valid) return false;
+
+    const session = JSON.parse(
+      new TextDecoder().decode(base64UrlToBytes(payload))
+    );
+
+    const now = Date.now();
+
+    return (
+      session.email === ADMIN_EMAIL &&
+      typeof session.expiresAt === "number" &&
+      Number.isFinite(session.expiresAt) &&
+      session.expiresAt > now &&
+      typeof session.lastActivityAt === "number" &&
+      Number.isFinite(session.lastActivityAt) &&
+      session.lastActivityAt <= now &&
+      now - session.lastActivityAt < IDLE_TIMEOUT_MS
+    );
+  } catch {
     return false;
   }
-
-  const session = decodePayload(payload);
-
-  if (!session) {
-    return false;
-  }
-
-  const now = Date.now();
-
-  return (
-    session.email.toLowerCase() === ADMIN_EMAIL &&
-    Number.isFinite(session.expiresAt) &&
-    Number.isFinite(session.lastActivityAt) &&
-    session.expiresAt > now &&
-    session.lastActivityAt <= now &&
-    now - session.lastActivityAt < IDLE_TIMEOUT_MS
-  );
 }
 
-export function middleware(request: NextRequest) {
-  const pathname = request.nextUrl.pathname;
+export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
 
-  // Allow the login page so users can sign in.
   if (pathname === "/admin/login") {
     return NextResponse.next();
   }
 
-  // Protect every other /admin page.
   if (pathname === "/admin" || pathname.startsWith("/admin/")) {
-    const sessionCookie = request.cookies.get(COOKIE_NAME)?.value;
+    const session = request.cookies.get(COOKIE_NAME)?.value;
+    const valid = await verifySession(session);
 
-    if (!verifySession(sessionCookie)) {
+    if (!valid) {
       const loginUrl = new URL("/admin/login", request.url);
-
-      // Only retain a local path for post-login navigation.
       loginUrl.searchParams.set("redirect", pathname);
 
       const response = NextResponse.redirect(loginUrl);
-
       response.cookies.set({
         name: COOKIE_NAME,
         value: "",
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure: request.nextUrl.protocol === "https:",
         sameSite: "lax",
         path: "/",
         maxAge: 0,
       });
-
       response.headers.set("Cache-Control", "no-store");
 
       return response;
