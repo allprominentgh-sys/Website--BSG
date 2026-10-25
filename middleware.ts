@@ -1,170 +1,133 @@
-
 import { NextRequest, NextResponse } from "next/server";
 
+export const runtime = "nodejs";
+
 const COOKIE_NAME = "bsg_admin_session";
+const ADMIN_EMAIL = "admin@bestsalesgh.com";
+const IDLE_TIMEOUT_MS = 15 * 60 * 1000;
 
-/*
- * Convert Base64URL text into bytes.
- */
-function base64UrlToBytes(value: string): Uint8Array {
-  const base64 = value
-    .replace(/-/g, "+")
-    .replace(/_/g, "/");
+type AdminSession = {
+  email: string;
+  expiresAt: number;
+  lastActivityAt: number;
+};
 
-  const padded = base64.padEnd(
-    base64.length + ((4 - (base64.length % 4)) % 4),
-    "="
-  );
-
-  const binary = atob(padded);
-  const bytes = new Uint8Array(binary.length);
-
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-
-  return bytes;
-}
-
-/*
- * Convert Uint8Array to a standalone ArrayBuffer.
- * This avoids the TypeScript BufferSource compatibility error.
- */
-function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
-  const buffer = new ArrayBuffer(bytes.byteLength);
-
-  new Uint8Array(buffer).set(bytes);
-
-  return buffer;
-}
-
-/*
- * Verify the administrator session cookie.
- */
-async function verifySession(value: string): Promise<boolean> {
-  const secret = process.env.ADMIN_SESSION_SECRET;
-
-  if (!secret) {
-    console.error("ADMIN_SESSION_SECRET is missing.");
-    return false;
-  }
-
-  const parts = value.split(".");
-
-  if (parts.length !== 2) {
-    return false;
-  }
-
-  const [payload, signature] = parts;
-
-  if (!payload || !signature) {
-    return false;
-  }
-
+function verifySignature(
+  payload: string,
+  signature: string,
+  secret: string
+): boolean {
   try {
-    const encoder = new TextEncoder();
+    const crypto = require("crypto") as typeof import("crypto");
 
-    /*
-     * Import the secret key.
-     */
-    const key = await crypto.subtle.importKey(
-      "raw",
-      toArrayBuffer(encoder.encode(secret)),
-      {
-        name: "HMAC",
-        hash: "SHA-256",
-      },
-      false,
-      ["verify"]
-    );
+    const expected = crypto
+      .createHmac("sha256", secret)
+      .update(payload)
+      .digest("base64url");
 
-    /*
-     * Convert the signature and payload to ArrayBuffer.
-     */
-    const signatureBuffer = toArrayBuffer(
-      base64UrlToBytes(signature)
-    );
+    const expectedBuffer = Buffer.from(expected);
+    const actualBuffer = Buffer.from(signature);
 
-    const payloadBuffer = toArrayBuffer(
-      encoder.encode(payload)
-    );
-
-    /*
-     * Verify the HMAC signature.
-     */
-    const isValid = await crypto.subtle.verify(
-      "HMAC",
-      key,
-      signatureBuffer,
-      payloadBuffer
-    );
-
-    if (!isValid) {
+    if (expectedBuffer.length !== actualBuffer.length) {
       return false;
     }
 
-    /*
-     * Decode the verified session payload.
-     */
-    const decoded = JSON.parse(
-      new TextDecoder().decode(
-        base64UrlToBytes(payload)
-      )
-    );
-
-    /*
-     * Confirm the administrator identity and expiry.
-     */
-    return (
-      decoded.email === "admin@bestsalesgh.com" &&
-      typeof decoded.expiresAt === "number" &&
-      decoded.expiresAt > Date.now()
-    );
-  } catch (error) {
-    console.error(
-      "Session verification failed:",
-      error
-    );
-
+    return crypto.timingSafeEqual(expectedBuffer, actualBuffer);
+  } catch {
     return false;
   }
 }
 
-/*
- * Protect administrator pages.
- */
-export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+function decodePayload(payload: string): AdminSession | null {
+  try {
+    const decoded = JSON.parse(
+      Buffer.from(payload, "base64url").toString("utf8")
+    );
 
-  /*
-   * Allow the administrator login page.
-   */
+    if (
+      !decoded ||
+      typeof decoded.email !== "string" ||
+      typeof decoded.expiresAt !== "number" ||
+      typeof decoded.lastActivityAt !== "number"
+    ) {
+      return null;
+    }
+
+    return decoded as AdminSession;
+  } catch {
+    return null;
+  }
+}
+
+function verifySession(value: string | undefined): boolean {
+  const secret = process.env.ADMIN_SESSION_SECRET;
+
+  if (!secret || !value || value.length > 8192) {
+    return false;
+  }
+
+  const separator = value.lastIndexOf(".");
+
+  if (separator <= 0 || separator === value.length - 1) {
+    return false;
+  }
+
+  const payload = value.slice(0, separator);
+  const signature = value.slice(separator + 1);
+
+  if (!verifySignature(payload, signature, secret)) {
+    return false;
+  }
+
+  const session = decodePayload(payload);
+
+  if (!session) {
+    return false;
+  }
+
+  const now = Date.now();
+
+  return (
+    session.email.toLowerCase() === ADMIN_EMAIL &&
+    Number.isFinite(session.expiresAt) &&
+    Number.isFinite(session.lastActivityAt) &&
+    session.expiresAt > now &&
+    session.lastActivityAt <= now &&
+    now - session.lastActivityAt < IDLE_TIMEOUT_MS
+  );
+}
+
+export function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+
+  // Allow the login page so users can sign in.
   if (pathname === "/admin/login") {
     return NextResponse.next();
   }
 
-  /*
-   * Protect all other administrator pages.
-   */
-  if (pathname.startsWith("/admin")) {
-    const session = request.cookies.get(
-      COOKIE_NAME
-    )?.value;
+  // Protect every other /admin page.
+  if (pathname === "/admin" || pathname.startsWith("/admin/")) {
+    const sessionCookie = request.cookies.get(COOKIE_NAME)?.value;
 
-    if (!session || !(await verifySession(session))) {
-      const loginUrl = new URL(
-        "/admin/login",
-        request.url
-      );
+    if (!verifySession(sessionCookie)) {
+      const loginUrl = new URL("/admin/login", request.url);
 
-      loginUrl.searchParams.set(
-        "redirect",
-        pathname
-      );
+      // Only retain a local path for post-login navigation.
+      loginUrl.searchParams.set("redirect", pathname);
 
       const response = NextResponse.redirect(loginUrl);
 
-      response.cookies.delete(COOKIE_NAME);
+      response.cookies.set({
+        name: COOKIE_NAME,
+        value: "",
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 0,
+      });
+
+      response.headers.set("Cache-Control", "no-store");
 
       return response;
     }
@@ -173,9 +136,6 @@ export async function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
-/*
- * Apply middleware to administrator routes.
- */
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: ["/admin", "/admin/:path*"],
 };
