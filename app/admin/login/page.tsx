@@ -14,6 +14,8 @@ export default function AdminLoginPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    if (loading) return;
+
     setMessage("");
     setIsSuccess(false);
 
@@ -24,6 +26,9 @@ export default function AdminLoginPage() {
 
     setLoading(true);
 
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 15000);
+
     try {
       const response = await fetch("/api/admin/login", {
         method: "POST",
@@ -32,6 +37,7 @@ export default function AdminLoginPage() {
         },
         credentials: "same-origin",
         cache: "no-store",
+        signal: controller.signal,
         body: JSON.stringify({
           email: email.trim().toLowerCase(),
           password,
@@ -43,36 +49,45 @@ export default function AdminLoginPage() {
 
       if (!response.ok || data?.success !== true) {
         setMessage(
-          data?.message ||
-            "Login failed. Please check your credentials and try again."
+          typeof data?.message === "string"
+            ? data.message
+            : `Login failed (HTTP ${response.status}). Please try again.`
         );
-        setLoading(false);
         return;
       }
 
       setIsSuccess(true);
-      setMessage("Login accepted. Checking administrator access...");
+      setMessage("Login accepted. Opening administrator dashboard...");
 
-      // Only allow redirects to local administrator pages.
       const params = new URLSearchParams(window.location.search);
       const requestedPath = params.get("redirect");
 
       const destination =
         requestedPath &&
-        requestedPath.startsWith("/admin") &&
+        requestedPath.startsWith("/admin/") &&
         !requestedPath.startsWith("//") &&
         requestedPath !== "/admin/login"
           ? requestedPath
           : "/admin";
 
-      // Perform a full navigation so the browser sends the new cookie.
-      window.location.replace(destination);
+      // Full navigation sends the newly issued cookie with the next request.
+      window.location.assign(destination);
     } catch (error) {
-      console.error("Administrator login request failed.");
+      if (error instanceof Error && error.name === "AbortError") {
+        setMessage(
+          "The login request timed out. Please try again. If this continues, the server login route needs checking."
+        );
+      } else {
+        console.error("Administrator login request failed.");
 
-      setMessage(
-        "Unable to connect to the login system. Please try again."
-      );
+        setMessage(
+          "Could not contact the login service. Check your connection and try again."
+        );
+      }
+    } finally {
+      window.clearTimeout(timeoutId);
+
+      // Navigation will happen on success. On failure, restore the form.
       setLoading(false);
     }
   }
@@ -110,15 +125,12 @@ export default function AdminLoginPage() {
             <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-blue-700 text-4xl shadow-xl">
               🔐
             </div>
-
             <p className="mt-7 text-sm font-black uppercase tracking-[0.25em] text-blue-700">
               Administrator Access
             </p>
-
             <h1 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">
               Admin Sign In
             </h1>
-
             <p className="mt-3 text-slate-500">
               Sign in to manage BEST SALES GHANA.
             </p>
