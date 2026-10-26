@@ -1,20 +1,38 @@
-
 import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const COOKIE_NAME = "bsg_admin_session";
+const ADMIN_EMAIL = "admin@bestsalesgh.com";
 
-const ALLOWED_SETTINGS = [
-  "individual_premium_price",
-  "individual_priority_price",
-  "individual_top_priority_price",
-  "company_top_priority_monthly_price",
-  "business_transaction_fee_percent",
-] as const;
+const SETTING_DESCRIPTIONS = {
+  individual_premium_price:
+    "Price per individual Premium advertisement.",
+  individual_priority_price:
+    "Price per individual Priority advertisement.",
+  individual_top_priority_price:
+    "Price per individual Top Priority advertisement.",
+  company_top_priority_monthly_price:
+    "Monthly price for the company Top Priority advertising package.",
+  business_transaction_fee_percent:
+    "Platform fee percentage for eligible business transactions.",
+  individual_free_ads_limit:
+    "Number of free advertisements per individual seller.",
+  company_free_ads_limit:
+    "Number of free advertisements per company seller.",
+  company_priority_ads_limit:
+    "Company advertisements covered by the Priority arrangement.",
+  promotion_duration_days:
+    "Duration of an individual paid promotion in days.",
+} as const;
 
-type SettingKey = (typeof ALLOWED_SETTINGS)[number];
+type SettingKey = keyof typeof SETTING_DESCRIPTIONS;
+type AdvertisingSettings = Record<SettingKey, number>;
+
+const ALLOWED_SETTINGS = Object.keys(
+  SETTING_DESCRIPTIONS
+) as SettingKey[];
 
 const LIMITS: Record<
   SettingKey,
@@ -22,22 +40,22 @@ const LIMITS: Record<
 > = {
   individual_premium_price: {
     min: 1,
-    max: 1000000,
+    max: 1_000_000,
     decimals: 2,
   },
   individual_priority_price: {
     min: 1,
-    max: 1000000,
+    max: 1_000_000,
     decimals: 2,
   },
   individual_top_priority_price: {
     min: 1,
-    max: 1000000,
+    max: 1_000_000,
     decimals: 2,
   },
   company_top_priority_monthly_price: {
     min: 1,
-    max: 10000000,
+    max: 10_000_000,
     decimals: 2,
   },
   business_transaction_fee_percent: {
@@ -45,17 +63,33 @@ const LIMITS: Record<
     max: 100,
     decimals: 2,
   },
+  individual_free_ads_limit: {
+    min: 0,
+    max: 1_000_000,
+    decimals: 0,
+  },
+  company_free_ads_limit: {
+    min: 0,
+    max: 1_000_000,
+    decimals: 0,
+  },
+  company_priority_ads_limit: {
+    min: 0,
+    max: 1_000_000,
+    decimals: 0,
+  },
+  promotion_duration_days: {
+    min: 1,
+    max: 3650,
+    decimals: 0,
+  },
 };
 
 function base64UrlToBytes(value: string): Uint8Array {
-  const normalized = value
-    .replace(/-/g, "+")
-    .replace(/_/g, "/");
-
-  const padded = normalized.padEnd(
-    normalized.length + ((4 - (normalized.length % 4)) % 4),
-    "="
-  );
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded =
+    normalized +
+    "=".repeat((4 - (normalized.length % 4)) % 4);
 
   const binary = atob(padded);
 
@@ -65,12 +99,14 @@ function base64UrlToBytes(value: string): Uint8Array {
 }
 
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
-  const result = new ArrayBuffer(bytes.byteLength);
-  new Uint8Array(result).set(bytes);
-  return result;
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return buffer;
 }
 
-async function isAdministrator(request: NextRequest) {
+async function isAdministrator(
+  request: NextRequest
+): Promise<boolean> {
   const secret = process.env.ADMIN_SESSION_SECRET;
   const session = request.cookies.get(COOKIE_NAME)?.value;
 
@@ -80,7 +116,6 @@ async function isAdministrator(request: NextRequest) {
   if (parts.length !== 2) return false;
 
   const [payload, signature] = parts;
-
   if (!payload || !signature) return false;
 
   try {
@@ -108,13 +143,23 @@ async function isAdministrator(request: NextRequest) {
     );
 
     return (
-      decoded.email === "admin@bestsalesgh.com" &&
+      decoded.email === ADMIN_EMAIL &&
       typeof decoded.expiresAt === "number" &&
       decoded.expiresAt > Date.now()
     );
   } catch {
     return false;
   }
+}
+
+function jsonError(message: string, status: number) {
+  return NextResponse.json(
+    { success: false, error: message },
+    {
+      status,
+      headers: { "Cache-Control": "no-store" },
+    }
+  );
 }
 
 function getSupabaseConfig() {
@@ -131,8 +176,41 @@ function getSupabaseConfig() {
   };
 }
 
-function jsonError(message: string, status: number) {
-  return NextResponse.json({ success: false, error: message }, { status });
+async function databaseRequest(
+  path: string,
+  serviceKey: string,
+  options: RequestInit = {}
+) {
+  const { url } = getSupabaseConfig();
+
+  return fetch(`${url}/rest/v1/${path}`, {
+    ...options,
+    headers: {
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+      ...options.headers,
+    },
+    cache: "no-store",
+  });
+}
+
+function rowsToSettings(
+  rows: { setting_key: string; setting_value: number | string }[]
+): Partial<AdvertisingSettings> {
+  const settings: Partial<AdvertisingSettings> = {};
+
+  for (const row of rows) {
+    if (ALLOWED_SETTINGS.includes(row.setting_key as SettingKey)) {
+      const key = row.setting_key as SettingKey;
+      const value = Number(row.setting_value);
+
+      if (Number.isFinite(value)) {
+        settings[key] = value;
+      }
+    }
+  }
+
+  return settings;
 }
 
 export async function GET(request: NextRequest) {
@@ -141,28 +219,30 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const { url, serviceKey } = getSupabaseConfig();
+    const { serviceKey } = getSupabaseConfig();
+    const keys = ALLOWED_SETTINGS.join(",");
 
-    const response = await fetch(
-      `${url}/rest/v1/advertising_settings?select=setting_key,setting_value,description,updated_at&setting_key=in.(${ALLOWED_SETTINGS.join(",")})`,
-      {
-        headers: {
-          apikey: serviceKey,
-          Authorization: `Bearer ${serviceKey}`,
-        },
-        cache: "no-store",
-      }
+    const response = await databaseRequest(
+      `advertising_settings?select=setting_key,setting_value,description,updated_at&setting_key=in.(${keys})`,
+      serviceKey
     );
 
     if (!response.ok) {
-      console.error("Settings load failed:", await response.text());
+      console.error(
+        "Advertising settings load failed:",
+        await response.text()
+      );
       return jsonError("Unable to load advertising settings.", 502);
     }
 
     const rows = await response.json();
 
     return NextResponse.json(
-      { success: true, settings: rows },
+      {
+        success: true,
+        settings: rowsToSettings(rows),
+        rows,
+      },
       { headers: { "Cache-Control": "no-store" } }
     );
   } catch (error) {
@@ -202,7 +282,7 @@ export async function PUT(request: NextRequest) {
     )
   ) {
     return jsonError(
-      "Submit exactly the five supported advertising settings.",
+      "Submit all nine supported advertising settings.",
       400
     );
   }
@@ -210,6 +290,8 @@ export async function PUT(request: NextRequest) {
   const rows: {
     setting_key: SettingKey;
     setting_value: number;
+    description: string;
+    updated_at: string;
   }[] = [];
 
   for (const key of ALLOWED_SETTINGS) {
@@ -232,44 +314,49 @@ export async function PUT(request: NextRequest) {
       return jsonError(`Invalid value for ${key}.`, 400);
     }
 
-    rows.push({ setting_key: key, setting_value: value });
+    rows.push({
+      setting_key: key,
+      setting_value: value,
+      description: SETTING_DESCRIPTIONS[key],
+      updated_at: new Date().toISOString(),
+    });
   }
 
   try {
-    const { url, serviceKey } = getSupabaseConfig();
+    const { serviceKey } = getSupabaseConfig();
 
-    const response = await fetch(
-      `${url}/rest/v1/advertising_settings?on_conflict=setting_key`,
+    const response = await databaseRequest(
+      "advertising_settings?on_conflict=setting_key",
+      serviceKey,
       {
         method: "POST",
         headers: {
-          apikey: serviceKey,
-          Authorization: `Bearer ${serviceKey}`,
           "Content-Type": "application/json",
           Prefer: "resolution=merge-duplicates,return=representation",
         },
-        body: JSON.stringify(
-          rows.map((row) => ({
-            ...row,
-            updated_at: new Date().toISOString(),
-          }))
-        ),
-        cache: "no-store",
+        body: JSON.stringify(rows),
       }
     );
 
     if (!response.ok) {
-      console.error("Settings save failed:", await response.text());
+      console.error(
+        "Advertising settings save failed:",
+        await response.text()
+      );
       return jsonError("Unable to save advertising settings.", 502);
     }
 
-    const saved = await response.json();
+    const savedRows = await response.json();
 
-    return NextResponse.json({
-      success: true,
-      message: "Advertising settings saved.",
-      settings: saved,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        message: "Advertising settings saved.",
+        settings: rowsToSettings(savedRows),
+        rows: savedRows,
+      },
+      { headers: { "Cache-Control": "no-store" } }
+    );
   } catch (error) {
     console.error("Advertising settings PUT error:", error);
     return jsonError("Server configuration or database error.", 500);
