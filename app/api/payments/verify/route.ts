@@ -1,14 +1,54 @@
+
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const paystackSecret = process.env.PAYSTACK_SECRET_KEY;
+type PromotionRecord = {
+  id: string;
+  user_id: string;
+  listing_id: number;
+  package_id: string;
+  amount: number | string;
+  currency_code: string;
+  payment_reference: string | null;
+  payment_status: string;
+  promotion_status: string;
+  duration_days: number;
+  duration_months: number | null;
+  starts_at: string | null;
+  ends_at: string | null;
+};
+
+const ALLOWED_MONTHS = [1, 2, 3, 6, 12] as const;
+
+function addMonths(date: Date, months: number): Date {
+  const result = new Date(date);
+  const originalDay = result.getUTCDate();
+
+  result.setUTCDate(1);
+  result.setUTCMonth(result.getUTCMonth() + months);
+
+  const lastDayOfTargetMonth = new Date(
+    Date.UTC(
+      result.getUTCFullYear(),
+      result.getUTCMonth() + 1,
+      0
+    )
+  ).getUTCDate();
+
+  result.setUTCDate(Math.min(originalDay, lastDayOfTargetMonth));
+
+  return result;
+}
 
 export async function POST(request: NextRequest) {
   try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const paystackSecret = process.env.PAYSTACK_SECRET_KEY;
+
     if (!supabaseUrl || !serviceRoleKey || !paystackSecret) {
       return NextResponse.json(
         { error: "Payment verification is not configured." },
@@ -17,6 +57,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+
     const reference =
       typeof body.reference === "string"
         ? body.reference.trim()
@@ -40,11 +81,14 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    // Find the promotion request saved before checkout.
-    const { data: promotion, error: lookupError } = await supabase
+    // Find the exact promotion associated with this reference.
+    const {
+      data: rawPromotion,
+      error: lookupError,
+    } = await (supabase as any)
       .from("promotion_requests")
       .select(
-        "id, user_id, listing_id, amount, currency_code, payment_reference, payment_status, promotion_status, duration_days"
+        "id, user_id, listing_id, package_id, amount, currency_code, payment_reference, payment_status, promotion_status, duration_days, duration_months, starts_at, ends_at"
       )
       .eq("payment_reference", reference)
       .maybeSingle();
@@ -58,14 +102,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!promotion) {
+    if (!rawPromotion) {
       return NextResponse.json(
-        { error: "No promotion request matches this payment reference." },
+        { error: "No promotion request matches this reference." },
         { status: 404 }
       );
     }
 
-    // Verify the transaction directly with Paystack.
+    const promotion =
+      rawPromotion as PromotionRecord;
+
+    // Verify directly with Paystack. Never trust the browser's
+    // success message as evidence of payment.
     const paystackResponse = await fetch(
       `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,
       {
@@ -85,6 +133,11 @@ export async function POST(request: NextRequest) {
       paystackResult.status !== true ||
       !paystackResult.data
     ) {
+      console.error(
+        "Paystack verification failed:",
+        paystackResult.message
+      );
+
       return NextResponse.json(
         { error: "Paystack could not verify this transaction." },
         { status: 502 }
@@ -92,6 +145,13 @@ export async function POST(request: NextRequest) {
     }
 
     const payment = paystackResult.data;
+
+    if (payment.reference !== reference) {
+      return NextResponse.json(
+        { error: "The verified payment reference does not match." },
+        { status: 400 }
+      );
+    }
 
     if (payment.status !== "success") {
       return NextResponse.json(
@@ -104,6 +164,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Compare the exact amount in pesewas and the expected currency.
     const expectedAmountPesewas = Math.round(
       Number(promotion.amount) * 100
     );
@@ -113,19 +174,21 @@ export async function POST(request: NextRequest) {
       expectedAmountPesewas <= 0 ||
       Number(payment.amount) !== expectedAmountPesewas
     ) {
+      console.error("Promotion payment amount mismatch:", {
+        reference,
+        expectedAmountPesewas,
+        receivedAmount: payment.amount,
+      });
+
       return NextResponse.json(
         { error: "The payment amount does not match the promotion price." },
         { status: 400 }
       );
     }
 
-    const expectedCurrency = String(
-      promotion.currency_code || "GHS"
-    ).toUpperCase();
-
     if (
-      String(payment.currency).toUpperCase() !== expectedCurrency ||
-      expectedCurrency !== "GHS"
+      String(payment.currency).toUpperCase() !== "GHS" ||
+      String(promotion.currency_code).toUpperCase() !== "GHS"
     ) {
       return NextResponse.json(
         { error: "The payment currency does not match the promotion." },
@@ -133,46 +196,140 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (promotion.payment_status === "SUCCESS") {
+    // Idempotency: never extend or activate an already paid promotion
+    // a second time just because the customer refreshes the callback.
+    if (promotion.payment_status === "PAID") {
       return NextResponse.json({
         success: true,
         status: "success",
         reference,
+        promotionStatus: promotion.promotion_status,
         message: "This promotion payment has already been verified.",
       });
     }
 
-    // Record verified payment. Keep the promotion pending for review;
-    // do not activate an advertisement until your status workflow
-    // and database constraints have been confirmed.
-    const { error: updateError } = await supabase
+    if (promotion.payment_status !== "PENDING") {
+      return NextResponse.json(
+        {
+          success: false,
+          status: promotion.payment_status,
+          message:
+            "This promotion payment is not pending. Please contact support.",
+        },
+        { status: 409 }
+      );
+    }
+
+    // Check that this is one of the supported new monthly packages.
+    const packageId = promotion.package_id;
+    const validPackages = [
+      "premium",
+      "priority",
+      "top-priority",
+    ];
+
+    if (!validPackages.includes(packageId)) {
+      return NextResponse.json(
+        {
+          error:
+            "This payment belongs to an older promotion package. Contact support to have it reviewed.",
+        },
+        { status: 409 }
+      );
+    }
+
+    const durationMonths = Number(promotion.duration_months);
+
+    if (
+      !ALLOWED_MONTHS.includes(
+        durationMonths as (typeof ALLOWED_MONTHS)[number]
+      )
+    ) {
+      return NextResponse.json(
+        { error: "The saved promotion duration is invalid." },
+        { status: 400 }
+      );
+    }
+
+    // Start and end times are calculated on the server.
+    const startsAt = new Date();
+    const endsAt = addMonths(startsAt, durationMonths);
+
+    // Activate only if the record is still pending. The conditional
+    // update prevents concurrent callback requests from extending it.
+    const {
+      data: updatedRows,
+      error: updateError,
+    } = await (supabase as any)
       .from("promotion_requests")
       .update({
-        payment_status: "SUCCESS",
-        promotion_status: "PENDING",
+        payment_status: "PAID",
+        promotion_status: "ACTIVE",
+        starts_at: startsAt.toISOString(),
+        ends_at: endsAt.toISOString(),
         updated_at: new Date().toISOString(),
       })
       .eq("id", promotion.id)
-      .eq("payment_reference", reference);
+      .eq("payment_reference", reference)
+      .eq("payment_status", "PENDING")
+      .select("id, payment_status, promotion_status, starts_at, ends_at");
 
     if (updateError) {
-      console.error("Promotion payment update failed:", updateError);
+      console.error(
+        "Promotion activation failed:",
+        updateError
+      );
 
       return NextResponse.json(
         {
           error:
-            "Paystack confirmed the payment, but we could not save its status. Contact support before paying again.",
+            "Paystack confirmed payment, but activation could not be saved. Contact support before paying again.",
         },
         { status: 500 }
       );
     }
 
+    // If another callback won the race, read the final state rather
+    // than applying the duration a second time.
+    if (!updatedRows || updatedRows.length === 0) {
+      const { data: current, error: currentError } = await (
+        supabase as any
+      )
+        .from("promotion_requests")
+        .select("payment_status, promotion_status, starts_at, ends_at")
+        .eq("id", promotion.id)
+        .maybeSingle();
+
+      if (currentError || !current || current.payment_status !== "PAID") {
+        return NextResponse.json(
+          {
+            error:
+              "The payment was verified, but the promotion status needs review.",
+          },
+          { status: 409 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        status: "success",
+        reference,
+        promotionStatus: current.promotion_status,
+        message: "This promotion payment has already been processed.",
+      });
+    }
+
+    const activated = updatedRows[0];
+
     return NextResponse.json({
       success: true,
       status: "success",
       reference,
-      message:
-        "Payment verified. Your promotion request is awaiting processing.",
+      promotionStatus: activated.promotion_status,
+      startsAt: activated.starts_at,
+      endsAt: activated.ends_at,
+      durationMonths,
+      message: "Payment verified and promotion activated successfully.",
     });
   } catch (error) {
     console.error("Promotion verification error:", error);
