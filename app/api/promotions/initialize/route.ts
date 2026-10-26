@@ -22,6 +22,7 @@ const PACKAGES = {
 } as const;
 
 const ALLOWED_MONTHS = [1, 2, 3, 6, 12] as const;
+const BTOOL_PRICE = 70;
 
 type Tier = keyof typeof PACKAGES;
 
@@ -104,6 +105,10 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
+    // The add-on is optional and can only be purchased
+    // together with an existing advertisement package.
+    const btoolSelected = body.btoolSelected === true;
+
     const listingId = String(body.listingId ?? "");
     const tier = String(body.tier ?? body.packageId ?? "");
     const durationMonths = Number(body.durationMonths);
@@ -146,7 +151,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify ownership of the selected listing.
+    // Verify that the selected advertisement belongs to this user.
     const {
       data: rawListing,
       error: listingError,
@@ -168,7 +173,7 @@ export async function POST(request: NextRequest) {
 
     const listing = rawListing as unknown as ListingRecord;
 
-    // Read pricing and discount configuration from Supabase.
+    // Read package prices and discount configuration from Supabase.
     const requiredKeys = [
       selectedTier.setting,
       "promotion_discount_percent",
@@ -233,7 +238,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Premium = 1, Priority = 2, Top Priority = 4.
+    // Package bits: Premium = 1, Priority = 2, Top Priority = 4.
     const baseAmount = roundMoney(monthlyPrice * durationMonths);
 
     const discountEligible =
@@ -241,11 +246,25 @@ export async function POST(request: NextRequest) {
 
     const appliedDiscount = discountEligible ? discountSetting : 0;
 
-    const finalAmount = roundMoney(
+    // The advertisement package price after its applicable discount.
+    const promotionFinalAmount = roundMoney(
       baseAmount * (1 - appliedDiscount / 100)
     );
 
-    if (!Number.isFinite(finalAmount) || finalAmount <= 0) {
+    // Never trust a price supplied by the browser.
+    const btoolAmount = btoolSelected ? BTOOL_PRICE : 0;
+
+    // Paystack receives the package amount plus the optional add-on.
+    const finalAmount = roundMoney(
+      promotionFinalAmount + btoolAmount
+    );
+
+    if (
+      !Number.isFinite(promotionFinalAmount) ||
+      promotionFinalAmount <= 0 ||
+      !Number.isFinite(finalAmount) ||
+      finalAmount <= 0
+    ) {
       return NextResponse.json(
         {
           error:
@@ -255,7 +274,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Paystack requires the amount in pesewas.
+    // Paystack expects Ghana cedis converted to pesewas.
     const amountPesewas = Math.round(finalAmount * 100);
 
     if (!Number.isSafeInteger(amountPesewas) || amountPesewas <= 0) {
@@ -267,6 +286,8 @@ export async function POST(request: NextRequest) {
 
     const reference = `bsgpromo_${randomBytes(16).toString("hex")}`;
 
+    // Store the combined amount because payment verification must
+    // compare Paystack's successful charge against this exact amount.
     const promotionInsert = {
       user_id: user.id,
       listing_id: numericListingId,
@@ -280,9 +301,9 @@ export async function POST(request: NextRequest) {
       payment_reference: reference,
       payment_status: "PENDING",
       promotion_status: "PENDING",
+      btool_selected: btoolSelected,
     };
 
-    // The database remains responsible for validating the real columns.
     const {
       data: rawPromotion,
       error: insertError,
@@ -329,6 +350,9 @@ export async function POST(request: NextRequest) {
             duration_months: durationMonths,
             base_amount: baseAmount,
             discount_percent: appliedDiscount,
+            promotion_final_amount: promotionFinalAmount,
+            btool_selected: btoolSelected,
+            btool_amount: btoolAmount,
             final_amount: finalAmount,
           },
         }),
@@ -369,6 +393,9 @@ export async function POST(request: NextRequest) {
         monthlyPrice,
         baseAmount,
         discountPercent: appliedDiscount,
+        promotionFinalAmount,
+        btoolSelected,
+        btoolAmount,
         finalAmount,
         currency: "GHS",
       },
