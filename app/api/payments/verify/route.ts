@@ -45,25 +45,25 @@ function addMonths(date: Date, months: number): Date {
 }
 
 async function ensureBtoolEntitlement(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   promotion: PromotionRecord,
   startsAt: string | null,
   endsAt: string | null
-) {
+): Promise<{ success: boolean }> {
   if (promotion.btool_selected !== true) {
-    return { success: true as const };
+    return { success: true };
   }
 
-  if (!endsAt) {
+  if (!promotion.payment_reference || !endsAt) {
     console.error(
-      "BTool entitlement has no promotion expiry:",
+      "BTool entitlement is missing its payment reference or expiry:",
       promotion.id
     );
 
-    return { success: false as const };
+    return { success: false };
   }
 
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .from("btool_entitlements")
     .upsert(
       {
@@ -79,10 +79,10 @@ async function ensureBtoolEntitlement(
 
   if (error) {
     console.error("BTool entitlement activation failed:", error);
-    return { success: false as const };
+    return { success: false };
   }
 
-  return { success: true as const };
+  return { success: true };
 }
 
 export async function POST(request: NextRequest) {
@@ -123,11 +123,11 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    // Find the exact promotion associated with this reference.
+    // Retrieve the saved promotion associated with this reference.
     const {
       data: rawPromotion,
       error: lookupError,
-    } = await (supabase as any)
+    } = await supabase
       .from("promotion_requests")
       .select(
         "id, user_id, listing_id, package_id, amount, currency_code, payment_reference, payment_status, promotion_status, duration_days, duration_months, starts_at, ends_at, btool_selected"
@@ -151,9 +151,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const promotion = rawPromotion as PromotionRecord;
+    const promotion = rawPromotion as unknown as PromotionRecord;
 
-    // Always verify directly with Paystack.
+    // Confirm payment directly with Paystack.
     const paystackResponse = await fetch(
       `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,
       {
@@ -204,7 +204,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify the exact total, including BTool when selected.
+    // Compare Paystack's actual amount with the saved total.
+    // The saved total includes GH₵70 when BTool was selected.
     const expectedAmountPesewas = Math.round(
       Number(promotion.amount) * 100
     );
@@ -236,8 +237,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Idempotency: on a repeated callback, repair a missing BTool
-    // entitlement if the promotion was already paid successfully.
+    // Repeated callbacks must not extend the promotion a second time.
+    // If entitlement creation previously failed, retry it safely.
     if (promotion.payment_status === "PAID") {
       const entitlement = await ensureBtoolEntitlement(
         supabase,
@@ -250,7 +251,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           {
             error:
-              "Payment is confirmed, but BTool access could not be saved. Please retry verification or contact support.",
+              "Payment is confirmed, but BTool access could not be saved. Retry verification or contact support.",
           },
           { status: 500 }
         );
@@ -309,14 +310,15 @@ export async function POST(request: NextRequest) {
 
     const startsAtDate = new Date();
     const endsAtDate = addMonths(startsAtDate, durationMonths);
+
     const startsAt = startsAtDate.toISOString();
     const endsAt = endsAtDate.toISOString();
 
-    // Activate only while the promotion is still pending.
+    // Mark the promotion paid only if it is still pending.
     const {
       data: updatedRows,
       error: updateError,
-    } = await (supabase as any)
+    } = await supabase
       .from("promotion_requests")
       .update({
         payment_status: "PAID",
@@ -342,11 +344,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // If another callback processed the payment, read its saved state.
+    // Handle another callback processing the same payment first.
     if (!updatedRows || updatedRows.length === 0) {
-      const { data: current, error: currentError } = await (
-        supabase as any
-      )
+      const { data: current, error: currentError } = await supabase
         .from("promotion_requests")
         .select(
           "payment_status, promotion_status, starts_at, ends_at"
@@ -397,7 +397,7 @@ export async function POST(request: NextRequest) {
 
     const activated = updatedRows[0];
 
-    // Grant BTool only after Paystack verification and promotion activation.
+    // Create the entitlement only for a verified BTool purchase.
     const entitlement = await ensureBtoolEntitlement(
       supabase,
       promotion,
