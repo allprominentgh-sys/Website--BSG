@@ -28,12 +28,20 @@ const ALLOWED_MONTHS = [1, 2, 3, 6, 12] as const;
 
 type Tier = keyof typeof PACKAGES;
 
-function money(value: number): number {
+type AdvertisingSettingRow = {
+  setting_key: string;
+  setting_value: number | string;
+};
+
+function roundMoney(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
 export async function POST(request: NextRequest) {
-  let supabase: ReturnType<typeof createClient> | null = null;
+  let supabase:
+    | ReturnType<typeof createClient>
+    | null = null;
+
   let promotionId: string | null = null;
   let userId: string | null = null;
 
@@ -50,14 +58,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Authenticate the signed-in customer.
     const authorization = request.headers.get("authorization");
+
     const accessToken = authorization?.startsWith("Bearer ")
       ? authorization.slice(7)
       : "";
 
     if (!accessToken) {
       return NextResponse.json(
-        { error: "Please sign in before promoting an advertisement." },
+        {
+          error: "Please sign in before promoting an advertisement.",
+        },
         { status: 401 }
       );
     }
@@ -76,7 +88,9 @@ export async function POST(request: NextRequest) {
 
     if (userError || !user) {
       return NextResponse.json(
-        { error: "Your session has expired. Please sign in again." },
+        {
+          error: "Your session has expired. Please sign in again.",
+        },
         { status: 401 }
       );
     }
@@ -90,6 +104,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate the customer's selection.
     const body = await request.json();
 
     const listingId = String(body.listingId ?? "");
@@ -107,7 +122,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Please refresh the page and select Premium, Priority or Top Priority.",
+            "Choose Premium, Priority or Top Priority. Refresh the page and try again.",
         },
         { status: 400 }
       );
@@ -119,48 +134,74 @@ export async function POST(request: NextRequest) {
       )
     ) {
       return NextResponse.json(
-        { error: "Choose a duration of 1, 2, 3, 6 or 12 months." },
+        {
+          error: "Choose a duration of 1, 2, 3, 6 or 12 months.",
+        },
         { status: 400 }
       );
     }
 
     const selectedTier = PACKAGES[tier as Tier];
+    const numericListingId = Number(listingId);
 
+    if (!Number.isSafeInteger(numericListingId)) {
+      return NextResponse.json(
+        { error: "The advertisement ID is invalid." },
+        { status: 400 }
+      );
+    }
+
+    // Confirm the signed-in seller owns this advertisement.
     const { data: listing, error: listingError } = await supabase
       .from("listings")
       .select("id, seller_id, title")
-      .eq("id", Number(listingId))
+      .eq("id", numericListingId)
       .eq("seller_id", user.id)
       .maybeSingle();
 
     if (listingError || !listing) {
       return NextResponse.json(
-        { error: "The selected advertisement could not be verified." },
+        {
+          error: "The selected advertisement could not be verified.",
+        },
         { status: 404 }
       );
     }
 
-    // All prices and discount rules are read from the database.
+    // Load prices and discount rules from Supabase, not from the browser.
     const requiredKeys = [
       selectedTier.setting,
       "promotion_discount_percent",
       "promotion_discount_packages",
     ];
 
-    const { data: settings, error: settingsError } = await supabase
+    const {
+      data: rawSettings,
+      error: settingsError,
+    } = await supabase
       .from("advertising_settings")
       .select("setting_key, setting_value")
       .in("setting_key", requiredKeys);
 
-    if (settingsError || !settings) {
-      console.error("Promotion settings read failed:", settingsError);
+    if (settingsError || !rawSettings) {
+      console.error(
+        "Promotion settings read failed:",
+        settingsError
+      );
+
       return NextResponse.json(
-        { error: "Could not load promotion pricing. Please try again later." },
+        {
+          error:
+            "Could not load promotion prices. Please try again later.",
+        },
         { status: 500 }
       );
     }
 
-    const settingMap = new Map(
+    // Explicit row typing fixes the TypeScript error shown in Vercel.
+    const settings = rawSettings as AdvertisingSettingRow[];
+
+    const settingMap = new Map<string, number>(
       settings.map((item) => [
         item.setting_key,
         Number(item.setting_value),
@@ -168,13 +209,17 @@ export async function POST(request: NextRequest) {
     );
 
     const monthlyPrice = settingMap.get(selectedTier.setting);
-    const discountSetting = settingMap.get("promotion_discount_percent");
-    const eligiblePackages = settingMap.get("promotion_discount_packages");
+    const discountSetting = settingMap.get(
+      "promotion_discount_percent"
+    );
+    const eligiblePackages = settingMap.get(
+      "promotion_discount_packages"
+    );
 
     if (
       monthlyPrice === undefined ||
       !Number.isFinite(monthlyPrice) ||
-      monthlyPrice < 0 ||
+      monthlyPrice <= 0 ||
       discountSetting === undefined ||
       !Number.isFinite(discountSetting) ||
       discountSetting < 0 ||
@@ -184,41 +229,73 @@ export async function POST(request: NextRequest) {
       eligiblePackages < 0 ||
       eligiblePackages > 7
     ) {
+      console.error("Invalid promotion settings:", {
+        monthlyPrice,
+        discountSetting,
+        eligiblePackages,
+      });
+
       return NextResponse.json(
-        { error: "Promotion pricing settings are invalid. Contact support." },
+        {
+          error:
+            "Promotion pricing settings are invalid. Please contact support.",
+        },
         { status: 500 }
       );
     }
 
-    const baseAmount = money(monthlyPrice * durationMonths);
-    const packageIsDiscountEligible =
+    // Premium = 1, Priority = 2, Top Priority = 4.
+    // Combined selections use bitmasks: 3, 5, 6 or 7.
+    const baseAmount = roundMoney(
+      monthlyPrice * durationMonths
+    );
+
+    const discountEligible =
       (eligiblePackages & selectedTier.bit) !== 0;
 
-    const appliedDiscount = packageIsDiscountEligible
+    const appliedDiscount = discountEligible
       ? discountSetting
       : 0;
 
-    const finalAmount = money(
+    const finalAmount = roundMoney(
       baseAmount * (1 - appliedDiscount / 100)
     );
 
-    if (finalAmount <= 0) {
+    if (!Number.isFinite(finalAmount) || finalAmount <= 0) {
       return NextResponse.json(
         {
           error:
-            "The calculated payment must be greater than GH₵0. Please review the promotion settings.",
+            "The final payment must be greater than GH₵0. Check the admin pricing settings.",
         },
         { status: 400 }
       );
     }
 
-    const reference = `bsgpromo_${randomBytes(16).toString("hex")}`;
+    // Paystack requires the amount in pesewas.
+    const amountPesewas = Math.round(finalAmount * 100);
 
-    const { data: promotion, error: insertError } = await supabase
+    if (
+      !Number.isSafeInteger(amountPesewas) ||
+      amountPesewas <= 0
+    ) {
+      return NextResponse.json(
+        { error: "The calculated payment amount is invalid." },
+        { status: 400 }
+      );
+    }
+
+    const reference =
+      `bsgpromo_${randomBytes(16).toString("hex")}`;
+
+    // Save the request before initializing Paystack.
+    const {
+      data: promotion,
+      error: insertError,
+    } = await supabase
       .from("promotion_requests")
       .insert({
         user_id: user.id,
-        listing_id: Number(listingId),
+        listing_id: numericListingId,
         package_id: tier,
         duration_days: durationMonths * 30,
         duration_months: durationMonths,
@@ -234,7 +311,11 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (insertError || !promotion) {
-      console.error("Promotion request save failed:", insertError);
+      console.error(
+        "Promotion request save failed:",
+        insertError
+      );
+
       return NextResponse.json(
         { error: "Could not save your promotion request." },
         { status: 500 }
@@ -256,7 +337,7 @@ export async function POST(request: NextRequest) {
         },
         body: JSON.stringify({
           email: user.email,
-          amount: Math.round(finalAmount * 100),
+          amount: amountPesewas,
           currency: "GHS",
           reference,
           callback_url: callbackUrl,
@@ -294,13 +375,17 @@ export async function POST(request: NextRequest) {
         .eq("user_id", user.id);
 
       return NextResponse.json(
-        { error: "Paystack could not start payment. Please try again." },
+        {
+          error:
+            "Paystack could not start payment. Please try again.",
+        },
         { status: 502 }
       );
     }
 
     return NextResponse.json({
-      authorizationUrl: paystackResult.data.authorization_url,
+      authorizationUrl:
+        paystackResult.data.authorization_url,
       reference,
       pricing: {
         tier,
@@ -313,10 +398,13 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Promotion initialization error:", error);
+    console.error(
+      "Promotion initialization error:",
+      error
+    );
 
-    // If initialization failed unexpectedly after saving the request,
-    // mark it failed rather than leaving a misleading pending request.
+    // Prevent a saved request from remaining pending if an
+    // unexpected error occurs after it was created.
     if (supabase && promotionId && userId) {
       try {
         await supabase
@@ -326,12 +414,18 @@ export async function POST(request: NextRequest) {
           .eq("user_id", userId)
           .eq("payment_status", "PENDING");
       } catch (updateError) {
-        console.error("Could not update failed promotion:", updateError);
+        console.error(
+          "Could not update failed promotion:",
+          updateError
+        );
       }
     }
 
     return NextResponse.json(
-      { error: "An unexpected error occurred while preparing payment." },
+      {
+        error:
+          "An unexpected error occurred while preparing payment.",
+      },
       { status: 500 }
     );
   }
