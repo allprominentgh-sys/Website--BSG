@@ -1,3 +1,4 @@
+
 import Link from "next/link";
 import LatestListings from "@/components/LatestListings";
 
@@ -244,7 +245,7 @@ export default function HomePage() {
 
       <footer className="bg-slate-950 text-white">
         <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-          <div className="grid gap-10 md:grid-cols-4">
+          <div className="grid gap-10 sm:grid-cols-2 md:grid-cols-4">
             <div className="md:col-span-2">
               <div className="text-2xl font-black">BEST SALES GHANA</div>
               <p className="mt-3 max-w-md text-sm leading-6 text-slate-400">
@@ -278,7 +279,45 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="mt-10 border-t border-white/10 pt-6 text-center text-sm text-slate-500">
+          {/* Follow Us */}
+          <div className="mt-10 border-t border-white/10 pt-8">
+            <h3 className="text-lg font-black">Follow Us</h3>
+            <p className="mt-2 text-sm text-slate-400">
+              Connect with BEST SALES GHANA on social media.
+            </p>
+
+            <div className="mt-5 flex flex-wrap gap-3">
+              <a
+                href="https://www.facebook.com/allprominentgh/"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Follow BEST SALES GHANA on Facebook (opens in a new tab)"
+                className="inline-flex items-center gap-3 rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm font-bold text-white transition hover:border-blue-400 hover:bg-blue-700"
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-current">
+                  <path d="M13.5 21v-8.2h2.8l.4-3.2h-3.2V7.5c0-.9.3-1.5 1.6-1.5h1.7V3.1c-.3 0-1.3-.1-2.5-.1-2.5 0-4.2 1.5-4.2 4.3v2.3H7.3v3.2h2.8V21h3.4Z" />
+                </svg>
+                Facebook
+              </a>
+
+              <a
+                href="https://www.instagram.com/allprominent_/"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Follow BEST SALES GHANA on Instagram (opens in a new tab)"
+                className="inline-flex items-center gap-3 rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm font-bold text-white transition hover:border-pink-400 hover:bg-pink-600"
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current" strokeWidth="1.8">
+                  <rect x="3" y="3" width="18" height="18" rx="5" />
+                  <circle cx="12" cy="12" r="4" />
+                  <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
+                </svg>
+                Instagram
+              </a>
+            </div>
+          </div>
+
+          <div className="mt-8 border-t border-white/10 pt-6 text-center text-sm text-slate-500">
             © 2026 All Prominent Ghana Limited. All rights reserved.
           </div>
         </div>
