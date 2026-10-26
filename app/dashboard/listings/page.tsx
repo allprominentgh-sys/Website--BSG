@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabaseBrowser } from "@/supabase-browser";
 
 type Listing = {
-  id: string | number;
+  id: number;
   title: string | null;
   price: number | null;
   currency_code?: string | null;
@@ -23,7 +23,7 @@ type FilterStatus = "all" | "active" | "pending" | "inactive";
 export default function MyListingsPage() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
-  const [deletingId, setDeletingId] = useState<string | number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterStatus>("all");
   const [message, setMessage] = useState("");
@@ -34,10 +34,12 @@ export default function MyListingsPage() {
     setError("");
 
     try {
+      const supabase = supabaseBrowser();
+
       const {
         data: { user },
         error: authError,
-      } = await supabaseBrowser.auth.getUser();
+      } = await supabase.auth.getUser();
 
       if (authError) throw authError;
 
@@ -47,7 +49,7 @@ export default function MyListingsPage() {
         return;
       }
 
-      const { data, error: queryError } = await supabaseBrowser
+      const { data, error: queryError } = await supabase
         .from("listings")
         .select(
           "id, title, price, currency_code, currency, location, status, featured, created_at, category"
@@ -63,7 +65,7 @@ export default function MyListingsPage() {
       setError(
         err instanceof Error
           ? err.message
-          : "Unable to load your listings. Please try again."
+          : "Unable to load listings. Please try again."
       );
     } finally {
       setLoading(false);
@@ -86,7 +88,7 @@ export default function MyListingsPage() {
         (listing.title ?? "").toLowerCase().includes(term) ||
         (listing.location ?? "").toLowerCase().includes(term) ||
         (listing.category ?? "").toLowerCase().includes(term) ||
-        String(listing.id).toLowerCase().includes(term);
+        String(listing.id).includes(term);
 
       const status = getStatus(listing);
 
@@ -121,21 +123,25 @@ export default function MyListingsPage() {
   );
 
   async function deleteListing(listing: Listing) {
-    const confirmed = window.confirm(
-      `Are you sure you want to delete "${listing.title || "this listing"}"? This action cannot be undone.`
-    );
-
-    if (!confirmed) return;
+    if (
+      !window.confirm(
+        `Are you sure you want to delete "${listing.title || "this listing"}"? This cannot be undone.`
+      )
+    ) {
+      return;
+    }
 
     setDeletingId(listing.id);
     setError("");
     setMessage("");
 
     try {
+      const supabase = supabaseBrowser();
+
       const {
         data: { user },
         error: authError,
-      } = await supabaseBrowser.auth.getUser();
+      } = await supabase.auth.getUser();
 
       if (authError) throw authError;
 
@@ -143,7 +149,7 @@ export default function MyListingsPage() {
         throw new Error("Please log in before deleting a listing.");
       }
 
-      const { data, error: deleteError } = await supabaseBrowser
+      const { data, error: deleteError } = await supabase
         .from("listings")
         .delete()
         .eq("id", listing.id)
@@ -154,7 +160,7 @@ export default function MyListingsPage() {
 
       if (!data || data.length === 0) {
         throw new Error(
-          "The listing was not deleted. Please check your account permissions."
+          "The listing was not deleted. Check your permissions and try again."
         );
       }
 
@@ -167,7 +173,7 @@ export default function MyListingsPage() {
       setError(
         err instanceof Error
           ? err.message
-          : "Unable to delete the listing."
+          : "Unable to delete this listing."
       );
     } finally {
       setDeletingId(null);
@@ -175,28 +181,25 @@ export default function MyListingsPage() {
   }
 
   function formatPrice(listing: Listing) {
-    if (listing.price === null || listing.price === undefined) {
-      return "Price not set";
-    }
+    if (listing.price == null) return "Price not set";
 
-    const currency = listing.currency_code || listing.currency || "GHS";
+    const currency = (
+      listing.currency_code ||
+      listing.currency ||
+      "GHS"
+    ).toUpperCase();
+
     const amount = new Intl.NumberFormat("en-GH", {
       maximumFractionDigits: 2,
     }).format(listing.price);
 
-    const symbol =
-      currency.toUpperCase() === "GHS"
-        ? "GH₵"
-        : `${currency.toUpperCase()} `;
-
-    return `${symbol}${amount}`;
+    return currency === "GHS" ? `GH₵${amount}` : `${currency} ${amount}`;
   }
 
   function formatDate(date?: string | null) {
     if (!date) return "Date unavailable";
 
     const parsed = new Date(date);
-
     if (Number.isNaN(parsed.getTime())) return "Date unavailable";
 
     return parsed.toLocaleDateString("en-GH", {
@@ -230,7 +233,7 @@ export default function MyListingsPage() {
               My Listings
             </h1>
             <p className="mt-1 text-sm text-gray-600">
-              Manage your ads, view their status, and promote your listings.
+              Manage your ads and promote your listings.
             </p>
           </div>
 
@@ -301,7 +304,6 @@ export default function MyListingsPage() {
           >
             Search your listings
           </label>
-
           <input
             id="listing-search"
             type="search"
@@ -328,7 +330,6 @@ export default function MyListingsPage() {
                 ? "Post your first ad to start reaching customers."
                 : "Try another search term or status filter."}
             </p>
-
             {listings.length === 0 && (
               <Link
                 href="/sell"
@@ -347,7 +348,7 @@ export default function MyListingsPage() {
 
               return (
                 <article
-                  key={String(listing.id)}
+                  key={listing.id}
                   className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5"
                 >
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -383,7 +384,7 @@ export default function MyListingsPage() {
                       </p>
 
                       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
-                        <span>Listing ID: {String(listing.id)}</span>
+                        <span>Listing ID: {listing.id}</span>
                         {listing.location && (
                           <span>Location: {listing.location}</span>
                         )}
