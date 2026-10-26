@@ -6,6 +6,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabaseBrowser } from "@/supabase-browser";
 
+type Tier = "top-priority" | "priority" | "premium";
+
 type Listing = {
   id: number;
   title: string | null;
@@ -28,6 +30,13 @@ type ListingImage = {
   image_url: string;
 };
 
+type Promotion = {
+  listing_id: number;
+  package_id: string;
+  starts_at: string;
+  ends_at: string;
+};
+
 type CategoryData = {
   name: string;
   icon: string;
@@ -36,6 +45,26 @@ type CategoryData = {
   searchTerms: string[];
 };
 
+const TIER_ORDER: Record<Tier, number> = {
+  "top-priority": 0,
+  priority: 1,
+  premium: 2,
+};
+
+const TIER_LABEL: Record<Tier, string> = {
+  "top-priority": "TOP PRIORITY",
+  priority: "PRIORITY",
+  premium: "PREMIUM",
+};
+
+function isTier(value: string): value is Tier {
+  return (
+    value === "top-priority" ||
+    value === "priority" ||
+    value === "premium"
+  );
+}
+
 const categoryData: Record<string, CategoryData> = {
   vehicles: {
     name: "Vehicles",
@@ -43,14 +72,8 @@ const categoryData: Record<string, CategoryData> = {
     description:
       "Buy and sell cars, trucks, buses, motorcycles and other vehicles across Ghana.",
     subcategories: [
-      "Cars",
-      "SUVs",
-      "Trucks",
-      "Buses",
-      "Motorcycles",
-      "Commercial Vehicles",
-      "Heavy Equipment",
-      "Vehicle Parts",
+      "Cars", "SUVs", "Trucks", "Buses", "Motorcycles",
+      "Commercial Vehicles", "Heavy Equipment", "Vehicle Parts",
       "Vehicle Accessories",
     ],
     searchTerms: ["vehicle", "vehicles", "car", "cars", "automobile"],
@@ -61,14 +84,8 @@ const categoryData: Record<string, CategoryData> = {
     description:
       "Find houses, apartments, land, commercial properties and real estate opportunities.",
     subcategories: [
-      "Houses",
-      "Apartments",
-      "Land",
-      "Commercial Property",
-      "Office Space",
-      "Shops",
-      "Warehouses",
-      "Hotels",
+      "Houses", "Apartments", "Land", "Commercial Property",
+      "Office Space", "Shops", "Warehouses", "Hotels",
       "Industrial Property",
     ],
     searchTerms: ["property", "real estate", "properties"],
@@ -79,16 +96,9 @@ const categoryData: Record<string, CategoryData> = {
     description:
       "Shop phones, laptops, televisions, computers and other electronic products.",
     subcategories: [
-      "Phones",
-      "Tablets",
-      "Laptops",
-      "Desktop Computers",
-      "Televisions",
-      "Cameras",
-      "Audio Equipment",
-      "Gaming",
-      "Computer Accessories",
-      "Phone Accessories",
+      "Phones", "Tablets", "Laptops", "Desktop Computers",
+      "Televisions", "Cameras", "Audio Equipment", "Gaming",
+      "Computer Accessories", "Phone Accessories",
     ],
     searchTerms: ["electronics", "electronic"],
   },
@@ -98,17 +108,10 @@ const categoryData: Record<string, CategoryData> = {
     description:
       "Discover industrial machinery, printing equipment, construction equipment and tools.",
     subcategories: [
-      "Industrial Machinery",
-      "Printing Equipment",
-      "DTF Printing Machines",
-      "Eco-Solvent Printers",
-      "Construction Equipment",
-      "Mining Equipment",
-      "Generators",
-      "Factory Equipment",
-      "Packaging Machines",
-      "Machine Parts",
-      "Tools",
+      "Industrial Machinery", "Printing Equipment",
+      "DTF Printing Machines", "Eco-Solvent Printers",
+      "Construction Equipment", "Mining Equipment", "Generators",
+      "Factory Equipment", "Packaging Machines", "Machine Parts", "Tools",
     ],
     searchTerms: ["machinery", "machine", "machines", "industrial equipment"],
   },
@@ -118,16 +121,9 @@ const categoryData: Record<string, CategoryData> = {
     description:
       "Agricultural machinery, farming equipment, livestock and farming opportunities.",
     subcategories: [
-      "Tractors",
-      "Farm Machinery",
-      "Irrigation",
-      "Poultry Equipment",
-      "Livestock",
-      "Seeds",
-      "Fertilizer",
-      "Processing Equipment",
-      "Greenhouse Equipment",
-      "Farm Tools",
+      "Tractors", "Farm Machinery", "Irrigation", "Poultry Equipment",
+      "Livestock", "Seeds", "Fertilizer", "Processing Equipment",
+      "Greenhouse Equipment", "Farm Tools",
     ],
     searchTerms: ["agriculture", "agricultural", "farming", "farm"],
   },
@@ -137,16 +133,9 @@ const categoryData: Record<string, CategoryData> = {
     description:
       "Find professional, business, technical, transport and other services across Ghana.",
     subcategories: [
-      "Business Services",
-      "Construction",
-      "Graphic Design",
-      "IT Services",
-      "Transport",
-      "Delivery",
-      "Repairs",
-      "Cleaning",
-      "Professional Services",
-      "Photography",
+      "Business Services", "Construction", "Graphic Design", "IT Services",
+      "Transport", "Delivery", "Repairs", "Cleaning",
+      "Professional Services", "Photography",
     ],
     searchTerms: ["services", "service"],
   },
@@ -161,7 +150,7 @@ function formatPrice(
     return "Price on request";
   }
 
-  const code = currencyCode || currency || "GHS";
+  const code = (currencyCode || currency || "GHS").toUpperCase();
 
   try {
     return new Intl.NumberFormat("en-GH", {
@@ -170,7 +159,7 @@ function formatPrice(
       maximumFractionDigits: 2,
     }).format(price);
   } catch {
-    return `${code} ${Number(price).toLocaleString()}`;
+    return `${code} ${Number(price).toLocaleString("en-GH")}`;
   }
 }
 
@@ -191,13 +180,13 @@ function getListingLocation(listing: Listing) {
 export default function CategoryPage() {
   const params = useParams<{ category: string }>();
   const categorySlug = String(params.category || "").toLowerCase();
-
   const data = categoryData[categorySlug];
 
   const supabase = useMemo(() => supabaseBrowser(), []);
 
   const [listings, setListings] = useState<Listing[]>([]);
   const [images, setImages] = useState<Record<number, string>>({});
+  const [promotions, setPromotions] = useState<Record<number, Tier>>({});
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [selectedSubcategory, setSelectedSubcategory] = useState("");
@@ -214,42 +203,33 @@ export default function CategoryPage() {
     setErrorMessage("");
 
     try {
-      const { data: rows, error } = await supabase
-        .from("listings")
-        .select(
-          `
-          id,
-          title,
-          description,
-          price,
-          currency_code,
-          currency,
-          category,
-          subcategory,
-          location,
-          item_region,
-          item_city,
-          item_area,
-          featured,
-          created_at
-          `
-        )
-        .eq("status", "active")
-        .order("featured", { ascending: false })
-        .order("created_at", { ascending: false });
+      const [listingResult, promotionResult] = await Promise.all([
+        supabase
+          .from("listings")
+          .select(`
+            id, title, description, price, currency_code, currency,
+            category, subcategory, location, item_region, item_city,
+            item_area, featured, created_at
+          `)
+          .eq("status", "active")
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("active_listing_promotions")
+          .select("listing_id, package_id, starts_at, ends_at"),
+      ]);
 
-      if (error) {
-        console.error("Category listings error:", error);
+      if (listingResult.error) {
+        console.error("Category listings error:", listingResult.error);
         setErrorMessage(
           "We couldn't load listings right now. Please try again."
         );
         setListings([]);
         setImages({});
+        setPromotions({});
         return;
       }
 
-      const allListings = (rows || []) as Listing[];
-
+      const allListings = (listingResult.data || []) as Listing[];
       const categoryTerms = data.searchTerms.map((term) =>
         term.toLowerCase()
       );
@@ -266,14 +246,71 @@ export default function CategoryPage() {
         );
       });
 
-      setListings(categoryListings);
+      const now = Date.now();
+      const tierByListing: Record<number, Tier> = {};
 
-      if (categoryListings.length === 0) {
+      if (promotionResult.error) {
+        console.warn(
+          "Could not load active listing promotions:",
+          promotionResult.error.message
+        );
+      } else {
+        ((promotionResult.data || []) as Promotion[]).forEach((promotion) => {
+          if (
+            !isTier(promotion.package_id) ||
+            !Number.isFinite(Date.parse(promotion.starts_at)) ||
+            !Number.isFinite(Date.parse(promotion.ends_at)) ||
+            Date.parse(promotion.starts_at) > now ||
+            Date.parse(promotion.ends_at) <= now
+          ) {
+            return;
+          }
+
+          const listingId = Number(promotion.listing_id);
+
+          // Ignore promotions for listings that are not active in this category.
+          if (!categoryListings.some((item) => item.id === listingId)) {
+            return;
+          }
+
+          const tier = promotion.package_id;
+          const currentTier = tierByListing[listingId];
+
+          if (
+            !currentTier ||
+            TIER_ORDER[tier] < TIER_ORDER[currentTier]
+          ) {
+            tierByListing[listingId] = tier;
+          }
+        });
+      }
+
+      const sortedListings = [...categoryListings].sort((a, b) => {
+        const tierA = tierByListing[a.id];
+        const tierB = tierByListing[b.id];
+
+        if (tierA && !tierB) return -1;
+        if (!tierA && tierB) return 1;
+
+        if (tierA && tierB) {
+          const difference = TIER_ORDER[tierA] - TIER_ORDER[tierB];
+          if (difference !== 0) return difference;
+        }
+
+        const dateA = a.created_at ? Date.parse(a.created_at) || 0 : 0;
+        const dateB = b.created_at ? Date.parse(b.created_at) || 0 : 0;
+        return dateB - dateA;
+      });
+
+      setListings(sortedListings);
+      setPromotions(tierByListing);
+
+      if (sortedListings.length === 0) {
         setImages({});
         return;
       }
 
-      const listingIds = categoryListings.map((listing) => listing.id);
+      const listingIds = sortedListings.map((listing) => listing.id);
 
       const { data: imageRows, error: imageError } = await supabase
         .from("listing_images")
@@ -301,13 +338,14 @@ export default function CategoryPage() {
       );
       setListings([]);
       setImages({});
+      setPromotions({});
     } finally {
       setLoading(false);
     }
   }, [data, categorySlug, supabase]);
 
   useEffect(() => {
-    loadListings();
+    void loadListings();
   }, [loadListings]);
 
   const filteredListings = useMemo(() => {
@@ -353,9 +391,7 @@ export default function CategoryPage() {
           .join(" ")
           .toLowerCase();
 
-        if (!searchableText.includes(query)) {
-          return false;
-        }
+        if (!searchableText.includes(query)) return false;
       }
 
       return true;
@@ -425,7 +461,6 @@ export default function CategoryPage() {
           <Link href="/categories" className="font-bold text-cyan-100 hover:text-white">
             ← All Categories
           </Link>
-
           <div className="mt-8 flex flex-col gap-6 sm:flex-row sm:items-center">
             <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-3xl bg-white/15 text-6xl shadow-xl">
               {data.icon}
@@ -453,7 +488,6 @@ export default function CategoryPage() {
           <h2 className="mt-1 text-2xl font-black text-slate-900">
             {data.name} Subcategories
           </h2>
-
           <div className="mt-5 flex flex-wrap gap-3">
             <button
               type="button"
@@ -466,7 +500,6 @@ export default function CategoryPage() {
             >
               All Subcategories
             </button>
-
             {data.subcategories.map((subcategory) => (
               <button
                 key={subcategory}
@@ -497,7 +530,6 @@ export default function CategoryPage() {
           <p className="mt-1 text-sm text-slate-500">
             Search real seller listings by product, subcategory or location.
           </p>
-
           <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_220px_auto]">
             <input
               type="search"
@@ -506,31 +538,21 @@ export default function CategoryPage() {
               placeholder={`Search ${data.name.toLowerCase()}...`}
               className="min-w-0 rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-600"
             />
-
             <select
               value={selectedLocation}
               onChange={(event) => setSelectedLocation(event.target.value)}
               className="rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-blue-600"
             >
               <option value="">All Ghana</option>
-              <option value="Greater Accra">Greater Accra</option>
-              <option value="Ashanti">Ashanti</option>
-              <option value="Western">Western</option>
-              <option value="Central">Central</option>
-              <option value="Eastern">Eastern</option>
-              <option value="Volta">Volta</option>
-              <option value="Northern">Northern</option>
-              <option value="Bono">Bono</option>
-              <option value="Bono East">Bono East</option>
-              <option value="Ahafo">Ahafo</option>
-              <option value="Upper East">Upper East</option>
-              <option value="Upper West">Upper West</option>
-              <option value="Oti">Oti</option>
-              <option value="Savannah">Savannah</option>
-              <option value="North East">North East</option>
-              <option value="Western North">Western North</option>
+              {[
+                "Greater Accra", "Ashanti", "Western", "Central", "Eastern",
+                "Volta", "Northern", "Bono", "Bono East", "Ahafo",
+                "Upper East", "Upper West", "Oti", "Savannah",
+                "North East", "Western North",
+              ].map((region) => (
+                <option key={region} value={region}>{region}</option>
+              ))}
             </select>
-
             <button
               type="button"
               onClick={() => {
@@ -543,7 +565,6 @@ export default function CategoryPage() {
               Clear Filters
             </button>
           </div>
-
           <div className="mt-4 rounded-xl bg-blue-50 p-4">
             <p className="font-black text-slate-900">📍 Delivery in Ghana</p>
             <p className="mt-1 text-sm text-slate-600">
@@ -564,12 +585,9 @@ export default function CategoryPage() {
             <p className="mt-2 text-slate-500">
               {loading
                 ? "Loading active listings..."
-                : `${filteredListings.length} real listing${
-                    filteredListings.length === 1 ? "" : "s"
-                  } found`}
+                : `${filteredListings.length} real listing${filteredListings.length === 1 ? "" : "s"} found`}
             </p>
           </div>
-
           <Link
             href="/sell"
             className="inline-flex justify-center rounded-xl bg-blue-700 px-6 py-3 font-black text-white shadow-lg hover:bg-blue-800"
@@ -590,7 +608,7 @@ export default function CategoryPage() {
             <p className="font-bold text-red-700">{errorMessage}</p>
             <button
               type="button"
-              onClick={loadListings}
+              onClick={() => void loadListings()}
               className="mt-5 rounded-xl bg-blue-700 px-6 py-3 font-bold text-white"
             >
               Try Again
@@ -620,74 +638,71 @@ export default function CategoryPage() {
           </div>
         ) : (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {filteredListings.map((listing) => (
-              <article
-                key={listing.id}
-                className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl"
-              >
-                <Link
-                  href={`/listings/${listing.id}`}
-                  className="block"
-                  aria-label={`View ${listing.title || "listing"}`}
+            {filteredListings.map((listing) => {
+              const tier = promotions[listing.id];
+
+              return (
+                <article
+                  key={listing.id}
+                  className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl"
                 >
-                  <div className="relative flex h-48 items-center justify-center overflow-hidden bg-gradient-to-br from-blue-50 to-slate-100">
-                    {images[listing.id] ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={images[listing.id]}
-                        alt={listing.title || "Product image"}
-                        loading="lazy"
-                        className="h-full w-full object-contain transition duration-300 group-hover:scale-105"
-                      />
-                    ) : (
-                      <span className="text-7xl">{data.icon}</span>
-                    )}
-
-                    {listing.featured && (
-                      <span className="absolute left-3 top-3 rounded-full bg-yellow-100 px-3 py-1 text-xs font-black text-yellow-800">
-                        TOP PRIORITY
-                      </span>
-                    )}
-                  </div>
-                </Link>
-
-                <div className="p-5">
-                  <p className="text-xs font-black uppercase tracking-wider text-blue-700">
-                    {listing.category || data.name}
-                    {listing.subcategory
-                      ? ` • ${listing.subcategory}`
-                      : ""}
-                  </p>
-
-                  <h3 className="mt-2 line-clamp-2 text-lg font-black text-slate-900">
-                    {listing.title || "Untitled Listing"}
-                  </h3>
-
-                  <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-500">
-                    {listing.description || "No description provided."}
-                  </p>
-
-                  <div className="mt-4 text-xl font-black text-blue-700">
-                    {formatPrice(
-                      listing.price,
-                      listing.currency_code,
-                      listing.currency
-                    )}
-                  </div>
-
-                  <p className="mt-3 text-sm text-slate-500">
-                    📍 {getListingLocation(listing)}
-                  </p>
-
                   <Link
                     href={`/listings/${listing.id}`}
-                    className="mt-5 block rounded-xl bg-blue-700 px-4 py-3 text-center font-bold text-white transition hover:bg-blue-800"
+                    className="block"
+                    aria-label={`View ${listing.title || "listing"}`}
                   >
-                    View Listing
+                    <div className="relative flex h-48 items-center justify-center overflow-hidden bg-gradient-to-br from-blue-50 to-slate-100">
+                      {images[listing.id] ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={images[listing.id]}
+                          alt={listing.title || "Product image"}
+                          loading="lazy"
+                          className="h-full w-full object-contain transition duration-300 group-hover:scale-105"
+                        />
+                      ) : (
+                        <span className="text-7xl">{data.icon}</span>
+                      )}
+
+                      {tier && (
+                        <span className="absolute left-3 top-3 rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-900 shadow-sm">
+                          ⭐ {TIER_LABEL[tier]}
+                        </span>
+                      )}
+                    </div>
                   </Link>
-                </div>
-              </article>
-            ))}
+
+                  <div className="p-5">
+                    <p className="text-xs font-black uppercase tracking-wider text-blue-700">
+                      {listing.category || data.name}
+                      {listing.subcategory ? ` • ${listing.subcategory}` : ""}
+                    </p>
+                    <h3 className="mt-2 line-clamp-2 text-lg font-black text-slate-900">
+                      {listing.title || "Untitled Listing"}
+                    </h3>
+                    <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-500">
+                      {listing.description || "No description provided."}
+                    </p>
+                    <div className="mt-4 text-xl font-black text-blue-700">
+                      {formatPrice(
+                        listing.price,
+                        listing.currency_code,
+                        listing.currency
+                      )}
+                    </div>
+                    <p className="mt-3 text-sm text-slate-500">
+                      📍 {getListingLocation(listing)}
+                    </p>
+                    <Link
+                      href={`/listings/${listing.id}`}
+                      className="mt-5 block rounded-xl bg-blue-700 px-4 py-3 text-center font-bold text-white transition hover:bg-blue-800"
+                    >
+                      View Listing
+                    </Link>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         )}
 
@@ -706,28 +721,21 @@ export default function CategoryPage() {
                 before completing your purchase.
               </p>
             </div>
-
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="rounded-2xl bg-white/10 p-5">
                 <div className="text-3xl">📍</div>
                 <p className="mt-3 font-black">Location</p>
-                <p className="mt-1 text-sm text-white/70">
-                  Seller location
-                </p>
+                <p className="mt-1 text-sm text-white/70">Seller location</p>
               </div>
               <div className="rounded-2xl bg-white/10 p-5">
                 <div className="text-3xl">🔢</div>
                 <p className="mt-3 font-black">Tracking</p>
-                <p className="mt-1 text-sm text-white/70">
-                  When offered
-                </p>
+                <p className="mt-1 text-sm text-white/70">When offered</p>
               </div>
               <div className="rounded-2xl bg-white/10 p-5">
                 <div className="text-3xl">🚚</div>
                 <p className="mt-3 font-black">Delivery</p>
-                <p className="mt-1 text-sm text-white/70">
-                  Check at checkout
-                </p>
+                <p className="mt-1 text-sm text-white/70">Check at checkout</p>
               </div>
             </div>
           </div>
