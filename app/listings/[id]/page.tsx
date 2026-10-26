@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabaseBrowser } from "@/supabase-browser";
 
+type PromotionTier = "top-priority" | "priority" | "premium";
+
 type Listing = {
   id: number;
   title: string;
@@ -28,6 +30,13 @@ type ListingImage = {
   image_url: string;
 };
 
+type Promotion = {
+  listing_id: number;
+  package_id: string;
+  starts_at: string;
+  ends_at: string;
+};
+
 type Currency = {
   code: string;
   name: string | null;
@@ -45,14 +54,28 @@ type SellerProfile = {
   account_type: string | null;
 };
 
+const TIER_ORDER: Record<PromotionTier, number> = {
+  "top-priority": 0,
+  priority: 1,
+  premium: 2,
+};
+
+const TIER_LABEL: Record<PromotionTier, string> = {
+  "top-priority": "TOP PRIORITY",
+  priority: "PRIORITY",
+  premium: "PREMIUM",
+};
+
 export default function ProductPage() {
-  const params = useParams();
+  const params = useParams<{ id: string }>();
   const supabase = supabaseBrowser();
 
   const [listing, setListing] = useState<Listing | null>(null);
   const [images, setImages] = useState<ListingImage[]>([]);
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [seller, setSeller] = useState<SellerProfile | null>(null);
+  const [promotionTier, setPromotionTier] =
+    useState<PromotionTier | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -76,10 +99,14 @@ export default function ProductPage() {
       setLoading(true);
       setError("");
 
-      const rawId = Array.isArray(params.id) ? params.id[0] : params.id;
+      const rawId = params.id;
       const listingId = Number(rawId);
 
-      if (!rawId || !Number.isInteger(listingId) || listingId <= 0) {
+      if (
+        !rawId ||
+        !Number.isInteger(listingId) ||
+        listingId <= 0
+      ) {
         setError("Invalid listing.");
         setLoading(false);
         return;
@@ -111,11 +138,58 @@ export default function ProductPage() {
 
         if (!data) {
           setListing(null);
+          setPromotionTier(null);
           setLoading(false);
           return;
         }
 
-        setListing(data as Listing);
+        const currentListing = data as Listing;
+        setListing(currentListing);
+
+        // Load only valid promotions exposed by the public-facing view.
+        const {
+          data: promotionData,
+          error: promotionError,
+        } = await supabase
+          .from("active_listing_promotions")
+          .select("listing_id, package_id, starts_at, ends_at")
+          .eq("listing_id", listingId);
+
+        if (cancelled) return;
+
+        if (promotionError) {
+          console.warn(
+            "Could not load listing promotion:",
+            promotionError.message
+          );
+          setPromotionTier(null);
+        } else {
+          const now = Date.now();
+
+          const validPromotions = (
+            (promotionData || []) as Promotion[]
+          ).filter((promotion) => {
+            const tier = promotion.package_id as PromotionTier;
+
+            return (
+              Object.prototype.hasOwnProperty.call(TIER_ORDER, tier) &&
+              Number.isFinite(Date.parse(promotion.starts_at)) &&
+              Number.isFinite(Date.parse(promotion.ends_at)) &&
+              Date.parse(promotion.starts_at) <= now &&
+              Date.parse(promotion.ends_at) > now
+            );
+          });
+
+          validPromotions.sort(
+            (a, b) =>
+              TIER_ORDER[a.package_id as PromotionTier] -
+              TIER_ORDER[b.package_id as PromotionTier]
+          );
+
+          setPromotionTier(
+            (validPromotions[0]?.package_id as PromotionTier) || null
+          );
+        }
 
         const { data: imageData, error: imageError } = await supabase
           .from("listing_images")
@@ -123,17 +197,19 @@ export default function ProductPage() {
           .eq("listing_id", listingId)
           .order("id", { ascending: true });
 
-        if (!cancelled && !imageError) {
+        if (cancelled) return;
+
+        if (!imageError) {
           const validImages = ((imageData || []) as ListingImage[]).filter(
             (image) =>
               typeof image.image_url === "string" &&
-              image.image_url.trim().length > 0,
+              image.image_url.trim().length > 0
           );
 
           setImages(validImages);
           setSelectedImage(0);
           setImageErrors({});
-        } else if (imageError) {
+        } else {
           console.warn("Could not load listing images:", imageError.message);
         }
 
@@ -142,11 +218,13 @@ export default function ProductPage() {
           .select("code,name,symbol,manual_rate_from_ghs")
           .in("code", ["GHS", "USD", "CNY", "EUR", "GBP"]);
 
-        if (!cancelled && !currencyError) {
+        if (cancelled) return;
+
+        if (!currencyError) {
           setCurrencies((currencyData || []) as Currency[]);
         }
 
-        if (data.seller_id) {
+        if (currentListing.seller_id) {
           const { data: sellerData, error: sellerError } = await supabase
             .from("profiles")
             .select(`
@@ -158,10 +236,12 @@ export default function ProductPage() {
               verified,
               account_type
             `)
-            .eq("id", data.seller_id)
+            .eq("id", currentListing.seller_id)
             .maybeSingle();
 
-          if (!cancelled && !sellerError) {
+          if (cancelled) return;
+
+          if (!sellerError) {
             setSeller(sellerData as SellerProfile | null);
           }
         }
@@ -180,9 +260,9 @@ export default function ProductPage() {
             .eq("listing_id", listingId)
             .maybeSingle();
 
-          if (!cancelled) {
-            setIsFavourite(Boolean(favouriteData));
-          }
+          if (cancelled) return;
+
+          setIsFavourite(Boolean(favouriteData));
         }
 
         const { error: eventError } = await supabase
@@ -196,17 +276,17 @@ export default function ProductPage() {
         if (eventError) {
           console.warn(
             "Listing view could not be recorded:",
-            eventError.message,
+            eventError.message
           );
         }
       } catch (err: unknown) {
-        console.error(err);
+        console.error("Unable to load listing:", err);
 
         if (!cancelled) {
           setError(
             err instanceof Error
               ? err.message
-              : "Unable to load this listing.",
+              : "Unable to load this listing."
           );
         }
       } finally {
@@ -214,15 +294,17 @@ export default function ProductPage() {
       }
     }
 
-    loadListing();
+    void loadListing();
 
     return () => {
       cancelled = true;
     };
-  }, [params.id]);
+  }, [params.id, supabase]);
 
   function getCurrency(code: string) {
-    return currencies.find((currency) => currency.code === code);
+    return currencies.find(
+      (currency) => currency.code.toUpperCase() === code.toUpperCase()
+    );
   }
 
   function getSymbol(code: string) {
@@ -238,7 +320,11 @@ export default function ProductPage() {
     return code;
   }
 
-  function convertPrice(amount: number, fromCode: string, toCode: string) {
+  function convertPrice(
+    amount: number,
+    fromCode: string,
+    toCode: string
+  ) {
     if (fromCode === toCode) return amount;
 
     const source = getCurrency(fromCode);
@@ -288,19 +374,19 @@ export default function ProductPage() {
     return convertPrice(
       Number(listing.price),
       originalCurrency(),
-      displayCurrency,
+      displayCurrency
     );
   }
 
   function changeImage(direction: number) {
     if (images.length < 2) return;
 
-    setSelectedImage((current) => {
-      return (current + direction + images.length) % images.length;
-    });
+    setSelectedImage((current) =>
+      (current + direction + images.length) % images.length
+    );
   }
 
-  async function contactSeller() {
+  async function requireLogin() {
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -308,30 +394,24 @@ export default function ProductPage() {
     if (!user) {
       window.location.href =
         `/login?error=login_required&next=${encodeURIComponent(
-          `/listings/${listing?.id}`,
+          `/listings/${listing?.id}`
         )}`;
-      return;
+      return null;
     }
 
-    if (!listing) return;
+    return user;
+  }
+
+  async function contactSeller() {
+    const user = await requireLogin();
+    if (!user || !listing) return;
 
     window.location.href = `/chat?listing=${listing.id}`;
   }
 
   async function toggleFavourite() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      window.location.href =
-        `/login?error=login_required&next=${encodeURIComponent(
-          `/listings/${listing?.id}`,
-        )}`;
-      return;
-    }
-
-    if (!listing) return;
+    const user = await requireLogin();
+    if (!user || !listing) return;
 
     setSavingFavourite(true);
 
@@ -353,7 +433,7 @@ export default function ProductPage() {
               user_id: user.id,
               listing_id: listing.id,
             },
-            { onConflict: "user_id,listing_id" },
+            { onConflict: "user_id,listing_id" }
           );
 
         if (error) throw error;
@@ -395,19 +475,8 @@ export default function ProductPage() {
   }
 
   async function reportListing() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      window.location.href =
-        `/login?error=login_required&next=${encodeURIComponent(
-          `/listings/${listing?.id}`,
-        )}`;
-      return;
-    }
-
-    if (!listing) return;
+    const user = await requireLogin();
+    if (!user || !listing) return;
 
     const reason = window.prompt("Why are you reporting this listing?");
     if (!reason?.trim()) return;
@@ -424,7 +493,7 @@ export default function ProductPage() {
       if (error) throw error;
 
       alert(
-        "Your report event has been recorded. Note that this does not yet save the report reason for administrator review.",
+        "Your report event has been recorded. Note that this does not yet save the report reason for administrator review."
       );
     } catch (err) {
       console.error(err);
@@ -491,10 +560,7 @@ export default function ProductPage() {
     <main className="min-h-screen bg-slate-50">
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-          <Link
-            href="/listings"
-            className="font-bold text-blue-700"
-          >
+          <Link href="/listings" className="font-bold text-blue-700">
             ← Back to Marketplace
           </Link>
 
@@ -520,6 +586,7 @@ export default function ProductPage() {
                     className="flex min-h-[320px] w-full items-center justify-center sm:min-h-[480px]"
                     aria-label="Open full-screen product image"
                   >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={imageUrl}
                       alt={listing.title}
@@ -587,6 +654,7 @@ export default function ProductPage() {
                     }`}
                   >
                     {!imageErrors[index] ? (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={image.image_url}
                         alt={`${listing.title} photo ${index + 1}`}
@@ -618,9 +686,17 @@ export default function ProductPage() {
 
           {/* LISTING DETAILS */}
           <div>
-            {listing.featured && (
-              <div className="mb-4 inline-flex rounded-full bg-purple-600 px-4 py-2 text-sm font-black text-white">
-                ⭐ TOP PRIORITY
+            {promotionTier && (
+              <div
+                className={`mb-4 inline-flex rounded-full px-4 py-2 text-sm font-black ${
+                  promotionTier === "top-priority"
+                    ? "bg-purple-600 text-white"
+                    : promotionTier === "priority"
+                      ? "bg-blue-700 text-white"
+                      : "bg-amber-100 text-amber-900"
+                }`}
+              >
+                ⭐ {TIER_LABEL[promotionTier]}
               </div>
             )}
 
@@ -660,7 +736,7 @@ export default function ProductPage() {
                         convertedPrice ?? Number(listing.price),
                         convertedPrice === null
                           ? originalCurrency()
-                          : displayCurrency,
+                          : displayCurrency
                       )
                     : "Price not set"}
                 </div>
@@ -686,7 +762,7 @@ export default function ProductPage() {
                     Original price:{" "}
                     {formatAmount(
                       Number(listing.price),
-                      originalCurrency(),
+                      originalCurrency()
                     )}
                     {convertedPrice === null && (
                       <span className="ml-2 text-amber-600">
@@ -707,6 +783,7 @@ export default function ProductPage() {
             <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-center gap-4">
                 {seller?.avatar_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={seller.avatar_url}
                     alt={seller.full_name || "Seller"}
@@ -791,9 +868,7 @@ export default function ProductPage() {
             </div>
 
             <div className="mt-8 rounded-2xl bg-blue-50 p-5">
-              <h3 className="font-black text-slate-900">
-                🛡️ Shop safely
-              </h3>
+              <h3 className="font-black text-slate-900">🛡️ Shop safely</h3>
               <p className="mt-2 text-sm leading-6 text-slate-600">
                 Verify the item and seller before making payment.
                 Never share passwords, card details, verification codes,
@@ -809,11 +884,9 @@ export default function ProductPage() {
             <p className="text-sm font-black uppercase tracking-widest text-blue-700">
               About this listing
             </p>
-
             <h2 className="mt-2 text-2xl font-black text-slate-900">
               Description
             </h2>
-
             <p className="mt-5 whitespace-pre-wrap leading-8 text-slate-600">
               {listing.description ||
                 "The seller has not provided a description."}
@@ -822,15 +895,12 @@ export default function ProductPage() {
 
           <div className="rounded-3xl bg-slate-950 p-6 text-white sm:p-8">
             <div className="text-4xl">🚚</div>
-
             <h2 className="mt-4 text-2xl font-black">Delivery</h2>
-
             <p className="mt-3 leading-7 text-slate-300">
               Delivery options can be arranged between the buyer and seller.
               Integrated delivery booking and tracking must be connected
               to the marketplace delivery system.
             </p>
-
             <div className="mt-6 rounded-xl bg-white/10 p-4">
               <p className="text-sm font-bold">📍 Location</p>
               <p className="mt-1 text-sm text-slate-300">
@@ -899,6 +969,7 @@ export default function ProductPage() {
             </>
           )}
 
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={imageUrl}
             alt={listing.title}
