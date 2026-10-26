@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 type PromotionRecord = {
-  id: string;
+  id: string | number;
   user_id: string;
   listing_id: number;
   package_id: string;
@@ -19,6 +19,7 @@ type PromotionRecord = {
   duration_months: number | null;
   starts_at: string | null;
   ends_at: string | null;
+  btool_selected: boolean | null;
 };
 
 const ALLOWED_MONTHS = [1, 2, 3, 6, 12] as const;
@@ -41,6 +42,47 @@ function addMonths(date: Date, months: number): Date {
   result.setUTCDate(Math.min(originalDay, lastDayOfTargetMonth));
 
   return result;
+}
+
+async function ensureBtoolEntitlement(
+  supabase: ReturnType<typeof createClient>,
+  promotion: PromotionRecord,
+  startsAt: string | null,
+  endsAt: string | null
+) {
+  if (promotion.btool_selected !== true) {
+    return { success: true as const };
+  }
+
+  if (!endsAt) {
+    console.error(
+      "BTool entitlement has no promotion expiry:",
+      promotion.id
+    );
+
+    return { success: false as const };
+  }
+
+  const { error } = await (supabase as any)
+    .from("btool_entitlements")
+    .upsert(
+      {
+        user_id: promotion.user_id,
+        promotion_request_id: String(promotion.id),
+        payment_reference: promotion.payment_reference,
+        status: "active",
+        activated_at: startsAt ?? new Date().toISOString(),
+        expires_at: endsAt,
+      },
+      { onConflict: "payment_reference" }
+    );
+
+  if (error) {
+    console.error("BTool entitlement activation failed:", error);
+    return { success: false as const };
+  }
+
+  return { success: true as const };
 }
 
 export async function POST(request: NextRequest) {
@@ -88,7 +130,7 @@ export async function POST(request: NextRequest) {
     } = await (supabase as any)
       .from("promotion_requests")
       .select(
-        "id, user_id, listing_id, package_id, amount, currency_code, payment_reference, payment_status, promotion_status, duration_days, duration_months, starts_at, ends_at"
+        "id, user_id, listing_id, package_id, amount, currency_code, payment_reference, payment_status, promotion_status, duration_days, duration_months, starts_at, ends_at, btool_selected"
       )
       .eq("payment_reference", reference)
       .maybeSingle();
@@ -109,11 +151,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const promotion =
-      rawPromotion as PromotionRecord;
+    const promotion = rawPromotion as PromotionRecord;
 
-    // Verify directly with Paystack. Never trust the browser's
-    // success message as evidence of payment.
+    // Always verify directly with Paystack.
     const paystackResponse = await fetch(
       `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,
       {
@@ -164,7 +204,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Compare the exact amount in pesewas and the expected currency.
+    // Verify the exact total, including BTool when selected.
     const expectedAmountPesewas = Math.round(
       Number(promotion.amount) * 100
     );
@@ -196,14 +236,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Idempotency: never extend or activate an already paid promotion
-    // a second time just because the customer refreshes the callback.
+    // Idempotency: on a repeated callback, repair a missing BTool
+    // entitlement if the promotion was already paid successfully.
     if (promotion.payment_status === "PAID") {
+      const entitlement = await ensureBtoolEntitlement(
+        supabase,
+        promotion,
+        promotion.starts_at,
+        promotion.ends_at
+      );
+
+      if (!entitlement.success) {
+        return NextResponse.json(
+          {
+            error:
+              "Payment is confirmed, but BTool access could not be saved. Please retry verification or contact support.",
+          },
+          { status: 500 }
+        );
+      }
+
       return NextResponse.json({
         success: true,
         status: "success",
         reference,
         promotionStatus: promotion.promotion_status,
+        btoolSelected: promotion.btool_selected === true,
         message: "This promotion payment has already been verified.",
       });
     }
@@ -220,15 +278,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check that this is one of the supported new monthly packages.
-    const packageId = promotion.package_id;
     const validPackages = [
       "premium",
       "priority",
       "top-priority",
     ];
 
-    if (!validPackages.includes(packageId)) {
+    if (!validPackages.includes(promotion.package_id)) {
       return NextResponse.json(
         {
           error:
@@ -251,12 +307,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Start and end times are calculated on the server.
-    const startsAt = new Date();
-    const endsAt = addMonths(startsAt, durationMonths);
+    const startsAtDate = new Date();
+    const endsAtDate = addMonths(startsAtDate, durationMonths);
+    const startsAt = startsAtDate.toISOString();
+    const endsAt = endsAtDate.toISOString();
 
-    // Activate only if the record is still pending. The conditional
-    // update prevents concurrent callback requests from extending it.
+    // Activate only while the promotion is still pending.
     const {
       data: updatedRows,
       error: updateError,
@@ -265,8 +321,8 @@ export async function POST(request: NextRequest) {
       .update({
         payment_status: "PAID",
         promotion_status: "ACTIVE",
-        starts_at: startsAt.toISOString(),
-        ends_at: endsAt.toISOString(),
+        starts_at: startsAt,
+        ends_at: endsAt,
         updated_at: new Date().toISOString(),
       })
       .eq("id", promotion.id)
@@ -275,10 +331,7 @@ export async function POST(request: NextRequest) {
       .select("id, payment_status, promotion_status, starts_at, ends_at");
 
     if (updateError) {
-      console.error(
-        "Promotion activation failed:",
-        updateError
-      );
+      console.error("Promotion activation failed:", updateError);
 
       return NextResponse.json(
         {
@@ -289,18 +342,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // If another callback won the race, read the final state rather
-    // than applying the duration a second time.
+    // If another callback processed the payment, read its saved state.
     if (!updatedRows || updatedRows.length === 0) {
       const { data: current, error: currentError } = await (
         supabase as any
       )
         .from("promotion_requests")
-        .select("payment_status, promotion_status, starts_at, ends_at")
+        .select(
+          "payment_status, promotion_status, starts_at, ends_at"
+        )
         .eq("id", promotion.id)
         .maybeSingle();
 
-      if (currentError || !current || current.payment_status !== "PAID") {
+      if (
+        currentError ||
+        !current ||
+        current.payment_status !== "PAID"
+      ) {
         return NextResponse.json(
           {
             error:
@@ -310,16 +368,52 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      const entitlement = await ensureBtoolEntitlement(
+        supabase,
+        promotion,
+        current.starts_at,
+        current.ends_at
+      );
+
+      if (!entitlement.success) {
+        return NextResponse.json(
+          {
+            error:
+              "The promotion is active, but BTool access could not be saved. Retry verification or contact support.",
+          },
+          { status: 500 }
+        );
+      }
+
       return NextResponse.json({
         success: true,
         status: "success",
         reference,
         promotionStatus: current.promotion_status,
+        btoolSelected: promotion.btool_selected === true,
         message: "This promotion payment has already been processed.",
       });
     }
 
     const activated = updatedRows[0];
+
+    // Grant BTool only after Paystack verification and promotion activation.
+    const entitlement = await ensureBtoolEntitlement(
+      supabase,
+      promotion,
+      activated.starts_at,
+      activated.ends_at
+    );
+
+    if (!entitlement.success) {
+      return NextResponse.json(
+        {
+          error:
+            "Your promotion is active, but BTool access could not be saved. Retry verification or contact support.",
+        },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
@@ -329,7 +423,10 @@ export async function POST(request: NextRequest) {
       startsAt: activated.starts_at,
       endsAt: activated.ends_at,
       durationMonths,
-      message: "Payment verified and promotion activated successfully.",
+      btoolSelected: promotion.btool_selected === true,
+      message: promotion.btool_selected
+        ? "Payment verified, promotion activated, and BTool entitlement saved."
+        : "Payment verified and promotion activated successfully.",
     });
   } catch (error) {
     console.error("Promotion verification error:", error);
