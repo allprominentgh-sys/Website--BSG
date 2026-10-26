@@ -30,6 +30,10 @@ type AdvertisingSettingRow = {
   setting_value: number | string;
 };
 
+type PromotionInsertResult = {
+  id: string | number;
+};
+
 function roundMoney(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
@@ -93,6 +97,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+
     const listingId = String(body.listingId ?? "");
     const tier = String(body.tier ?? body.packageId ?? "");
     const durationMonths = Number(body.durationMonths);
@@ -135,6 +140,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Verify that the authenticated seller owns the advertisement.
     const { data: listing, error: listingError } = await supabase
       .from("listings")
       .select("id, seller_id, title")
@@ -143,12 +149,15 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     if (listingError || !listing) {
+      console.error("Listing verification failed:", listingError);
+
       return NextResponse.json(
         { error: "The selected advertisement could not be verified." },
         { status: 404 }
       );
     }
 
+    // Read prices and discount settings from the database.
     const requiredKeys = [
       selectedTier.setting,
       "promotion_discount_percent",
@@ -162,6 +171,7 @@ export async function POST(request: NextRequest) {
 
     if (settingsError || !rawSettings) {
       console.error("Promotion settings read failed:", settingsError);
+
       return NextResponse.json(
         { error: "Could not load promotion prices. Please try again later." },
         { status: 500 }
@@ -209,6 +219,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Premium = 1, Priority = 2, Top Priority = 4.
+    // Combinations: 3, 5, 6 or 7.
     const baseAmount = roundMoney(monthlyPrice * durationMonths);
 
     const discountEligible =
@@ -230,6 +242,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Paystack expects pesewas, not cedis.
     const amountPesewas = Math.round(finalAmount * 100);
 
     if (!Number.isSafeInteger(amountPesewas) || amountPesewas <= 0) {
@@ -241,7 +254,6 @@ export async function POST(request: NextRequest) {
 
     const reference = `bsgpromo_${randomBytes(16).toString("hex")}`;
 
-    // Keep the insert object separate so the workaround is easy to review.
     const promotionInsert = {
       user_id: user.id,
       listing_id: numericListingId,
@@ -257,8 +269,10 @@ export async function POST(request: NextRequest) {
       promotion_status: "PENDING",
     };
 
+    // Cast the stale generated insert type; the database still validates
+    // the actual columns, types, constraints and required fields.
     const {
-      data: promotion,
+      data: rawPromotion,
       error: insertError,
     } = await supabase
       .from("promotion_requests")
@@ -266,14 +280,17 @@ export async function POST(request: NextRequest) {
       .select("id")
       .single();
 
-    if (insertError || !promotion) {
+    if (insertError || !rawPromotion) {
       console.error("Promotion request save failed:", insertError);
+
       return NextResponse.json(
         { error: "Could not save your promotion request." },
         { status: 500 }
       );
     }
 
+    // Explicitly type the selected ID to avoid the TypeScript error.
+    const promotion = rawPromotion as PromotionInsertResult;
     promotionId = String(promotion.id);
 
     const callbackUrl =
