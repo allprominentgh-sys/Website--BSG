@@ -1,3 +1,4 @@
+
 import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -7,95 +8,68 @@ const COOKIE_NAME = "bsg_admin_session";
 const ADMIN_EMAIL = "admin@bestsalesgh.com";
 
 const SETTING_DESCRIPTIONS = {
-  individual_premium_price:
-    "Price per individual Premium advertisement.",
-  individual_priority_price:
-    "Price per individual Priority advertisement.",
-  individual_top_priority_price:
-    "Price per individual Top Priority advertisement.",
-  company_top_priority_monthly_price:
-    "Monthly price for the company Top Priority advertising package.",
-  business_transaction_fee_percent:
-    "Platform fee percentage for eligible business transactions.",
-  individual_free_ads_limit:
-    "Number of free advertisements per individual seller.",
-  company_free_ads_limit:
-    "Number of free advertisements per company seller.",
-  company_priority_ads_limit:
-    "Company advertisements covered by the Priority arrangement.",
-  promotion_duration_days:
-    "Duration of an individual paid promotion in days.",
+  individual_premium_price: "Price per individual Premium advertisement.",
+  individual_priority_price: "Price per individual Priority advertisement.",
+  individual_top_priority_price: "Price per individual Top Priority advertisement.",
+  company_top_priority_monthly_price: "Monthly price for the company Top Priority advertising package.",
+  business_transaction_fee_percent: "Platform fee percentage for eligible business transactions.",
+  individual_free_ads_limit: "Number of free advertisements per individual seller.",
+  company_free_ads_limit: "Number of free advertisements per company seller.",
+  company_priority_ads_limit: "Company advertisements covered by the Priority arrangement.",
+  promotion_duration_days: "Legacy duration of an individual paid promotion in days.",
+  promotion_discount_percent: "Discount percentage for eligible paid advertisement promotions.",
+  promotion_discount_packages: "Package eligibility bitmask: Premium=1, Priority=2, Top Priority=4; combinations are added.",
 } as const;
 
 type SettingKey = keyof typeof SETTING_DESCRIPTIONS;
-type AdvertisingSettings = Record<SettingKey, number>;
 
 const ALLOWED_SETTINGS = Object.keys(
   SETTING_DESCRIPTIONS
 ) as SettingKey[];
 
+const REQUIRED_LEGACY_SETTINGS = ALLOWED_SETTINGS.filter(
+  (key) =>
+    key !== "promotion_discount_percent" &&
+    key !== "promotion_discount_packages"
+);
+
 const LIMITS: Record<
   SettingKey,
   { min: number; max: number; decimals: number }
 > = {
-  individual_premium_price: {
-    min: 1,
-    max: 1_000_000,
-    decimals: 2,
-  },
-  individual_priority_price: {
-    min: 1,
-    max: 1_000_000,
-    decimals: 2,
-  },
-  individual_top_priority_price: {
-    min: 1,
-    max: 1_000_000,
-    decimals: 2,
-  },
-  company_top_priority_monthly_price: {
-    min: 1,
-    max: 10_000_000,
-    decimals: 2,
-  },
-  business_transaction_fee_percent: {
-    min: 0,
-    max: 100,
-    decimals: 2,
-  },
-  individual_free_ads_limit: {
-    min: 0,
-    max: 1_000_000,
-    decimals: 0,
-  },
-  company_free_ads_limit: {
-    min: 0,
-    max: 1_000_000,
-    decimals: 0,
-  },
-  company_priority_ads_limit: {
-    min: 0,
-    max: 1_000_000,
-    decimals: 0,
-  },
-  promotion_duration_days: {
-    min: 1,
-    max: 3650,
-    decimals: 0,
-  },
+  individual_premium_price: { min: 1, max: 1_000_000, decimals: 2 },
+  individual_priority_price: { min: 1, max: 1_000_000, decimals: 2 },
+  individual_top_priority_price: { min: 1, max: 1_000_000, decimals: 2 },
+  company_top_priority_monthly_price: { min: 1, max: 10_000_000, decimals: 2 },
+  business_transaction_fee_percent: { min: 0, max: 100, decimals: 2 },
+  individual_free_ads_limit: { min: 0, max: 1_000_000, decimals: 0 },
+  company_free_ads_limit: { min: 0, max: 1_000_000, decimals: 0 },
+  company_priority_ads_limit: { min: 0, max: 1_000_000, decimals: 0 },
+  promotion_duration_days: { min: 1, max: 3650, decimals: 0 },
+  promotion_discount_percent: { min: 0, max: 100, decimals: 2 },
+  promotion_discount_packages: { min: 0, max: 7, decimals: 0 },
+};
+
+const DEFAULTS: Record<SettingKey, number> = {
+  individual_premium_price: 160,
+  individual_priority_price: 420,
+  individual_top_priority_price: 790,
+  company_top_priority_monthly_price: 630,
+  business_transaction_fee_percent: 2.15,
+  individual_free_ads_limit: 9,
+  company_free_ads_limit: 12,
+  company_priority_ads_limit: 12,
+  promotion_duration_days: 30,
+  promotion_discount_percent: 0,
+  promotion_discount_packages: 0,
 };
 
 function base64UrlToBytes(value: string): Uint8Array {
   const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
-  const padded =
-    normalized +
-    "=".repeat((4 - (normalized.length % 4)) % 4);
-
+  const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
   const binary = atob(padded);
 
-  return Uint8Array.from(binary, (character) =>
-    character.charCodeAt(0)
-  );
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
 }
 
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
@@ -104,9 +78,7 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   return buffer;
 }
 
-async function isAdministrator(
-  request: NextRequest
-): Promise<boolean> {
+async function isAdministrator(request: NextRequest): Promise<boolean> {
   const secret = process.env.ADMIN_SESSION_SECRET;
   const session = request.cookies.get(COOKIE_NAME)?.value;
 
@@ -120,7 +92,6 @@ async function isAdministrator(
 
   try {
     const encoder = new TextEncoder();
-
     const key = await crypto.subtle.importKey(
       "raw",
       toArrayBuffer(encoder.encode(secret)),
@@ -155,10 +126,7 @@ async function isAdministrator(
 function jsonError(message: string, status: number) {
   return NextResponse.json(
     { success: false, error: message },
-    {
-      status,
-      headers: { "Cache-Control": "no-store" },
-    }
+    { status, headers: { "Cache-Control": "no-store" } }
   );
 }
 
@@ -170,10 +138,7 @@ function getSupabaseConfig() {
     throw new Error("Missing server-side Supabase configuration.");
   }
 
-  return {
-    url: url.replace(/\/+$/, ""),
-    serviceKey,
-  };
+  return { url: url.replace(/\/+$/, ""), serviceKey };
 }
 
 async function databaseRequest(
@@ -194,18 +159,14 @@ async function databaseRequest(
   });
 }
 
-function rowsToSettings(
-  rows: { setting_key: string; setting_value: number | string }[]
-): Partial<AdvertisingSettings> {
-  const settings: Partial<AdvertisingSettings> = {};
+function rowsToSettings(rows: { setting_key: string; setting_value: number | string }[]) {
+  const settings: Partial<Record<SettingKey, number>> = {};
 
   for (const row of rows) {
     if (ALLOWED_SETTINGS.includes(row.setting_key as SettingKey)) {
-      const key = row.setting_key as SettingKey;
       const value = Number(row.setting_value);
-
       if (Number.isFinite(value)) {
-        settings[key] = value;
+        settings[row.setting_key as SettingKey] = value;
       }
     }
   }
@@ -228,21 +189,15 @@ export async function GET(request: NextRequest) {
     );
 
     if (!response.ok) {
-      console.error(
-        "Advertising settings load failed:",
-        await response.text()
-      );
+      console.error("Advertising settings load failed:", await response.text());
       return jsonError("Unable to load advertising settings.", 502);
     }
 
     const rows = await response.json();
+    const settings = { ...DEFAULTS, ...rowsToSettings(rows) };
 
     return NextResponse.json(
-      {
-        success: true,
-        settings: rowsToSettings(rows),
-        rows,
-      },
+      { success: true, settings, rows },
       { headers: { "Cache-Control": "no-store" } }
     );
   } catch (error) {
@@ -275,14 +230,17 @@ export async function PUT(request: NextRequest) {
   const submitted = body.settings as Record<string, unknown>;
   const submittedKeys = Object.keys(submitted);
 
-  if (
-    submittedKeys.length !== ALLOWED_SETTINGS.length ||
-    submittedKeys.some(
-      (key) => !ALLOWED_SETTINGS.includes(key as SettingKey)
-    )
-  ) {
+  const isLegacySubmission =
+    submittedKeys.length === REQUIRED_LEGACY_SETTINGS.length &&
+    REQUIRED_LEGACY_SETTINGS.every((key) => submittedKeys.includes(key));
+
+  const isCompleteSubmission =
+    submittedKeys.length === ALLOWED_SETTINGS.length &&
+    ALLOWED_SETTINGS.every((key) => submittedKeys.includes(key));
+
+  if (!isLegacySubmission && !isCompleteSubmission) {
     return jsonError(
-      "Submit all nine supported advertising settings.",
+      "Submit either the nine existing settings or all eleven settings.",
       400
     );
   }
@@ -294,7 +252,9 @@ export async function PUT(request: NextRequest) {
     updated_at: string;
   }[] = [];
 
-  for (const key of ALLOWED_SETTINGS) {
+  const now = new Date().toISOString();
+
+  for (const key of submittedKeys as SettingKey[]) {
     const raw = submitted[key];
     const value =
       typeof raw === "number"
@@ -318,7 +278,7 @@ export async function PUT(request: NextRequest) {
       setting_key: key,
       setting_value: value,
       description: SETTING_DESCRIPTIONS[key],
-      updated_at: new Date().toISOString(),
+      updated_at: now,
     });
   }
 
@@ -339,10 +299,7 @@ export async function PUT(request: NextRequest) {
     );
 
     if (!response.ok) {
-      console.error(
-        "Advertising settings save failed:",
-        await response.text()
-      );
+      console.error("Advertising settings save failed:", await response.text());
       return jsonError("Unable to save advertising settings.", 502);
     }
 
@@ -352,7 +309,7 @@ export async function PUT(request: NextRequest) {
       {
         success: true,
         message: "Advertising settings saved.",
-        settings: rowsToSettings(savedRows),
+        settings: { ...DEFAULTS, ...rowsToSettings(savedRows) },
         rows: savedRows,
       },
       { headers: { "Cache-Control": "no-store" } }
