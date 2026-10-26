@@ -30,7 +30,13 @@ type AdvertisingSettingRow = {
   setting_value: number | string;
 };
 
-type PromotionInsertResult = {
+type ListingRecord = {
+  id: number | string;
+  seller_id: string;
+  title: string;
+};
+
+type PromotionRecord = {
   id: string | number;
 };
 
@@ -140,15 +146,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify that the authenticated seller owns the advertisement.
-    const { data: listing, error: listingError } = await supabase
+    // Verify the authenticated seller owns this listing.
+    const {
+      data: rawListing,
+      error: listingError,
+    } = await supabase
       .from("listings")
       .select("id, seller_id, title")
       .eq("id", numericListingId)
       .eq("seller_id", user.id)
       .maybeSingle();
 
-    if (listingError || !listing) {
+    if (listingError || !rawListing) {
       console.error("Listing verification failed:", listingError);
 
       return NextResponse.json(
@@ -157,14 +166,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Read prices and discount settings from the database.
+    const listing = rawListing as unknown as ListingRecord;
+
+    // Read authoritative pricing and discount settings.
     const requiredKeys = [
       selectedTier.setting,
       "promotion_discount_percent",
       "promotion_discount_packages",
     ];
 
-    const { data: rawSettings, error: settingsError } = await supabase
+    const {
+      data: rawSettings,
+      error: settingsError,
+    } = await supabase
       .from("advertising_settings")
       .select("setting_key, setting_value")
       .in("setting_key", requiredKeys);
@@ -178,7 +192,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const settings = rawSettings as AdvertisingSettingRow[];
+    const settings = rawSettings as unknown as AdvertisingSettingRow[];
 
     const settingMap = new Map<string, number>(
       settings.map((item) => [
@@ -220,7 +234,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Premium = 1, Priority = 2, Top Priority = 4.
-    // Combinations: 3, 5, 6 or 7.
+    // Multiple packages can be selected using combined bit values.
     const baseAmount = roundMoney(monthlyPrice * durationMonths);
 
     const discountEligible =
@@ -242,7 +256,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Paystack expects pesewas, not cedis.
+    // Paystack amounts are supplied in pesewas.
     const amountPesewas = Math.round(finalAmount * 100);
 
     if (!Number.isSafeInteger(amountPesewas) || amountPesewas <= 0) {
@@ -269,8 +283,6 @@ export async function POST(request: NextRequest) {
       promotion_status: "PENDING",
     };
 
-    // Cast the stale generated insert type; the database still validates
-    // the actual columns, types, constraints and required fields.
     const {
       data: rawPromotion,
       error: insertError,
@@ -289,8 +301,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Explicitly type the selected ID to avoid the TypeScript error.
-    const promotion = rawPromotion as PromotionInsertResult;
+    const promotion = rawPromotion as unknown as PromotionRecord;
     promotionId = String(promotion.id);
 
     const callbackUrl =
@@ -374,7 +385,10 @@ export async function POST(request: NextRequest) {
           .eq("user_id", userId)
           .eq("payment_status", "PENDING");
       } catch (updateError) {
-        console.error("Could not update failed promotion:", updateError);
+        console.error(
+          "Could not update failed promotion:",
+          updateError
+        );
       }
     }
 
