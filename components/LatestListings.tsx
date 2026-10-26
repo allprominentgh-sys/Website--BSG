@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabaseBrowser } from "@/supabase-browser";
 
+type Tier = "top-priority" | "priority" | "premium";
+
 type Listing = {
   id: number;
   title: string | null;
@@ -27,6 +29,31 @@ type ListingImage = {
   listing_id: number;
   image_url: string;
 };
+
+type Promotion = {
+  listing_id: number;
+  package_id: string;
+  starts_at: string;
+  ends_at: string;
+};
+
+const TIER_ORDER: Record<Tier, number> = {
+  "top-priority": 0,
+  priority: 1,
+  premium: 2,
+};
+
+const TIER_LABEL: Record<Tier, string> = {
+  "top-priority": "TOP PRIORITY",
+  priority: "PRIORITY",
+  premium: "PREMIUM",
+};
+
+function isTier(value: string): value is Tier {
+  return value === "top-priority" ||
+    value === "priority" ||
+    value === "premium";
+}
 
 function formatPrice(
   price: number | null,
@@ -51,6 +78,7 @@ function formatPrice(
 export default function LatestListings() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [images, setImages] = useState<Record<number, string>>({});
+  const [promotions, setPromotions] = useState<Record<number, Tier>>({});
   const [failedImages, setFailedImages] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -61,7 +89,53 @@ export default function LatestListings() {
       const db = supabaseBrowser();
 
       try {
-        const { data, error } = await db
+        // Read only the limited, public-facing promotion view.
+        const { data: promotionData, error: promotionError } = await db
+          .from("active_listing_promotions")
+          .select("listing_id, package_id, starts_at, ends_at");
+
+        if (promotionError) {
+          console.warn(
+            "Could not load active promotions:",
+            promotionError.message
+          );
+        }
+
+        if (cancelled) return;
+
+        const now = Date.now();
+        const activePromotions: Promotion[] = (
+          (promotionData || []) as Promotion[]
+        ).filter((promotion) => {
+          return (
+            isTier(promotion.package_id) &&
+            Number.isFinite(Date.parse(promotion.starts_at)) &&
+            Number.isFinite(Date.parse(promotion.ends_at)) &&
+            Date.parse(promotion.starts_at) <= now &&
+            Date.parse(promotion.ends_at) > now
+          );
+        });
+
+        // Keep the highest tier if a listing has overlapping promotions.
+        const tierByListing: Record<number, Tier> = {};
+
+        for (const promotion of activePromotions) {
+          const listingId = Number(promotion.listing_id);
+          const tier = promotion.package_id as Tier;
+          const existingTier = tierByListing[listingId];
+
+          if (
+            !existingTier ||
+            TIER_ORDER[tier] < TIER_ORDER[existingTier]
+          ) {
+            tierByListing[listingId] = tier;
+          }
+        }
+
+        setPromotions(tierByListing);
+
+        // Fetch the newest listings so ordinary products remain visible.
+        const { data: latestData, error: latestError } = await db
           .from("listings")
           .select(`
             id,
@@ -80,19 +154,98 @@ export default function LatestListings() {
             created_at
           `)
           .eq("status", "active")
-          .order("featured", { ascending: false })
           .order("created_at", { ascending: false })
-          .limit(12);
+          .limit(50);
 
-        if (error) throw error;
+        if (latestError) throw latestError;
+
+        const latestListings = (latestData || []) as Listing[];
+
+        // Fetch promoted listings separately so older promoted products
+        // are not lost just because they are outside the latest 50.
+        const promotedIds = Object.keys(tierByListing).map(Number);
+        let promotedListings: Listing[] = [];
+
+        if (promotedIds.length > 0) {
+          const { data: promotedData, error: promotedError } = await db
+            .from("listings")
+            .select(`
+              id,
+              title,
+              description,
+              price,
+              currency_code,
+              currency,
+              category,
+              subcategory,
+              location,
+              item_region,
+              item_city,
+              item_area,
+              featured,
+              created_at
+            `)
+            .eq("status", "active")
+            .in("id", promotedIds);
+
+          if (promotedError) {
+            console.warn(
+              "Could not load promoted listings:",
+              promotedError.message
+            );
+          } else {
+            promotedListings = (promotedData || []) as Listing[];
+          }
+        }
+
         if (cancelled) return;
 
-        const loadedListings = (data || []) as Listing[];
-        setListings(loadedListings);
+        // Merge without duplicates. Promotions are ranked first by tier;
+        // products within the same tier are ordered newest first.
+        const merged = new Map<number, Listing>();
 
-        if (loadedListings.length === 0) return;
+        for (const listing of latestListings) {
+          merged.set(listing.id, listing);
+        }
 
-        const listingIds = loadedListings.map((item) => item.id);
+        for (const listing of promotedListings) {
+          merged.set(listing.id, listing);
+        }
+
+        const orderedListings = Array.from(merged.values())
+          .sort((a, b) => {
+            const tierA = tierByListing[a.id];
+            const tierB = tierByListing[b.id];
+
+            if (tierA && !tierB) return -1;
+            if (!tierA && tierB) return 1;
+
+            if (tierA && tierB) {
+              const tierDifference =
+                TIER_ORDER[tierA] - TIER_ORDER[tierB];
+
+              if (tierDifference !== 0) return tierDifference;
+            }
+
+            const dateA = a.created_at
+              ? Date.parse(a.created_at)
+              : 0;
+            const dateB = b.created_at
+              ? Date.parse(b.created_at)
+              : 0;
+
+            return dateB - dateA;
+          })
+          .slice(0, 12);
+
+        setListings(orderedListings);
+
+        if (orderedListings.length === 0) {
+          setImages({});
+          return;
+        }
+
+        const listingIds = orderedListings.map((item) => item.id);
 
         const { data: imageData, error: imageError } = await db
           .from("listing_images")
@@ -101,7 +254,10 @@ export default function LatestListings() {
           .order("id", { ascending: true });
 
         if (imageError) {
-          console.warn("Could not load listing photos:", imageError.message);
+          console.warn(
+            "Could not load listing photos:",
+            imageError.message
+          );
           return;
         }
 
@@ -111,8 +267,7 @@ export default function LatestListings() {
 
         ((imageData || []) as ListingImage[]).forEach((image) => {
           if (
-            image.image_url &&
-            image.image_url.trim() &&
+            image.image_url?.trim() &&
             !firstImages[image.listing_id]
           ) {
             firstImages[image.listing_id] = image.image_url;
@@ -187,6 +342,7 @@ export default function LatestListings() {
 
         const photo = images[listing.id];
         const photoFailed = failedImages.includes(listing.id);
+        const tier = promotions[listing.id];
 
         return (
           <Link
@@ -215,9 +371,9 @@ export default function LatestListings() {
                 </div>
               )}
 
-              {listing.featured && (
+              {tier && (
                 <span className="absolute left-2 top-2 rounded-full bg-amber-100 px-2 py-1 text-[10px] font-black text-amber-900 shadow-sm">
-                  ⭐ PRIORITY
+                  ⭐ {TIER_LABEL[tier]}
                 </span>
               )}
             </div>
