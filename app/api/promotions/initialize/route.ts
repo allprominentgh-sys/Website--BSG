@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify the authenticated seller owns this listing.
+    // Verify ownership of the selected listing.
     const {
       data: rawListing,
       error: listingError,
@@ -168,7 +168,7 @@ export async function POST(request: NextRequest) {
 
     const listing = rawListing as unknown as ListingRecord;
 
-    // Read authoritative pricing and discount settings.
+    // Read pricing and discount configuration from Supabase.
     const requiredKeys = [
       selectedTier.setting,
       "promotion_discount_percent",
@@ -234,7 +234,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Premium = 1, Priority = 2, Top Priority = 4.
-    // Multiple packages can be selected using combined bit values.
     const baseAmount = roundMoney(monthlyPrice * durationMonths);
 
     const discountEligible =
@@ -256,7 +255,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Paystack amounts are supplied in pesewas.
+    // Paystack requires the amount in pesewas.
     const amountPesewas = Math.round(finalAmount * 100);
 
     if (!Number.isSafeInteger(amountPesewas) || amountPesewas <= 0) {
@@ -283,12 +282,13 @@ export async function POST(request: NextRequest) {
       promotion_status: "PENDING",
     };
 
+    // The database remains responsible for validating the real columns.
     const {
       data: rawPromotion,
       error: insertError,
-    } = await supabase
+    } = await (supabase as any)
       .from("promotion_requests")
-      .insert(promotionInsert as any)
+      .insert(promotionInsert)
       .select("id")
       .single();
 
@@ -301,7 +301,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const promotion = rawPromotion as unknown as PromotionRecord;
+    const promotion = rawPromotion as PromotionRecord;
     promotionId = String(promotion.id);
 
     const callbackUrl =
@@ -348,7 +348,7 @@ export async function POST(request: NextRequest) {
         paystackResult.message
       );
 
-      await supabase
+      await (supabase as any)
         .from("promotion_requests")
         .update({ payment_status: "FAILED" })
         .eq("id", promotion.id)
@@ -378,7 +378,7 @@ export async function POST(request: NextRequest) {
 
     if (supabase && promotionId && userId) {
       try {
-        await supabase
+        await (supabase as any)
           .from("promotion_requests")
           .update({ payment_status: "FAILED" })
           .eq("id", promotionId)
