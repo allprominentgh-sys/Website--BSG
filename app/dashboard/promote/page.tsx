@@ -32,6 +32,8 @@ type SettingRow = {
   setting_value: number | string;
 };
 
+const BTOOL_PRICE = 70;
+
 const PACKAGES: PromotionPackage[] = [
   {
     id: "premium",
@@ -94,6 +96,7 @@ export default function PromoteAdsPage() {
   const [selectedTier, setSelectedTier] = useState<Tier>("premium");
   const [durationMonths, setDurationMonths] =
     useState<DurationMonths>(1);
+  const [btoolSelected, setBtoolSelected] = useState(false);
 
   const [settings, setSettings] = useState<Record<string, number>>({});
   const [settingsLoaded, setSettingsLoaded] = useState(false);
@@ -109,7 +112,6 @@ export default function PromoteAdsPage() {
       try {
         const db = supabaseBrowser();
 
-        // Read the listing selected from the seller dashboard URL.
         const requestedListingId =
           new URLSearchParams(window.location.search).get("listingId") || "";
 
@@ -129,9 +131,7 @@ export default function PromoteAdsPage() {
 
         const { data: listingData, error: listingError } = await db
           .from("listings")
-          .select(
-            "id,title,price,currency_code,currency,status"
-          )
+          .select("id,title,price,currency_code,currency,status")
           .eq("seller_id", user.id)
           .order("created_at", { ascending: false });
 
@@ -166,8 +166,6 @@ export default function PromoteAdsPage() {
           setSelectedListing(String(ownListings[0].id));
         }
 
-        // Prices are read from the database. The server independently
-        // recalculates and validates the final payment amount.
         const settingKeys = [
           "individual_premium_price",
           "individual_priority_price",
@@ -253,6 +251,7 @@ export default function PromoteAdsPage() {
       (eligiblePackages & selectedPackage.bit) !== 0;
 
     const discountPercent = discountEligible ? discountSetting : 0;
+
     const baseAmount =
       Math.round(
         (monthlyPrice * durationMonths + Number.EPSILON) * 100
@@ -277,6 +276,19 @@ export default function PromoteAdsPage() {
     };
   }, [settings, selectedPackage, durationMonths]);
 
+  const totalToPay = useMemo(() => {
+    if (!priceDetails) return null;
+
+    return (
+      Math.round(
+        (priceDetails.finalAmount +
+          (btoolSelected ? BTOOL_PRICE : 0) +
+          Number.EPSILON) *
+          100
+      ) / 100
+    );
+  }, [priceDetails, btoolSelected]);
+
   async function startPayment() {
     if (submitting) return;
 
@@ -288,7 +300,11 @@ export default function PromoteAdsPage() {
       return;
     }
 
-    if (!priceDetails || priceDetails.finalAmount <= 0) {
+    if (
+      !priceDetails ||
+      totalToPay === null ||
+      totalToPay <= 0
+    ) {
       setError(
         "Promotion pricing is unavailable or invalid. Please contact support."
       );
@@ -340,6 +356,7 @@ export default function PromoteAdsPage() {
           listingId: selectedListing,
           tier: selectedTier,
           durationMonths,
+          btoolSelected,
         }),
         cache: "no-store",
       });
@@ -354,18 +371,16 @@ export default function PromoteAdsPage() {
         return;
       }
 
-      // Use the server's price as the final price authority.
+      // Warn if the displayed amount differs from the server amount.
       if (
         result.pricing &&
         typeof result.pricing.finalAmount === "number" &&
-        Math.abs(
-          result.pricing.finalAmount - priceDetails.finalAmount
-        ) > 0.01
+        Math.abs(result.pricing.finalAmount - totalToPay) > 0.01
       ) {
         console.warn(
           "Displayed price differed from server-calculated price.",
           {
-            displayed: priceDetails.finalAmount,
+            displayed: totalToPay,
             server: result.pricing.finalAmount,
           }
         );
@@ -390,6 +405,7 @@ export default function PromoteAdsPage() {
     listings.length > 0 &&
     Boolean(selectedListing) &&
     Boolean(priceDetails) &&
+    totalToPay !== null &&
     (selectedAd?.status || "").toLowerCase() === "active";
 
   return (
@@ -413,8 +429,8 @@ export default function PromoteAdsPage() {
 
           <p className="mt-3 max-w-3xl leading-7 text-slate-600">
             Choose your advertisement, promotion tier and duration.
-            Prices and eligible discounts are loaded from your marketplace
-            settings. Your payment will be verified by our server.
+            You may optionally add BTool Business Tools to your
+            advertising purchase. All payments are verified by our server.
           </p>
         </header>
 
@@ -489,7 +505,9 @@ export default function PromoteAdsPage() {
                         name="promotion-listing"
                         value={String(listing.id)}
                         checked={selected}
-                        onChange={() => setSelectedListing(String(listing.id))}
+                        onChange={() =>
+                          setSelectedListing(String(listing.id))
+                        }
                         className="mt-1 h-4 w-4 accent-blue-700"
                       />
 
@@ -524,8 +542,8 @@ export default function PromoteAdsPage() {
               </h2>
 
               <p className="mt-2 text-sm text-slate-600">
-                Choose one tier. The final price depends on the tier,
-                selected duration and the current admin discount settings.
+                Choose one tier. Pricing depends on the tier, duration
+                and eligible discount settings.
               </p>
 
               <div className="mt-5 grid gap-5 md:grid-cols-3">
@@ -590,7 +608,7 @@ export default function PromoteAdsPage() {
 
               <p className="mt-2 text-sm text-slate-600">
                 Longer durations use the monthly price configured by your
-                administrator. Any eligible discount is shown below.
+                administrator.
               </p>
 
               <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-5">
@@ -626,19 +644,54 @@ export default function PromoteAdsPage() {
               </div>
             </section>
 
+            <section className="mt-8 rounded-3xl border border-blue-200 bg-white p-5 shadow-sm sm:p-8">
+              <h2 className="text-xl font-black">
+                4. Optional BTool Add-on
+              </h2>
+
+              <p className="mt-2 text-sm text-slate-600">
+                BTool is available only with a BSG advertising package.
+                It cannot be purchased separately.
+              </p>
+
+              <label className="mt-5 flex cursor-pointer items-start gap-4 rounded-2xl border border-blue-200 bg-blue-50 p-5">
+                <input
+                  type="checkbox"
+                  checked={btoolSelected}
+                  onChange={(event) =>
+                    setBtoolSelected(event.target.checked)
+                  }
+                  className="mt-1 h-5 w-5 accent-blue-700"
+                />
+
+                <span className="min-w-0 flex-1">
+                  <span className="block text-lg font-black">
+                    Add BTool Business Tools
+                  </span>
+                  <span className="mt-2 block text-sm leading-6 text-slate-600">
+                    Create invoices, receipts and business sales records
+                    for your business.
+                  </span>
+                  <span className="mt-3 block font-black text-blue-700">
+                    + {money(BTOOL_PRICE)}
+                  </span>
+                </span>
+              </label>
+            </section>
+
             <section className="mt-8 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
               <h2 className="text-xl font-black">
-                4. Review Your Payment
+                5. Review Your Payment
               </h2>
 
               {!settingsLoaded ? (
                 <p className="mt-4 text-slate-600">
                   Loading current prices...
                 </p>
-              ) : !priceDetails ? (
+              ) : !priceDetails || totalToPay === null ? (
                 <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
                   A valid price or discount setting is missing. Please
-                  contact your administrator to correct the promotion settings.
+                  contact your administrator.
                 </div>
               ) : (
                 <>
@@ -665,43 +718,38 @@ export default function PromoteAdsPage() {
                     </div>
 
                     <div className="flex justify-between gap-4">
-                      <span className="text-slate-600">Monthly price</span>
+                      <span className="text-slate-600">Promotion price</span>
                       <span className="font-bold">
-                        {money(priceDetails.monthlyPrice)}
+                        {money(priceDetails.finalAmount)}
                       </span>
                     </div>
 
-                    <div className="flex justify-between gap-4">
-                      <span className="text-slate-600">Base amount</span>
-                      <span className="font-bold">
-                        {money(priceDetails.baseAmount)}
-                      </span>
-                    </div>
-
-                    <div className="flex justify-between gap-4">
-                      <span className="text-slate-600">
-                        Discount ({priceDetails.discountPercent}%)
-                      </span>
-                      <span className="font-bold text-green-700">
-                        −{money(priceDetails.discountAmount)}
-                      </span>
-                    </div>
+                    {btoolSelected && (
+                      <div className="flex justify-between gap-4">
+                        <span className="text-slate-600">
+                          BTool add-on
+                        </span>
+                        <span className="font-bold">
+                          {money(BTOOL_PRICE)}
+                        </span>
+                      </div>
+                    )}
 
                     <div className="border-t border-slate-200 pt-4">
                       <div className="flex items-end justify-between gap-4">
                         <span className="font-black">Total to pay</span>
                         <span className="text-2xl font-black text-blue-700">
-                          {money(priceDetails.finalAmount)}
+                          {money(totalToPay)}
                         </span>
                       </div>
                     </div>
                   </div>
 
                   <p className="mt-4 text-xs leading-5 text-slate-500">
-                    This is a price preview based on the current settings.
-                    The server recalculates the amount before starting Paystack.
-                    Your promotion is not active until payment is successfully
-                    verified.
+                    This is a price preview. The payment server must
+                    independently calculate and verify the amount.
+                    BTool access is not activated until payment has
+                    been successfully verified.
                   </p>
                 </>
               )}
@@ -712,8 +760,8 @@ export default function PromoteAdsPage() {
                 Ready to Promote?
               </h2>
               <p className="mt-2 text-sm leading-6 text-slate-300">
-                Confirm your selected advertisement, tier and duration.
-                You'll be redirected to Paystack to complete payment.
+                Confirm your advertisement, tier, duration and optional
+                BTool add-on. You will be redirected to Paystack.
               </p>
 
               <button
@@ -724,8 +772,8 @@ export default function PromoteAdsPage() {
               >
                 {submitting
                   ? "Connecting to Paystack..."
-                  : priceDetails
-                    ? `Pay ${money(priceDetails.finalAmount)} with Paystack`
+                  : totalToPay !== null
+                    ? `Pay ${money(totalToPay)} with Paystack`
                     : "Payment Unavailable"}
               </button>
 
@@ -747,9 +795,10 @@ export default function PromoteAdsPage() {
             <div className="min-w-0 flex-1">
               <p className="truncate text-xs font-semibold text-slate-500">
                 {selectedPackage.name} · {durationLabel(durationMonths)}
+                {btoolSelected ? " + BTool" : ""}
               </p>
               <p className="text-lg font-black text-blue-700">
-                {priceDetails ? money(priceDetails.finalAmount) : "—"}
+                {totalToPay !== null ? money(totalToPay) : "—"}
               </p>
             </div>
 
