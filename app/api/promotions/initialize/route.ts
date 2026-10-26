@@ -4,14 +4,39 @@ import { createClient } from "@supabase/supabase-js";
 import { randomBytes } from "crypto";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
-const packages = {
-  "7-day": { durationDays: 7, amount: 50 },
-  "14-day": { durationDays: 14, amount: 90 },
-  "30-day": { durationDays: 30, amount: 180 },
+const PACKAGES = {
+  premium: {
+    bit: 1,
+    setting: "individual_premium_price",
+    label: "Premium",
+  },
+  priority: {
+    bit: 2,
+    setting: "individual_priority_price",
+    label: "Priority",
+  },
+  "top-priority": {
+    bit: 4,
+    setting: "individual_top_priority_price",
+    label: "Top Priority",
+  },
 } as const;
 
+const ALLOWED_MONTHS = [1, 2, 3, 6, 12] as const;
+
+type Tier = keyof typeof PACKAGES;
+
+function money(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
 export async function POST(request: NextRequest) {
+  let supabase: ReturnType<typeof createClient> | null = null;
+  let promotionId: string | null = null;
+  let userId: string | null = null;
+
   try {
     const secretKey = process.env.PAYSTACK_SECRET_KEY;
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
@@ -37,7 +62,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+    supabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
@@ -56,22 +81,50 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
-    const listingId = String(body.listingId ?? "");
-    const packageId = String(body.packageId ?? "");
+    userId = user.id;
 
-    if (
-      !/^\d+$/.test(listingId) ||
-      !Object.prototype.hasOwnProperty.call(packages, packageId)
-    ) {
+    if (!user.email) {
       return NextResponse.json(
-        { error: "Choose a valid advertisement and promotion package." },
+        { error: "Your account needs an email address for payment." },
         { status: 400 }
       );
     }
 
-    const chosenPackage =
-      packages[packageId as keyof typeof packages];
+    const body = await request.json();
+
+    const listingId = String(body.listingId ?? "");
+    const tier = String(body.tier ?? body.packageId ?? "");
+    const durationMonths = Number(body.durationMonths);
+
+    if (!/^\d+$/.test(listingId)) {
+      return NextResponse.json(
+        { error: "Choose a valid advertisement." },
+        { status: 400 }
+      );
+    }
+
+    if (!Object.prototype.hasOwnProperty.call(PACKAGES, tier)) {
+      return NextResponse.json(
+        {
+          error:
+            "Please refresh the page and select Premium, Priority or Top Priority.",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (
+      !ALLOWED_MONTHS.includes(
+        durationMonths as (typeof ALLOWED_MONTHS)[number]
+      )
+    ) {
+      return NextResponse.json(
+        { error: "Choose a duration of 1, 2, 3, 6 or 12 months." },
+        { status: 400 }
+      );
+    }
+
+    const selectedTier = PACKAGES[tier as Tier];
 
     const { data: listing, error: listingError } = await supabase
       .from("listings")
@@ -87,17 +140,91 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // All prices and discount rules are read from the database.
+    const requiredKeys = [
+      selectedTier.setting,
+      "promotion_discount_percent",
+      "promotion_discount_packages",
+    ];
+
+    const { data: settings, error: settingsError } = await supabase
+      .from("advertising_settings")
+      .select("setting_key, setting_value")
+      .in("setting_key", requiredKeys);
+
+    if (settingsError || !settings) {
+      console.error("Promotion settings read failed:", settingsError);
+      return NextResponse.json(
+        { error: "Could not load promotion pricing. Please try again later." },
+        { status: 500 }
+      );
+    }
+
+    const settingMap = new Map(
+      settings.map((item) => [
+        item.setting_key,
+        Number(item.setting_value),
+      ])
+    );
+
+    const monthlyPrice = settingMap.get(selectedTier.setting);
+    const discountSetting = settingMap.get("promotion_discount_percent");
+    const eligiblePackages = settingMap.get("promotion_discount_packages");
+
+    if (
+      monthlyPrice === undefined ||
+      !Number.isFinite(monthlyPrice) ||
+      monthlyPrice < 0 ||
+      discountSetting === undefined ||
+      !Number.isFinite(discountSetting) ||
+      discountSetting < 0 ||
+      discountSetting > 100 ||
+      eligiblePackages === undefined ||
+      !Number.isInteger(eligiblePackages) ||
+      eligiblePackages < 0 ||
+      eligiblePackages > 7
+    ) {
+      return NextResponse.json(
+        { error: "Promotion pricing settings are invalid. Contact support." },
+        { status: 500 }
+      );
+    }
+
+    const baseAmount = money(monthlyPrice * durationMonths);
+    const packageIsDiscountEligible =
+      (eligiblePackages & selectedTier.bit) !== 0;
+
+    const appliedDiscount = packageIsDiscountEligible
+      ? discountSetting
+      : 0;
+
+    const finalAmount = money(
+      baseAmount * (1 - appliedDiscount / 100)
+    );
+
+    if (finalAmount <= 0) {
+      return NextResponse.json(
+        {
+          error:
+            "The calculated payment must be greater than GH₵0. Please review the promotion settings.",
+        },
+        { status: 400 }
+      );
+    }
+
     const reference = `bsgpromo_${randomBytes(16).toString("hex")}`;
-    const amountPesewas = chosenPackage.amount * 100;
 
     const { data: promotion, error: insertError } = await supabase
       .from("promotion_requests")
       .insert({
         user_id: user.id,
         listing_id: Number(listingId),
-        package_id: packageId,
-        duration_days: chosenPackage.durationDays,
-        amount: chosenPackage.amount,
+        package_id: tier,
+        duration_days: durationMonths * 30,
+        duration_months: durationMonths,
+        base_amount: baseAmount,
+        discount_percent: appliedDiscount,
+        amount: finalAmount,
         currency_code: "GHS",
         payment_reference: reference,
         payment_status: "PENDING",
@@ -114,6 +241,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    promotionId = String(promotion.id);
+
     const callbackUrl =
       `${siteUrl.replace(/\/+$/, "")}/payment/callback`;
 
@@ -127,7 +256,7 @@ export async function POST(request: NextRequest) {
         },
         body: JSON.stringify({
           email: user.email,
-          amount: amountPesewas,
+          amount: Math.round(finalAmount * 100),
           currency: "GHS",
           reference,
           callback_url: callbackUrl,
@@ -135,7 +264,11 @@ export async function POST(request: NextRequest) {
             purpose: "advertisement_promotion",
             promotion_request_id: promotion.id,
             listing_id: listing.id,
-            package_id: packageId,
+            package_id: tier,
+            duration_months: durationMonths,
+            base_amount: baseAmount,
+            discount_percent: appliedDiscount,
+            final_amount: finalAmount,
           },
         }),
         cache: "no-store",
@@ -169,9 +302,34 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       authorizationUrl: paystackResult.data.authorization_url,
       reference,
+      pricing: {
+        tier,
+        durationMonths,
+        monthlyPrice,
+        baseAmount,
+        discountPercent: appliedDiscount,
+        finalAmount,
+        currency: "GHS",
+      },
     });
   } catch (error) {
     console.error("Promotion initialization error:", error);
+
+    // If initialization failed unexpectedly after saving the request,
+    // mark it failed rather than leaving a misleading pending request.
+    if (supabase && promotionId && userId) {
+      try {
+        await supabase
+          .from("promotion_requests")
+          .update({ payment_status: "FAILED" })
+          .eq("id", promotionId)
+          .eq("user_id", userId)
+          .eq("payment_status", "PENDING");
+      } catch (updateError) {
+        console.error("Could not update failed promotion:", updateError);
+      }
+    }
+
     return NextResponse.json(
       { error: "An unexpected error occurred while preparing payment." },
       { status: 500 }
