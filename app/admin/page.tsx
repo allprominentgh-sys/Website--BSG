@@ -1,21 +1,74 @@
+
 "use client";
 
 import Link from "next/link";
 
 const adminSections = [
-  { title: "Direct Sales", icon: "🛒", href: "/admin/direct-sales" },
-  { title: "Marketplace Listings", icon: "📋", href: "/listings" },
-  { title: "Sellers", icon: "👥", href: "/admin/sellers" },
-  { title: "Customers", icon: "👤", href: "/admin/customers" },
-  { title: "Orders", icon: "📦", href: "/admin/orders" },
-  { title: "Delivery & Tracking", icon: "🚚", href: "/admin/delivery" },
-  { title: "Payments", icon: "💳", href: "/admin/payments" },
-  { title: "Revenue & Payments", icon: "💰", href: "/admin/revenue" },
-  { title: "Advertising", icon: "📢", href: "/admin/advertising" },
-  { title: "Refund Policy", icon: "↩️", href: "/admin/refund-policy" },
-  { title: "Customer Service", icon: "🎧", href: "/admin/support" },
-  { title: "Content Management", icon: "📝", href: "/admin/cms" },
-  { title: "Settings", icon: "⚙️", href: "/admin/settings" },
+  {
+    title: "Direct Sales",
+    icon: "🛒",
+    href: "/admin/direct-sales",
+  },
+  {
+    title: "Marketplace Listings",
+    icon: "📋",
+    href: "/admin/listings",
+  },
+  {
+    title: "Sellers",
+    icon: "👥",
+    href: "/admin/sellers",
+  },
+  {
+    title: "Customers",
+    icon: "👤",
+    href: "/admin/customers",
+  },
+  {
+    title: "Orders",
+    icon: "📦",
+    href: "/admin/orders",
+  },
+  {
+    title: "Delivery & Tracking",
+    icon: "🚚",
+    href: "/admin/delivery",
+  },
+  {
+    title: "Payments",
+    icon: "💳",
+    href: "/admin/payments",
+  },
+  {
+    title: "Revenue & Payments",
+    icon: "💰",
+    href: "/admin/revenue",
+  },
+  {
+    title: "Advertising",
+    icon: "📢",
+    href: "/admin/advertising",
+  },
+  {
+    title: "Refund Policy",
+    icon: "↩️",
+    href: "/admin/refund-policy",
+  },
+  {
+    title: "Customer Service",
+    icon: "🎧",
+    href: "/admin/support",
+  },
+  {
+    title: "Content Management",
+    icon: "📝",
+    href: "/admin/cms",
+  },
+  {
+    title: "Settings",
+    icon: "⚙️",
+    href: "/admin/settings",
+  },
 ];
 
 export default function AdminDashboardPage() {
@@ -27,6 +80,7 @@ export default function AdminDashboardPage() {
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-700 text-xl text-white">
               ⭐
             </span>
+
             <span className="min-w-0">
               <strong className="block truncate text-sm font-black sm:text-base">
                 BEST SALES GHANA
@@ -93,6 +147,7 @@ export default function AdminDashboardPage() {
             <h2 className="text-lg font-black sm:text-xl">
               Management
             </h2>
+
             <span className="text-xs text-slate-500">
               {adminSections.length} sections
             </span>
@@ -103,7 +158,11 @@ export default function AdminDashboardPage() {
               <Link
                 key={section.title}
                 href={section.href}
-                className="group flex min-h-28 flex-col justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-blue-400 hover:shadow-md active:scale-[0.98] sm:min-h-32 sm:p-5"
+                className={`group flex min-h-28 flex-col justify-between rounded-xl border bg-white p-4 shadow-sm transition hover:border-blue-400 hover:shadow-md active:scale-[0.98] sm:min-h-32 sm:p-5 ${
+                  section.title === "Marketplace Listings"
+                    ? "border-blue-300 ring-1 ring-blue-100"
+                    : "border-slate-200"
+                }`}
               >
                 <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-2xl">
                   {section.icon}
@@ -113,6 +172,7 @@ export default function AdminDashboardPage() {
                   <span className="text-sm font-bold leading-5 group-hover:text-blue-700">
                     {section.title}
                   </span>
+
                   <span className="shrink-0 text-sm text-blue-700">
                     →
                   </span>
@@ -126,6 +186,7 @@ export default function AdminDashboardPage() {
           <p className="font-bold text-slate-700">
             BEST SALES GHANA
           </p>
+
           <p className="mt-1">
             © {new Date().getFullYear()} All Prominent Ghana Limited.
           </p>
