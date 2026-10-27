@@ -7,71 +7,126 @@ import { cookies } from "next/headers";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+type GPSBody = {
+  deliveryId?: unknown;
+  latitude?: unknown;
+  longitude?: unknown;
+  accuracyMeters?: unknown;
+  headingDegrees?: unknown;
+  speedMetersPerSecond?: unknown;
+};
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function jsonError(message: string, status: number) {
+  return NextResponse.json({ success: false, message }, { status });
+}
+
+function createAdminClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !key) {
+    throw new Error("Supabase server configuration is incomplete.");
+  }
+
+  return createClient(url, key, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+}
+
+async function getAuthenticatedUser() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !key) {
+    throw new Error("Supabase authentication configuration is incomplete.");
+  }
+
+  const cookieStore = cookies();
+
+  const supabase = createServerClient(url, key, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll();
+      },
+      setAll(cookiesToSet) {
+        try {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            cookieStore.set(name, value, options);
+          });
+        } catch {
+          // Some rendering contexts do not allow cookie mutation.
+        }
+      },
+    },
+  });
+
+  const { data, error } = await supabase.auth.getUser();
+
+  if (error || !data.user) {
+    return null;
+  }
+
+  return data.user;
+}
+
+async function getAssignedDelivery(
+  deliveryId: string,
+  userId: string
+) {
+  const admin = createAdminClient();
+
+  const { data, error } = await admin
+    .from("bsg_deliveries")
+    .select("id, rider_id")
+    .eq("id", deliveryId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error("Could not verify the delivery assignment.");
+  }
+
+  if (!data || data.rider_id !== userId) {
+    return null;
+  }
+
+  return data;
+}
+
+// POST: Save the authenticated rider's latest GPS position.
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = cookies();
+    const user = await getAuthenticatedUser();
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!supabaseUrl || !anonKey || !serviceRoleKey) {
-      return NextResponse.json(
-        { message: "Server configuration is incomplete." },
-        { status: 500 }
-      );
+    if (!user) {
+      return jsonError("Please sign in before sharing your location.", 401);
     }
 
-    // Verify the signed-in user using the existing Supabase session.
-    const authClient = createServerClient(supabaseUrl, anonKey, {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) => {
-              cookieStore.set(name, value, options);
-            });
-          } catch {
-            // Route handlers may not always permit cookie mutation.
-          }
-        },
-      },
-    });
+    let body: GPSBody;
 
-    const {
-      data: { user },
-      error: authError,
-    } = await authClient.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { message: "Please sign in before sharing your location." },
-        { status: 401 }
-      );
+    try {
+      body = await request.json();
+    } catch {
+      return jsonError("Invalid request body.", 400);
     }
-
-    const body = await request.json();
 
     const deliveryId =
       typeof body.deliveryId === "string" ? body.deliveryId : "";
+
+    if (!UUID_PATTERN.test(deliveryId)) {
+      return jsonError("A valid delivery ID is required.", 400);
+    }
 
     const latitude = body.latitude;
     const longitude = body.longitude;
     const accuracy = body.accuracyMeters;
     const heading = body.headingDegrees;
     const speed = body.speedMetersPerSecond;
-
-    const uuidPattern =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-    if (!uuidPattern.test(deliveryId)) {
-      return NextResponse.json(
-        { message: "A valid delivery ID is required." },
-        { status: 400 }
-      );
-    }
 
     if (
       typeof latitude !== "number" ||
@@ -83,10 +138,7 @@ export async function POST(request: NextRequest) {
       longitude < -180 ||
       longitude > 180
     ) {
-      return NextResponse.json(
-        { message: "Invalid GPS coordinates." },
-        { status: 400 }
-      );
+      return jsonError("Invalid GPS coordinates.", 400);
     }
 
     if (
@@ -96,10 +148,7 @@ export async function POST(request: NextRequest) {
         accuracy < 0 ||
         accuracy > 100000)
     ) {
-      return NextResponse.json(
-        { message: "Invalid GPS accuracy." },
-        { status: 400 }
-      );
+      return jsonError("Invalid GPS accuracy.", 400);
     }
 
     if (
@@ -109,10 +158,7 @@ export async function POST(request: NextRequest) {
         heading < 0 ||
         heading > 360)
     ) {
-      return NextResponse.json(
-        { message: "Invalid GPS heading." },
-        { status: 400 }
-      );
+      return jsonError("Invalid GPS heading.", 400);
     }
 
     if (
@@ -121,44 +167,21 @@ export async function POST(request: NextRequest) {
         !Number.isFinite(speed) ||
         speed < 0)
     ) {
-      return NextResponse.json(
-        { message: "Invalid GPS speed." },
-        { status: 400 }
+      return jsonError("Invalid GPS speed.", 400);
+    }
+
+    const delivery = await getAssignedDelivery(deliveryId, user.id);
+
+    if (!delivery) {
+      return jsonError(
+        "You are not assigned to this delivery.",
+        403
       );
     }
 
-    // Keep the service-role key on the server only.
-    const admin = createClient(supabaseUrl, serviceRoleKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    });
+    const admin = createAdminClient();
 
-    // Confirm this authenticated user is the assigned rider.
-    const { data: delivery, error: deliveryError } = await admin
-      .from("bsg_deliveries")
-      .select("id, rider_id")
-      .eq("id", deliveryId)
-      .maybeSingle();
-
-    if (deliveryError) {
-      console.error("Delivery lookup failed:", deliveryError.message);
-
-      return NextResponse.json(
-        { message: "Could not verify the delivery assignment." },
-        { status: 500 }
-      );
-    }
-
-    if (!delivery || delivery.rider_id !== user.id) {
-      return NextResponse.json(
-        { message: "You are not assigned to this delivery." },
-        { status: 403 }
-      );
-    }
-
-    const { error: saveError } = await admin
+    const { error } = await admin
       .from("bsg_delivery_live_locations")
       .upsert(
         {
@@ -173,13 +196,9 @@ export async function POST(request: NextRequest) {
         { onConflict: "rider_id" }
       );
 
-    if (saveError) {
-      console.error("GPS save failed:", saveError.message);
-
-      return NextResponse.json(
-        { message: "Could not save the GPS location." },
-        { status: 500 }
-      );
+    if (error) {
+      console.error("GPS save failed:", error.message);
+      return jsonError("Could not save the GPS location.", 500);
     }
 
     return NextResponse.json({
@@ -187,11 +206,65 @@ export async function POST(request: NextRequest) {
       updatedAt: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("GPS endpoint error:", error);
+    console.error("GPS POST error:", error);
 
-    return NextResponse.json(
-      { message: "Unable to process the GPS update." },
-      { status: 500 }
+    return jsonError(
+      "Unable to process the GPS update. Check server configuration.",
+      500
+    );
+  }
+}
+
+// GET: Read the latest GPS position for the assigned rider.
+export async function GET(request: NextRequest) {
+  try {
+    const user = await getAuthenticatedUser();
+
+    if (!user) {
+      return jsonError("Please sign in.", 401);
+    }
+
+    const deliveryId =
+      request.nextUrl.searchParams.get("deliveryId") ?? "";
+
+    if (!UUID_PATTERN.test(deliveryId)) {
+      return jsonError("A valid delivery ID is required.", 400);
+    }
+
+    const delivery = await getAssignedDelivery(deliveryId, user.id);
+
+    if (!delivery) {
+      return jsonError(
+        "You are not authorised to view this delivery location.",
+        403
+      );
+    }
+
+    const admin = createAdminClient();
+
+    const { data, error } = await admin
+      .from("bsg_delivery_live_locations")
+      .select(
+        "rider_id, latitude, longitude, accuracy_meters, heading_degrees, speed_meters_per_second, updated_at"
+      )
+      .eq("rider_id", delivery.rider_id)
+      .maybeSingle();
+
+    if (error) {
+      console.error("GPS read failed:", error.message);
+      return jsonError("Could not load the latest location.", 500);
+    }
+
+    return NextResponse.json({
+      success: true,
+      location: data ?? null,
+    });
+  } catch (error) {
+    console.error("GPS GET error:", error);
+
+    return jsonError(
+      "Unable to load the delivery location. Check server configuration.",
+      500
     );
   }
 }
