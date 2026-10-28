@@ -52,7 +52,6 @@ type SellerProfile = {
   avatar_url: string | null;
   verified: boolean | null;
   account_type: string | null;
-  phone?: string | null;
 };
 
 const TIER_ORDER: Record<PromotionTier, number> = {
@@ -215,7 +214,7 @@ export default function ProductPage() {
         }
 
         if (currentListing.seller_id) {
-          // Deliberately do not select the seller's phone number here.
+          // Do not fetch the seller's private phone number.
           const { data: sellerData, error: sellerError } = await supabase
             .from("profiles")
             .select(`
@@ -359,17 +358,21 @@ export default function ProductPage() {
     );
   }
 
-  async function requireLogin() {
+  // If the buyer is signed out, send them to login with the intended
+  // destination. The login page must honor the "next" query parameter.
+  async function requireLogin(nextPath?: string) {
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser();
 
     if (authError || !user) {
+      const returnTo =
+        nextPath || (listing ? `/listings/${listing.id}` : "/listings");
+
       window.location.href =
-        `/login?error=login_required&next=${encodeURIComponent(
-          `/listings/${listing?.id}`
-        )}`;
+        `/login?error=login_required&next=${encodeURIComponent(returnTo)}`;
+
       return null;
     }
 
@@ -377,15 +380,22 @@ export default function ProductPage() {
   }
 
   async function contactSeller() {
-    const user = await requireLogin();
-    if (!user || !listing) return;
+    if (!listing) return;
 
-    window.location.href = `/chat?listing=${listing.id}`;
+    // Important: after login, continue to the chat, not merely the listing.
+    const chatPath = `/chat?listing=${encodeURIComponent(String(listing.id))}`;
+    const user = await requireLogin(chatPath);
+
+    if (!user) return;
+
+    window.location.href = chatPath;
   }
 
   async function callSeller() {
-    const user = await requireLogin();
-    if (!user || !listing) return;
+    if (!listing) return;
+
+    const user = await requireLogin(`/listings/${listing.id}`);
+    if (!user) return;
 
     setNotice(
       "You are signed in. Phone contact is not connected yet because the seller's number is being kept private."
@@ -557,7 +567,6 @@ export default function ProductPage() {
       </header>
 
       <section className="mx-auto max-w-7xl px-3 py-4 sm:px-6 sm:py-8 lg:px-8">
-        {/* Product gallery */}
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm sm:rounded-3xl">
           <div className="relative flex min-h-[260px] items-center justify-center bg-slate-100 sm:min-h-[480px]">
             {imageUrl && !currentImageFailed ? (
@@ -658,7 +667,6 @@ export default function ProductPage() {
           )}
         </div>
 
-        {/* Product summary */}
         <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:mt-6 sm:rounded-3xl sm:p-7">
           <div className="flex flex-wrap items-center gap-2">
             {promotionTier && (
@@ -718,8 +726,7 @@ export default function ProductPage() {
 
           {listing.price !== null && displayCurrency !== originalCurrency && (
             <p className="mt-2 text-sm text-slate-500">
-              Original price:{" "}
-              {formatAmount(Number(listing.price), originalCurrency)}
+              Original price: {formatAmount(Number(listing.price), originalCurrency)}
               {convertedPrice === null && (
                 <span className="ml-2 text-amber-700">
                   • Conversion rate not set
@@ -734,7 +741,6 @@ export default function ProductPage() {
           </p>
         </section>
 
-        {/* Product information tabs */}
         <section className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm sm:mt-6 sm:rounded-3xl">
           <div
             role="tablist"
@@ -762,243 +768,128 @@ export default function ProductPage() {
           </div>
 
           {activeTab === "overview" && (
-            <div
-              id="panel-overview"
-              role="tabpanel"
-              aria-labelledby="tab-overview"
-              className="p-5 sm:p-8"
-            >
-              <p className="text-xs font-black uppercase tracking-widest text-blue-700">
-                Product overview
-              </p>
+            <div id="panel-overview" role="tabpanel" aria-labelledby="tab-overview" className="p-5 sm:p-8">
+              <p className="text-xs font-black uppercase tracking-widest text-blue-700">Product overview</p>
               <h2 className="mt-2 text-2xl font-black">Description</h2>
-              <p className="mt-4 whitespace-pre-wrap leading-8 text-slate-600">
-                {description}
-              </p>
+              <p className="mt-4 whitespace-pre-wrap leading-8 text-slate-600">{description}</p>
             </div>
           )}
 
           {activeTab === "details" && (
-            <div
-              id="panel-details"
-              role="tabpanel"
-              aria-labelledby="tab-details"
-              className="p-5 sm:p-8"
-            >
-              <p className="text-xs font-black uppercase tracking-widest text-blue-700">
-                Listing information
-              </p>
+            <div id="panel-details" role="tabpanel" aria-labelledby="tab-details" className="p-5 sm:p-8">
+              <p className="text-xs font-black uppercase tracking-widest text-blue-700">Listing information</p>
               <h2 className="mt-2 text-2xl font-black">Details</h2>
-
               <dl className="mt-4 divide-y divide-slate-100">
                 {[
                   ["Product name", listing.title],
                   ["Category", listing.category || "Not specified"],
                   ["Subcategory", listing.subcategory || "Not specified"],
                   ["Status", listing.status || "Not specified"],
-                  [
-                    "Price",
-                    listing.price === null
-                      ? "Price not set"
-                      : formatAmount(Number(listing.price), originalCurrency),
-                  ],
+                  ["Price", listing.price === null ? "Price not set" : formatAmount(Number(listing.price), originalCurrency)],
                   ["Seller", seller?.full_name || "Marketplace Seller"],
                 ].map(([label, value]) => (
-                  <div
-                    key={label}
-                    className="flex flex-col gap-1 py-3 sm:flex-row sm:justify-between"
-                  >
-                    <dt className="text-sm font-semibold text-slate-500">
-                      {label}
-                    </dt>
-                    <dd className="font-bold sm:max-w-[65%] sm:text-right">
-                      {value}
-                    </dd>
+                  <div key={label} className="flex flex-col gap-1 py-3 sm:flex-row sm:justify-between">
+                    <dt className="text-sm font-semibold text-slate-500">{label}</dt>
+                    <dd className="font-bold sm:max-w-[65%] sm:text-right">{value}</dd>
                   </div>
                 ))}
               </dl>
-
               <h3 className="mt-5 text-lg font-black">Full description</h3>
-              <p className="mt-3 whitespace-pre-wrap leading-8 text-slate-600">
-                {description}
-              </p>
+              <p className="mt-3 whitespace-pre-wrap leading-8 text-slate-600">{description}</p>
             </div>
           )}
 
           {activeTab === "delivery" && (
-            <div
-              id="panel-delivery"
-              role="tabpanel"
-              aria-labelledby="tab-delivery"
-              className="p-5 sm:p-8"
-            >
+            <div id="panel-delivery" role="tabpanel" aria-labelledby="tab-delivery" className="p-5 sm:p-8">
               <div className="flex items-start gap-4">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-2xl">
-                  🚚
-                </div>
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-2xl">🚚</div>
                 <div>
                   <h2 className="text-xl font-black">Delivery information</h2>
                   <p className="mt-2 leading-7 text-slate-600">
-                    Contact the seller to confirm delivery availability,
-                    charges and timing before payment.
+                    Contact the seller to confirm delivery availability, charges and timing before payment.
                   </p>
                 </div>
               </div>
-
               <div className="mt-5 rounded-xl bg-slate-50 p-4">
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                  Listing location
-                </p>
-                <p className="mt-2 font-bold">
-                  📍 {listing.location || "Location not provided"}
-                </p>
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Listing location</p>
+                <p className="mt-2 font-bold">📍 {listing.location || "Location not provided"}</p>
               </div>
-
               <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
-                <h3 className="font-black text-amber-950">
-                  Confirm before paying
-                </h3>
+                <h3 className="font-black text-amber-950">Confirm before paying</h3>
                 <p className="mt-2 text-sm leading-6 text-amber-900">
-                  Agree on delivery costs and timing directly with the seller.
-                  This page does not confirm a delivery booking or provide live
-                  shipment tracking.
+                  Agree on delivery costs and timing directly with the seller. This page does not confirm a delivery booking or provide live shipment tracking.
                 </p>
               </div>
-
-              <button
-                type="button"
-                onClick={contactSeller}
-                className="mt-5 w-full rounded-xl bg-blue-700 px-5 py-4 font-black text-white hover:bg-blue-800 sm:w-auto"
-              >
+              <button type="button" onClick={contactSeller} className="mt-5 w-full rounded-xl bg-blue-700 px-5 py-4 font-black text-white hover:bg-blue-800 sm:w-auto">
                 💬 Ask Seller About Delivery
               </button>
             </div>
           )}
         </section>
 
-        {/* Seller card: phone number stays hidden */}
         <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:mt-6 sm:rounded-3xl sm:p-6">
           <div className="flex items-center gap-4">
             {seller?.avatar_url ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={seller.avatar_url}
-                alt={seller.full_name || "Seller"}
-                className="h-14 w-14 shrink-0 rounded-full object-cover"
-              />
+              <img src={seller.avatar_url} alt={seller.full_name || "Seller"} className="h-14 w-14 shrink-0 rounded-full object-cover" />
             ) : (
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-blue-100 text-2xl">
-                👤
-              </div>
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-blue-100 text-2xl">👤</div>
             )}
 
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="font-black">
-                  {seller?.full_name || "Marketplace Seller"}
-                </h2>
+                <h2 className="font-black">{seller?.full_name || "Marketplace Seller"}</h2>
                 {seller?.verified && (
-                  <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-black text-green-700">
-                    ✓ VERIFIED
-                  </span>
+                  <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-black text-green-700">✓ VERIFIED</span>
                 )}
               </div>
               <p className="mt-1 text-sm text-slate-500">{sellerType}</p>
-              {seller?.location && (
-                <p className="mt-1 text-sm text-slate-500">
-                  📍 {seller.location}
-                </p>
-              )}
+              {seller?.location && <p className="mt-1 text-sm text-slate-500">📍 {seller.location}</p>}
             </div>
           </div>
 
           <div className="mt-4 rounded-xl bg-slate-50 p-4">
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-              Seller contact
-            </p>
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Seller contact</p>
             <p className="mt-2 text-sm font-semibold text-slate-600">
               The seller's phone number is hidden. Sign in to request contact.
             </p>
           </div>
 
           <div className="mt-4 grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={callSeller}
-              className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-green-600 px-3 py-3 text-sm font-black text-white hover:bg-green-700"
-            >
+            <button type="button" onClick={callSeller} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-green-600 px-3 py-3 text-sm font-black text-white hover:bg-green-700">
               📞 Call
             </button>
-
-            <button
-              type="button"
-              onClick={contactSeller}
-              className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-blue-700 px-3 py-3 text-sm font-black text-white hover:bg-blue-800"
-            >
+            <button type="button" onClick={contactSeller} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-blue-700 px-3 py-3 text-sm font-black text-white hover:bg-blue-800">
               💬 Message
             </button>
           </div>
         </section>
 
-        {/* Save / share / report */}
         <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:mt-6 sm:rounded-3xl sm:p-6">
           <h2 className="text-lg font-black">Listing actions</h2>
-
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <button
-              type="button"
-              disabled={savingFavourite}
-              onClick={toggleFavourite}
-              className={`min-h-12 rounded-xl border px-4 py-3 font-black ${
-                isFavourite
-                  ? "border-red-300 bg-red-50 text-red-700"
-                  : "border-blue-200 bg-white text-blue-700 hover:bg-blue-50"
-              }`}
-            >
-              {savingFavourite
-                ? "Saving..."
-                : isFavourite
-                  ? "♥ Saved"
-                  : "♡ Save Listing"}
+            <button type="button" disabled={savingFavourite} onClick={toggleFavourite} className={`min-h-12 rounded-xl border px-4 py-3 font-black ${isFavourite ? "border-red-300 bg-red-50 text-red-700" : "border-blue-200 bg-white text-blue-700 hover:bg-blue-50"}`}>
+              {savingFavourite ? "Saving..." : isFavourite ? "♥ Saved" : "♡ Save Listing"}
             </button>
-
-            <button
-              type="button"
-              disabled={sharing}
-              onClick={shareListing}
-              className="min-h-12 rounded-xl border border-slate-300 bg-white px-4 py-3 font-bold text-slate-700 hover:bg-slate-50"
-            >
+            <button type="button" disabled={sharing} onClick={shareListing} className="min-h-12 rounded-xl border border-slate-300 bg-white px-4 py-3 font-bold text-slate-700 hover:bg-slate-50">
               📤 {sharing ? "Sharing..." : "Share Listing"}
             </button>
-
-            <button
-              type="button"
-              disabled={reporting}
-              onClick={reportListing}
-              className="min-h-12 rounded-xl border border-red-200 bg-white px-4 py-3 font-bold text-red-700 hover:bg-red-50"
-            >
+            <button type="button" disabled={reporting} onClick={reportListing} className="min-h-12 rounded-xl border border-red-200 bg-white px-4 py-3 font-bold text-red-700 hover:bg-red-50">
               🚩 {reporting ? "Reporting..." : "Report Listing"}
             </button>
           </div>
 
           {notice && (
-            <p
-              role="status"
-              aria-live="polite"
-              className="mt-4 rounded-xl bg-blue-50 p-3 text-sm font-semibold text-blue-900"
-            >
+            <p role="status" aria-live="polite" className="mt-4 rounded-xl bg-blue-50 p-3 text-sm font-semibold text-blue-900">
               {notice}
             </p>
           )}
         </section>
 
-        {/* Safety notice */}
         <section className="mt-4 rounded-2xl bg-blue-50 p-5 sm:mt-6 sm:rounded-3xl sm:p-7">
           <h2 className="text-lg font-black">🛡️ Shop safely</h2>
           <p className="mt-2 leading-7 text-slate-600">
-            Verify the item and seller before making payment. Never share
-            passwords, card details, verification codes or other sensitive
-            account information with another person.
+            Verify the item and seller before making payment. Never share passwords, card details, verification codes or other sensitive account information with another person.
           </p>
         </section>
       </section>
@@ -1006,16 +897,11 @@ export default function ProductPage() {
       <footer className="mt-8 bg-slate-950 py-8 text-white">
         <div className="mx-auto max-w-7xl px-4 text-center">
           <div className="text-xl font-black">BEST SALES GHANA</div>
-          <p className="mt-2 text-sm text-slate-400">
-            Buy • Sell • Advertise • Connect
-          </p>
-          <p className="mt-5 text-sm text-slate-500">
-            © 2026 All Prominent Ghana Limited. All rights reserved.
-          </p>
+          <p className="mt-2 text-sm text-slate-400">Buy • Sell • Advertise • Connect</p>
+          <p className="mt-5 text-sm text-slate-500">© 2026 All Prominent Ghana Limited. All rights reserved.</p>
         </div>
       </footer>
 
-      {/* Full-screen image viewer */}
       {viewerOpen && imageUrl && !currentImageFailed && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 p-4"
@@ -1024,49 +910,23 @@ export default function ProductPage() {
           aria-label="Product image viewer"
           onClick={() => setViewerOpen(false)}
         >
-          <button
-            type="button"
-            onClick={() => setViewerOpen(false)}
-            aria-label="Close image viewer"
-            className="absolute right-4 top-4 z-10 flex h-12 w-12 items-center justify-center rounded-full bg-white text-3xl font-bold text-black"
-          >
+          <button type="button" onClick={() => setViewerOpen(false)} aria-label="Close image viewer" className="absolute right-4 top-4 z-10 flex h-12 w-12 items-center justify-center rounded-full bg-white text-3xl font-bold text-black">
             ×
           </button>
 
           {images.length > 1 && (
             <>
-              <button
-                type="button"
-                aria-label="Previous image"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  changeImage(-1);
-                }}
-                className="absolute left-3 top-1/2 z-10 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-3xl font-bold text-black"
-              >
+              <button type="button" aria-label="Previous image" onClick={(event) => { event.stopPropagation(); changeImage(-1); }} className="absolute left-3 top-1/2 z-10 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-3xl font-bold text-black">
                 ‹
               </button>
-              <button
-                type="button"
-                aria-label="Next image"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  changeImage(1);
-                }}
-                className="absolute right-3 top-1/2 z-10 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-3xl font-bold text-black"
-              >
+              <button type="button" aria-label="Next image" onClick={(event) => { event.stopPropagation(); changeImage(1); }} className="absolute right-3 top-1/2 z-10 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-3xl font-bold text-black">
                 ›
               </button>
             </>
           )}
 
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={imageUrl}
-            alt={listing.title}
-            onClick={(event) => event.stopPropagation()}
-            className="max-h-[90vh] max-w-full object-contain"
-          />
+          <img src={imageUrl} alt={listing.title} onClick={(event) => event.stopPropagation()} className="max-h-[90vh] max-w-full object-contain" />
 
           {images.length > 1 && (
             <span className="absolute bottom-5 rounded-full bg-white/15 px-4 py-2 text-sm font-bold text-white">
