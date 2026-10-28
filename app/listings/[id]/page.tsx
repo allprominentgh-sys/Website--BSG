@@ -90,6 +90,7 @@ export default function ProductPage() {
   const [savingFavourite, setSavingFavourite] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [reporting, setReporting] = useState(false);
+  const [contactLoading, setContactLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<ProductTab>("overview");
   const [selectedImage, setSelectedImage] = useState(0);
   const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({});
@@ -99,6 +100,7 @@ export default function ProductPage() {
   const imageUrl = images[selectedImage]?.image_url;
   const currentImageFailed = Boolean(imageErrors[selectedImage]);
 
+  // Load the listing first, then fetch its related information in parallel.
   useEffect(() => {
     let cancelled = false;
 
@@ -114,6 +116,7 @@ export default function ProductPage() {
       setSelectedImage(0);
       setImageErrors({});
       setActiveTab("overview");
+      setNotice("");
 
       const rawId = params.id;
       const listingId = Number(rawId);
@@ -125,40 +128,100 @@ export default function ProductPage() {
       }
 
       try {
-        const { data, error: listingError } = await supabase
-          .from("listings")
-          .select(`
-            id, title, description, price, currency_code, currency,
-            location, status, featured, category, subcategory,
-            created_at, seller_id
-          `)
-          .eq("id", listingId)
-          .maybeSingle();
+        const [listingResult, currencyResult, authResult] =
+          await Promise.all([
+            supabase
+              .from("listings")
+              .select(`
+                id, title, description, price, currency_code, currency,
+                location, status, featured, category, subcategory,
+                created_at, seller_id
+              `)
+              .eq("id", listingId)
+              .maybeSingle(),
 
-        if (listingError) throw listingError;
+            supabase
+              .from("currencies")
+              .select("code, name, symbol, manual_rate_from_ghs")
+              .in("code", ["GHS", "USD", "CNY", "EUR", "GBP"]),
+
+            // Read the local session rather than waiting for a user refresh.
+            supabase.auth.getSession(),
+          ]);
+
         if (cancelled) return;
+        if (listingResult.error) throw listingResult.error;
 
-        if (!data) {
+        if (!listingResult.data) {
           setLoading(false);
           return;
         }
 
-        const currentListing = data as Listing;
+        const currentListing = listingResult.data as Listing;
         setListing(currentListing);
 
-        const { data: promotionData, error: promotionError } =
-          await supabase
+        if (!currencyResult.error) {
+          setCurrencies((currencyResult.data || []) as Currency[]);
+        } else {
+          console.warn(
+            "Could not load currencies:",
+            currencyResult.error.message
+          );
+        }
+
+        const user = authResult.data.session?.user ?? null;
+
+        // These requests are independent, so run them together.
+        const [
+          promotionResult,
+          imageResult,
+          sellerResult,
+          favouriteResult,
+        ] = await Promise.all([
+          supabase
             .from("active_listing_promotions")
             .select("listing_id, package_id, starts_at, ends_at")
-            .eq("listing_id", listingId);
+            .eq("listing_id", listingId),
+
+          supabase
+            .from("listing_images")
+            .select("id, listing_id, image_url")
+            .eq("listing_id", listingId)
+            .order("id", { ascending: true }),
+
+          currentListing.seller_id
+            ? supabase
+                .from("profiles")
+                .select(
+                  "id, full_name, location, avatar_url, verified, account_type"
+                )
+                .eq("id", currentListing.seller_id)
+                .maybeSingle()
+            : Promise.resolve({ data: null, error: null }),
+
+          user
+            ? supabase
+                .from("favorites")
+                .select("listing_id")
+                .eq("user_id", user.id)
+                .eq("listing_id", listingId)
+                .maybeSingle()
+            : Promise.resolve({ data: null, error: null }),
+        ]);
 
         if (cancelled) return;
 
-        if (promotionError) {
-          console.warn("Could not load promotion:", promotionError.message);
+        if (promotionResult.error) {
+          console.warn(
+            "Could not load promotion:",
+            promotionResult.error.message
+          );
         } else {
           const now = Date.now();
-          const validPromotions = ((promotionData || []) as Promotion[])
+
+          const validPromotions = (
+            (promotionResult.data || []) as Promotion[]
+          )
             .filter((promotion) => {
               const tier = promotion.package_id as PromotionTier;
               const start = Date.parse(promotion.starts_at);
@@ -183,87 +246,49 @@ export default function ProductPage() {
           );
         }
 
-        const { data: imageData, error: imageError } = await supabase
-          .from("listing_images")
-          .select("id, listing_id, image_url")
-          .eq("listing_id", listingId)
-          .order("id", { ascending: true });
-
-        if (cancelled) return;
-
-        if (!imageError) {
+        if (imageResult.error) {
+          console.warn("Could not load images:", imageResult.error.message);
+        } else {
           setImages(
-            ((imageData || []) as ListingImage[]).filter(
+            ((imageResult.data || []) as ListingImage[]).filter(
               (image) =>
                 typeof image.image_url === "string" &&
                 image.image_url.trim().length > 0
             )
           );
+        }
+
+        if (sellerResult.error) {
+          console.warn("Could not load seller:", sellerResult.error.message);
         } else {
-          console.warn("Could not load images:", imageError.message);
+          setSeller(sellerResult.data as SellerProfile | null);
         }
 
-        const { data: currencyData, error: currencyError } = await supabase
-          .from("currencies")
-          .select("code, name, symbol, manual_rate_from_ghs")
-          .in("code", ["GHS", "USD", "CNY", "EUR", "GBP"]);
-
-        if (cancelled) return;
-        if (!currencyError) {
-          setCurrencies((currencyData || []) as Currency[]);
+        if (favouriteResult.error) {
+          console.warn(
+            "Could not load favourite:",
+            favouriteResult.error.message
+          );
+        } else {
+          setIsFavourite(Boolean(favouriteResult.data));
         }
 
-        if (currentListing.seller_id) {
-          // Do not fetch the seller's private phone number.
-          const { data: sellerData, error: sellerError } = await supabase
-            .from("profiles")
-            .select(`
-              id, full_name, location, avatar_url, verified, account_type
-            `)
-            .eq("id", currentListing.seller_id)
-            .maybeSingle();
-
-          if (cancelled) return;
-
-          if (!sellerError) {
-            setSeller(sellerData as SellerProfile | null);
-          } else {
-            console.warn("Could not load seller:", sellerError.message);
-          }
-        }
-
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-
-        if (cancelled) return;
-
-        if (user) {
-          const { data: favouriteData, error: favouriteError } =
-            await supabase
-              .from("favorites")
-              .select("listing_id")
-              .eq("user_id", user.id)
-              .eq("listing_id", listingId)
-              .maybeSingle();
-
-          if (cancelled) return;
-          if (!favouriteError) {
-            setIsFavourite(Boolean(favouriteData));
-          }
-        }
-
-        const { error: eventError } = await supabase.from("ad_events").insert({
-          ad_id: listingId,
-          event_type: "VIEW",
-          viewer_id: user?.id || null,
-        });
-
-        if (eventError) {
-          console.warn("Could not record view:", eventError.message);
-        }
+        // Do not hold up the page while analytics are recorded.
+        void supabase
+          .from("ad_events")
+          .insert({
+            ad_id: listingId,
+            event_type: "VIEW",
+            viewer_id: user?.id || null,
+          })
+          .then(({ error: eventError }) => {
+            if (eventError) {
+              console.warn("Could not record view:", eventError.message);
+            }
+          });
       } catch (err: unknown) {
         console.error("Unable to load listing:", err);
+
         if (!cancelled) {
           setError(
             err instanceof Error ? err.message : "Unable to load this listing."
@@ -358,15 +383,14 @@ export default function ProductPage() {
     );
   }
 
-  // If the buyer is signed out, send them to login with the intended
-  // destination. The login page must honor the "next" query parameter.
+  // Use the current session and return signed-out buyers to their intended page.
   async function requireLogin(nextPath?: string) {
     const {
-      data: { user },
+      data: { session },
       error: authError,
-    } = await supabase.auth.getUser();
+    } = await supabase.auth.getSession();
 
-    if (authError || !user) {
+    if (authError || !session?.user) {
       const returnTo =
         nextPath || (listing ? `/listings/${listing.id}` : "/listings");
 
@@ -376,33 +400,53 @@ export default function ProductPage() {
       return null;
     }
 
-    return user;
+    return session.user;
   }
 
   async function contactSeller() {
-    if (!listing) return;
+    if (!listing || contactLoading) return;
 
-    // Important: after login, continue to the chat, not merely the listing.
+    setContactLoading(true);
+    setNotice("");
+
     const chatPath = `/chat?listing=${encodeURIComponent(String(listing.id))}`;
-    const user = await requireLogin(chatPath);
 
-    if (!user) return;
+    try {
+      const user = await requireLogin(chatPath);
+      if (!user) return;
 
-    window.location.href = chatPath;
+      window.location.href = chatPath;
+    } catch (err) {
+      console.error("Unable to open chat:", err);
+      setNotice("Unable to open the chat. Please try again.");
+      setContactLoading(false);
+    }
   }
 
   async function callSeller() {
-    if (!listing) return;
+    if (!listing || contactLoading) return;
 
-    const user = await requireLogin(`/listings/${listing.id}`);
-    if (!user) return;
+    setContactLoading(true);
+    setNotice("");
 
-    setNotice(
-      "You are signed in. Phone contact is not connected yet because the seller's number is being kept private."
-    );
+    try {
+      const user = await requireLogin(`/listings/${listing.id}`);
+      if (!user) return;
+
+      setNotice(
+        "Phone contact is not available yet. The seller's phone number remains private."
+      );
+    } catch (err) {
+      console.error("Unable to check contact access:", err);
+      setNotice("Unable to continue. Please try again.");
+    } finally {
+      setContactLoading(false);
+    }
   }
 
   async function toggleFavourite() {
+    if (savingFavourite) return;
+
     const user = await requireLogin();
     if (!user || !listing) return;
 
@@ -433,7 +477,7 @@ export default function ProductPage() {
         setNotice("Listing saved to your favourites.");
       }
     } catch (err) {
-      console.error(err);
+      console.error("Unable to update favourite:", err);
       setNotice("Unable to update your favourites. Please try again.");
     } finally {
       setSavingFavourite(false);
@@ -441,7 +485,7 @@ export default function ProductPage() {
   }
 
   async function shareListing() {
-    if (!listing) return;
+    if (!listing || sharing) return;
 
     setSharing(true);
     setNotice("");
@@ -462,13 +506,15 @@ export default function ProductPage() {
         window.prompt("Copy this listing link:", url);
       }
     } catch {
-      // The user may cancel sharing.
+      // The user may cancel the sharing dialog.
     } finally {
       setSharing(false);
     }
   }
 
   async function reportListing() {
+    if (reporting) return;
+
     const user = await requireLogin();
     if (!user || !listing) return;
 
@@ -491,7 +537,7 @@ export default function ProductPage() {
         "Your report event was recorded. The report reason is not currently stored for administrator review."
       );
     } catch (err) {
-      console.error(err);
+      console.error("Unable to report listing:", err);
       setNotice("Unable to submit your report. Please try again.");
     } finally {
       setReporting(false);
@@ -726,7 +772,8 @@ export default function ProductPage() {
 
           {listing.price !== null && displayCurrency !== originalCurrency && (
             <p className="mt-2 text-sm text-slate-500">
-              Original price: {formatAmount(Number(listing.price), originalCurrency)}
+              Original price:{" "}
+              {formatAmount(Number(listing.price), originalCurrency)}
               {convertedPrice === null && (
                 <span className="ml-2 text-amber-700">
                   • Conversion rate not set
@@ -768,16 +815,32 @@ export default function ProductPage() {
           </div>
 
           {activeTab === "overview" && (
-            <div id="panel-overview" role="tabpanel" aria-labelledby="tab-overview" className="p-5 sm:p-8">
-              <p className="text-xs font-black uppercase tracking-widest text-blue-700">Product overview</p>
+            <div
+              id="panel-overview"
+              role="tabpanel"
+              aria-labelledby="tab-overview"
+              className="p-5 sm:p-8"
+            >
+              <p className="text-xs font-black uppercase tracking-widest text-blue-700">
+                Product overview
+              </p>
               <h2 className="mt-2 text-2xl font-black">Description</h2>
-              <p className="mt-4 whitespace-pre-wrap leading-8 text-slate-600">{description}</p>
+              <p className="mt-4 whitespace-pre-wrap leading-8 text-slate-600">
+                {description}
+              </p>
             </div>
           )}
 
           {activeTab === "details" && (
-            <div id="panel-details" role="tabpanel" aria-labelledby="tab-details" className="p-5 sm:p-8">
-              <p className="text-xs font-black uppercase tracking-widest text-blue-700">Listing information</p>
+            <div
+              id="panel-details"
+              role="tabpanel"
+              aria-labelledby="tab-details"
+              className="p-5 sm:p-8"
+            >
+              <p className="text-xs font-black uppercase tracking-widest text-blue-700">
+                Listing information
+              </p>
               <h2 className="mt-2 text-2xl font-black">Details</h2>
               <dl className="mt-4 divide-y divide-slate-100">
                 {[
@@ -785,43 +848,80 @@ export default function ProductPage() {
                   ["Category", listing.category || "Not specified"],
                   ["Subcategory", listing.subcategory || "Not specified"],
                   ["Status", listing.status || "Not specified"],
-                  ["Price", listing.price === null ? "Price not set" : formatAmount(Number(listing.price), originalCurrency)],
+                  [
+                    "Price",
+                    listing.price === null
+                      ? "Price not set"
+                      : formatAmount(Number(listing.price), originalCurrency),
+                  ],
                   ["Seller", seller?.full_name || "Marketplace Seller"],
                 ].map(([label, value]) => (
-                  <div key={label} className="flex flex-col gap-1 py-3 sm:flex-row sm:justify-between">
-                    <dt className="text-sm font-semibold text-slate-500">{label}</dt>
-                    <dd className="font-bold sm:max-w-[65%] sm:text-right">{value}</dd>
+                  <div
+                    key={label}
+                    className="flex flex-col gap-1 py-3 sm:flex-row sm:justify-between"
+                  >
+                    <dt className="text-sm font-semibold text-slate-500">
+                      {label}
+                    </dt>
+                    <dd className="font-bold sm:max-w-[65%] sm:text-right">
+                      {value}
+                    </dd>
                   </div>
                 ))}
               </dl>
               <h3 className="mt-5 text-lg font-black">Full description</h3>
-              <p className="mt-3 whitespace-pre-wrap leading-8 text-slate-600">{description}</p>
+              <p className="mt-3 whitespace-pre-wrap leading-8 text-slate-600">
+                {description}
+              </p>
             </div>
           )}
 
           {activeTab === "delivery" && (
-            <div id="panel-delivery" role="tabpanel" aria-labelledby="tab-delivery" className="p-5 sm:p-8">
+            <div
+              id="panel-delivery"
+              role="tabpanel"
+              aria-labelledby="tab-delivery"
+              className="p-5 sm:p-8"
+            >
               <div className="flex items-start gap-4">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-2xl">🚚</div>
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-2xl">
+                  🚚
+                </div>
                 <div>
                   <h2 className="text-xl font-black">Delivery information</h2>
                   <p className="mt-2 leading-7 text-slate-600">
-                    Contact the seller to confirm delivery availability, charges and timing before payment.
+                    Contact the seller to confirm delivery availability,
+                    charges and timing before payment.
                   </p>
                 </div>
               </div>
               <div className="mt-5 rounded-xl bg-slate-50 p-4">
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Listing location</p>
-                <p className="mt-2 font-bold">📍 {listing.location || "Location not provided"}</p>
-              </div>
-              <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
-                <h3 className="font-black text-amber-950">Confirm before paying</h3>
-                <p className="mt-2 text-sm leading-6 text-amber-900">
-                  Agree on delivery costs and timing directly with the seller. This page does not confirm a delivery booking or provide live shipment tracking.
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                  Listing location
+                </p>
+                <p className="mt-2 font-bold">
+                  📍 {listing.location || "Location not provided"}
                 </p>
               </div>
-              <button type="button" onClick={contactSeller} className="mt-5 w-full rounded-xl bg-blue-700 px-5 py-4 font-black text-white hover:bg-blue-800 sm:w-auto">
-                💬 Ask Seller About Delivery
+              <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <h3 className="font-black text-amber-950">
+                  Confirm before paying
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-amber-900">
+                  Agree on delivery costs and timing directly with the seller.
+                  This page does not confirm a delivery booking or provide live
+                  shipment tracking.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={contactSeller}
+                disabled={contactLoading}
+                className="mt-5 w-full rounded-xl bg-blue-700 px-5 py-4 font-black text-white hover:bg-blue-800 disabled:cursor-wait disabled:opacity-60 sm:w-auto"
+              >
+                {contactLoading
+                  ? "Opening chat..."
+                  : "💬 Ask Seller About Delivery"}
               </button>
             </div>
           )}
@@ -831,36 +931,63 @@ export default function ProductPage() {
           <div className="flex items-center gap-4">
             {seller?.avatar_url ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={seller.avatar_url} alt={seller.full_name || "Seller"} className="h-14 w-14 shrink-0 rounded-full object-cover" />
+              <img
+                src={seller.avatar_url}
+                alt={seller.full_name || "Seller"}
+                loading="lazy"
+                className="h-14 w-14 shrink-0 rounded-full object-cover"
+              />
             ) : (
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-blue-100 text-2xl">👤</div>
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-blue-100 text-2xl">
+                👤
+              </div>
             )}
 
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="font-black">{seller?.full_name || "Marketplace Seller"}</h2>
+                <h2 className="font-black">
+                  {seller?.full_name || "Marketplace Seller"}
+                </h2>
                 {seller?.verified && (
-                  <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-black text-green-700">✓ VERIFIED</span>
+                  <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-black text-green-700">
+                    ✓ VERIFIED
+                  </span>
                 )}
               </div>
               <p className="mt-1 text-sm text-slate-500">{sellerType}</p>
-              {seller?.location && <p className="mt-1 text-sm text-slate-500">📍 {seller.location}</p>}
+              {seller?.location && (
+                <p className="mt-1 text-sm text-slate-500">
+                  📍 {seller.location}
+                </p>
+              )}
             </div>
           </div>
 
           <div className="mt-4 rounded-xl bg-slate-50 p-4">
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Seller contact</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+              Seller contact
+            </p>
             <p className="mt-2 text-sm font-semibold text-slate-600">
               The seller's phone number is hidden. Sign in to request contact.
             </p>
           </div>
 
           <div className="mt-4 grid grid-cols-2 gap-3">
-            <button type="button" onClick={callSeller} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-green-600 px-3 py-3 text-sm font-black text-white hover:bg-green-700">
-              📞 Call
+            <button
+              type="button"
+              disabled={contactLoading}
+              onClick={callSeller}
+              className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-green-600 px-3 py-3 text-sm font-black text-white hover:bg-green-700 disabled:cursor-wait disabled:opacity-60"
+            >
+              {contactLoading ? "Please wait..." : "📞 Call"}
             </button>
-            <button type="button" onClick={contactSeller} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-blue-700 px-3 py-3 text-sm font-black text-white hover:bg-blue-800">
-              💬 Message
+            <button
+              type="button"
+              disabled={contactLoading}
+              onClick={contactSeller}
+              className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-blue-700 px-3 py-3 text-sm font-black text-white hover:bg-blue-800 disabled:cursor-wait disabled:opacity-60"
+            >
+              {contactLoading ? "Opening chat..." : "💬 Message"}
             </button>
           </div>
         </section>
@@ -868,19 +995,46 @@ export default function ProductPage() {
         <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:mt-6 sm:rounded-3xl sm:p-6">
           <h2 className="text-lg font-black">Listing actions</h2>
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <button type="button" disabled={savingFavourite} onClick={toggleFavourite} className={`min-h-12 rounded-xl border px-4 py-3 font-black ${isFavourite ? "border-red-300 bg-red-50 text-red-700" : "border-blue-200 bg-white text-blue-700 hover:bg-blue-50"}`}>
-              {savingFavourite ? "Saving..." : isFavourite ? "♥ Saved" : "♡ Save Listing"}
+            <button
+              type="button"
+              disabled={savingFavourite}
+              onClick={toggleFavourite}
+              className={`min-h-12 rounded-xl border px-4 py-3 font-black ${
+                isFavourite
+                  ? "border-red-300 bg-red-50 text-red-700"
+                  : "border-blue-200 bg-white text-blue-700 hover:bg-blue-50"
+              } disabled:opacity-60`}
+            >
+              {savingFavourite
+                ? "Saving..."
+                : isFavourite
+                  ? "♥ Saved"
+                  : "♡ Save Listing"}
             </button>
-            <button type="button" disabled={sharing} onClick={shareListing} className="min-h-12 rounded-xl border border-slate-300 bg-white px-4 py-3 font-bold text-slate-700 hover:bg-slate-50">
+            <button
+              type="button"
+              disabled={sharing}
+              onClick={shareListing}
+              className="min-h-12 rounded-xl border border-slate-300 bg-white px-4 py-3 font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            >
               📤 {sharing ? "Sharing..." : "Share Listing"}
             </button>
-            <button type="button" disabled={reporting} onClick={reportListing} className="min-h-12 rounded-xl border border-red-200 bg-white px-4 py-3 font-bold text-red-700 hover:bg-red-50">
+            <button
+              type="button"
+              disabled={reporting}
+              onClick={reportListing}
+              className="min-h-12 rounded-xl border border-red-200 bg-white px-4 py-3 font-bold text-red-700 hover:bg-red-50 disabled:opacity-60"
+            >
               🚩 {reporting ? "Reporting..." : "Report Listing"}
             </button>
           </div>
 
           {notice && (
-            <p role="status" aria-live="polite" className="mt-4 rounded-xl bg-blue-50 p-3 text-sm font-semibold text-blue-900">
+            <p
+              role="status"
+              aria-live="polite"
+              className="mt-4 rounded-xl bg-blue-50 p-3 text-sm font-semibold text-blue-900"
+            >
               {notice}
             </p>
           )}
@@ -889,7 +1043,9 @@ export default function ProductPage() {
         <section className="mt-4 rounded-2xl bg-blue-50 p-5 sm:mt-6 sm:rounded-3xl sm:p-7">
           <h2 className="text-lg font-black">🛡️ Shop safely</h2>
           <p className="mt-2 leading-7 text-slate-600">
-            Verify the item and seller before making payment. Never share passwords, card details, verification codes or other sensitive account information with another person.
+            Verify the item and seller before making payment. Never share
+            passwords, card details, verification codes or other sensitive
+            account information with another person.
           </p>
         </section>
       </section>
@@ -897,8 +1053,12 @@ export default function ProductPage() {
       <footer className="mt-8 bg-slate-950 py-8 text-white">
         <div className="mx-auto max-w-7xl px-4 text-center">
           <div className="text-xl font-black">BEST SALES GHANA</div>
-          <p className="mt-2 text-sm text-slate-400">Buy • Sell • Advertise • Connect</p>
-          <p className="mt-5 text-sm text-slate-500">© 2026 All Prominent Ghana Limited. All rights reserved.</p>
+          <p className="mt-2 text-sm text-slate-400">
+            Buy • Sell • Advertise • Connect
+          </p>
+          <p className="mt-5 text-sm text-slate-500">
+            © 2026 All Prominent Ghana Limited. All rights reserved.
+          </p>
         </div>
       </footer>
 
@@ -910,23 +1070,49 @@ export default function ProductPage() {
           aria-label="Product image viewer"
           onClick={() => setViewerOpen(false)}
         >
-          <button type="button" onClick={() => setViewerOpen(false)} aria-label="Close image viewer" className="absolute right-4 top-4 z-10 flex h-12 w-12 items-center justify-center rounded-full bg-white text-3xl font-bold text-black">
+          <button
+            type="button"
+            onClick={() => setViewerOpen(false)}
+            aria-label="Close image viewer"
+            className="absolute right-4 top-4 z-10 flex h-12 w-12 items-center justify-center rounded-full bg-white text-3xl font-bold text-black"
+          >
             ×
           </button>
 
           {images.length > 1 && (
             <>
-              <button type="button" aria-label="Previous image" onClick={(event) => { event.stopPropagation(); changeImage(-1); }} className="absolute left-3 top-1/2 z-10 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-3xl font-bold text-black">
+              <button
+                type="button"
+                aria-label="Previous image"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  changeImage(-1);
+                }}
+                className="absolute left-3 top-1/2 z-10 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-3xl font-bold text-black"
+              >
                 ‹
               </button>
-              <button type="button" aria-label="Next image" onClick={(event) => { event.stopPropagation(); changeImage(1); }} className="absolute right-3 top-1/2 z-10 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-3xl font-bold text-black">
+              <button
+                type="button"
+                aria-label="Next image"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  changeImage(1);
+                }}
+                className="absolute right-3 top-1/2 z-10 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-3xl font-bold text-black"
+              >
                 ›
               </button>
             </>
           )}
 
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={imageUrl} alt={listing.title} onClick={(event) => event.stopPropagation()} className="max-h-[90vh] max-w-full object-contain" />
+          <img
+            src={imageUrl}
+            alt={listing.title}
+            onClick={(event) => event.stopPropagation()}
+            className="max-h-[90vh] max-w-full object-contain"
+          />
 
           {images.length > 1 && (
             <span className="absolute bottom-5 rounded-full bg-white/15 px-4 py-2 text-sm font-bold text-white">
