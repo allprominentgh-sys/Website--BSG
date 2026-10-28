@@ -2,6 +2,7 @@
 import type { Metadata } from "next";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { MarketPreferencesProvider } from "./components/MarketPreferencesProvider";
+import MarketPreferenceControls from "./components/MarketPreferenceControls";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -20,6 +21,10 @@ export default function RootLayout({
       <body>
         <ThemeProvider>
           <MarketPreferencesProvider>
+            <div className="border-b border-slate-200 bg-white px-4 py-3">
+              <MarketPreferenceControls />
+            </div>
+
             {children}
           </MarketPreferencesProvider>
         </ThemeProvider>
