@@ -33,14 +33,20 @@ export default function AdminSettingsPage() {
       try {
         const response = await fetch("/api/admin/security-settings", {
           cache: "no-store",
+          credentials: "same-origin",
         });
+
         const data = await response.json();
 
         if (!response.ok || !data.success) {
-          throw new Error(data.message || "Could not load security settings.");
+          throw new Error(
+            data.message || "Could not load security settings."
+          );
         }
 
-        if (!cancelled) setSettings(data.settings);
+        if (!cancelled) {
+          setSettings(data.settings);
+        }
       } catch (err) {
         if (!cancelled) {
           setError(
@@ -50,11 +56,14 @@ export default function AdminSettingsPage() {
           );
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     }
 
-    loadSettings();
+    void loadSettings();
+
     return () => {
       cancelled = true;
     };
@@ -68,6 +77,7 @@ export default function AdminSettingsPage() {
     try {
       const response = await fetch("/api/admin/security-settings", {
         method: "PATCH",
+        credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           idle_timeout_minutes: 15,
@@ -94,43 +104,55 @@ export default function AdminSettingsPage() {
     }
   }
 
+  const cardClass =
+    "rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-blue-400 hover:shadow-lg";
+
   return (
-    <main className="min-h-screen bg-slate-100 px-4 py-8 text-slate-900 sm:px-8">
+    <main className="min-h-screen bg-slate-100 px-4 py-6 text-slate-900 sm:px-8 sm:py-8">
       <div className="mx-auto max-w-5xl">
         <Link
           href="/admin"
-          className="inline-flex rounded-xl border border-blue-700 px-4 py-2 font-bold text-blue-700 hover:bg-blue-700 hover:text-white"
+          className="inline-flex min-h-11 items-center rounded-xl border border-blue-700 px-4 py-2 font-bold text-blue-700 transition hover:bg-blue-700 hover:text-white"
         >
           ← Back to Admin Dashboard
         </Link>
 
-        <header className="mt-6 rounded-3xl bg-gradient-to-r from-blue-800 to-cyan-600 p-8 text-white">
+        <header className="mt-5 rounded-2xl bg-gradient-to-r from-blue-800 to-cyan-600 p-5 text-white sm:mt-6 sm:rounded-3xl sm:p-8">
           <p className="text-sm font-bold uppercase tracking-widest">
             Administrator
           </p>
+
           <h1 className="mt-2 text-3xl font-black sm:text-4xl">
             Marketplace Settings
           </h1>
+
           <p className="mt-3 leading-7 text-white/90">
             Manage the main settings and configuration areas for Best Sales
             Ghana.
           </p>
         </header>
 
-        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <section className="mt-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:mt-6 sm:p-6">
           <div className="flex items-start gap-4">
-            <div className="text-3xl" aria-hidden="true">🔐</div>
+            <div className="text-3xl" aria-hidden="true">
+              🔐
+            </div>
+
             <div>
-              <h2 className="text-xl font-black">Staff Session Security</h2>
+              <h2 className="text-xl font-black">
+                Staff Session Security
+              </h2>
               <p className="mt-1 text-sm leading-6 text-slate-600">
-                Configure inactivity logout for the administrator and all staff
-                departments.
+                Configure inactivity logout for the administrator and all
+                staff departments.
               </p>
             </div>
           </div>
 
           {loading ? (
-            <p className="mt-6 text-slate-500">Loading security settings...</p>
+            <p className="mt-6 text-slate-500">
+              Loading security settings...
+            </p>
           ) : (
             <div className="mt-6 space-y-5">
               <div className="rounded-xl bg-blue-50 p-4">
@@ -140,9 +162,9 @@ export default function AdminSettingsPage() {
                 <p className="mt-1 text-2xl font-black text-blue-800">
                   15 minutes
                 </p>
-                <p className="mt-1 text-sm text-blue-900">
-                  Required security policy. Staff cannot extend this limit using
-                  “Keep me signed in”.
+                <p className="mt-1 text-sm leading-6 text-blue-900">
+                  Required security policy. Staff cannot extend this limit
+                  using “Keep me signed in”.
                 </p>
               </div>
 
@@ -153,6 +175,7 @@ export default function AdminSettingsPage() {
                 >
                   Warn before logout
                 </label>
+
                 <select
                   id="warning-minutes"
                   value={settings.warning_minutes}
@@ -162,7 +185,7 @@ export default function AdminSettingsPage() {
                       warning_minutes: Number(event.target.value),
                     }))
                   }
-                  className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3"
+                  className="mt-2 min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 py-3"
                 >
                   <option value={0}>No warning</option>
                   <option value={1}>1 minute before logout</option>
@@ -174,23 +197,36 @@ export default function AdminSettingsPage() {
 
               <div className="space-y-3 rounded-xl border border-slate-200 p-4">
                 <p className="font-bold">Policy coverage</p>
-                <p className="text-sm text-slate-600">
-                  <span className="font-bold text-emerald-700">Enabled</span>
+
+                <p className="text-sm leading-6 text-slate-600">
+                  <span className="font-bold text-emerald-700">
+                    Enabled
+                  </span>
                   {" — "}Apply to all staff departments.
                 </p>
-                <p className="text-sm text-slate-600">
-                  <span className="font-bold text-emerald-700">Disabled</span>
+
+                <p className="text-sm leading-6 text-slate-600">
+                  <span className="font-bold text-emerald-700">
+                    Disabled
+                  </span>
                   {" — "}“Keep me signed in” cannot bypass inactivity logout.
                 </p>
               </div>
 
               {message && (
-                <p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">
+                <p
+                  role="status"
+                  className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800"
+                >
                   {message}
                 </p>
               )}
+
               {error && (
-                <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">
+                <p
+                  role="alert"
+                  className="break-words rounded-xl bg-red-50 p-3 text-sm text-red-700"
+                >
                   {error}
                 </p>
               )}
@@ -199,7 +235,7 @@ export default function AdminSettingsPage() {
                 type="button"
                 onClick={saveSettings}
                 disabled={saving}
-                className="rounded-xl bg-blue-700 px-5 py-3 font-bold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
+                className="min-h-11 rounded-xl bg-blue-700 px-5 py-3 font-bold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {saving ? "Saving..." : "Save Security Settings"}
               </button>
@@ -207,13 +243,14 @@ export default function AdminSettingsPage() {
           )}
         </section>
 
-        <div className="mt-6 grid gap-5 sm:grid-cols-2">
-          <Link
-            href="/admin/advertising"
-            className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-blue-400 hover:shadow-lg"
-          >
-            <div className="text-3xl">📢</div>
-            <h2 className="mt-4 text-xl font-black">Advertising Settings</h2>
+        <section className="mt-5 grid grid-cols-1 gap-4 sm:mt-6 sm:grid-cols-2 sm:gap-5">
+          <Link href="/admin/advertising" className={cardClass}>
+            <div className="text-3xl" aria-hidden="true">
+              📢
+            </div>
+            <h2 className="mt-4 text-xl font-black">
+              Advertising Settings
+            </h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">
               Configure individual promotion prices, company advertising
               packages, free-ad limits and advertising duration.
@@ -223,42 +260,46 @@ export default function AdminSettingsPage() {
             </span>
           </Link>
 
-          <a
-            href="/admin#currency-management"
-            className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-blue-400 hover:shadow-lg"
-          >
-            <div className="text-3xl">💱</div>
-            <h2 className="mt-4 text-xl font-black">Currency Settings</h2>
+          <Link href="/admin/currency-settings" className={cardClass}>
+            <div className="text-3xl" aria-hidden="true">
+              💱
+            </div>
+            <h2 className="mt-4 text-xl font-black">
+              Currency Settings
+            </h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">
-              Return to the admin dashboard to manage exchange rates and
-              currency adjustment settings.
+              Manage exchange rates for Chinese Yuan, US Dollars, Euros
+              and British Pounds. Set manual rates for marketplace price
+              conversions.
             </p>
             <span className="mt-5 inline-block font-bold text-blue-700">
-              Open Currency Control →
+              Open Currency Settings →
             </span>
-          </a>
+          </Link>
 
-          <Link
-            href="/admin/revenue"
-            className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-blue-400 hover:shadow-lg"
-          >
-            <div className="text-3xl">💰</div>
-            <h2 className="mt-4 text-xl font-black">Revenue & Settlements</h2>
+          <Link href="/admin/revenue" className={cardClass}>
+            <div className="text-3xl" aria-hidden="true">
+              💰
+            </div>
+            <h2 className="mt-4 text-xl font-black">
+              Revenue &amp; Settlements
+            </h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">
-              Open the existing revenue dashboard to manage platform finance
-              and seller settlements.
+              Open the existing revenue dashboard to manage platform
+              finance and seller settlements.
             </p>
             <span className="mt-5 inline-block font-bold text-blue-700">
               Open Revenue →
             </span>
           </Link>
 
-          <Link
-            href="/admin/refund-policy"
-            className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-blue-400 hover:shadow-lg"
-          >
-            <div className="text-3xl">↩️</div>
-            <h2 className="mt-4 text-xl font-black">Refund Policy</h2>
+          <Link href="/admin/refund-policy" className={cardClass}>
+            <div className="text-3xl" aria-hidden="true">
+              ↩️
+            </div>
+            <h2 className="mt-4 text-xl font-black">
+              Refund Policy
+            </h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">
               Open the existing refund policy and refund-management area.
             </p>
@@ -266,7 +307,7 @@ export default function AdminSettingsPage() {
               Open Refund Policy →
             </span>
           </Link>
-        </div>
+        </section>
       </div>
     </main>
   );
