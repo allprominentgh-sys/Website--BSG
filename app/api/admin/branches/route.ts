@@ -1,7 +1,6 @@
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,9 +20,11 @@ function jsonError(message: string, status: number) {
   );
 }
 
-async function getAdminSupabase() {
+async function getAdminClient(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const authorization = request.headers.get("authorization");
+  const token = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
 
   if (!url || !anonKey) {
     return {
@@ -31,33 +32,30 @@ async function getAdminSupabase() {
     };
   }
 
-  const cookieStore = await cookies();
+  if (!token) {
+    return {
+      error: jsonError("Please sign in as an administrator.", 401),
+    };
+  }
 
-  const supabase = createServerClient(url, anonKey, {
-    cookies: {
-      getAll() {
-        return cookieStore.getAll();
-      },
-      setAll(cookiesToSet) {
-        try {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options);
-          });
-        } catch {
-          // Cookie updates may not be available in every request context.
-        }
-      },
+  const supabase = createClient(url, anonKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+    global: {
+      headers: { Authorization: `Bearer ${token}` },
     },
   });
 
   const {
     data: { user },
     error: authError,
-  } = await supabase.auth.getUser();
+  } = await supabase.auth.getUser(token);
 
   if (authError || !user) {
     return {
-      error: jsonError("Please sign in as an administrator.", 401),
+      error: jsonError("Your session is invalid or expired. Please sign in again.", 401),
     };
   }
 
@@ -68,9 +66,9 @@ async function getAdminSupabase() {
     .maybeSingle();
 
   if (profileError) {
-    console.error("Branch API profile verification failed:", profileError.message);
+    console.error("Branch API profile check failed:", profileError.message);
     return {
-      error: jsonError("Unable to verify administrator access.", 500),
+      error: jsonError("Unable to verify administrator permissions.", 500),
     };
   }
 
@@ -88,27 +86,35 @@ async function getAdminSupabase() {
   return { supabase };
 }
 
+async function readBody(request: NextRequest) {
+  try {
+    const body: unknown = await request.json();
+
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return { error: "Submit a valid JSON object." };
+    }
+
+    return { body: body as Record<string, unknown> };
+  } catch {
+    return { error: "Submit valid JSON data." };
+  }
+}
+
 function parseBranch(body: Record<string, unknown>) {
   const company_id =
     typeof body.company_id === "string"
       ? body.company_id.trim()
       : "BSGH-HQ-0001";
-
   const branch_code =
     typeof body.branch_code === "string"
       ? body.branch_code.trim().toUpperCase()
       : "";
-
   const branch_name =
     typeof body.branch_name === "string"
       ? body.branch_name.trim()
       : "";
-
   const location =
-    typeof body.location === "string"
-      ? body.location.trim()
-      : "";
-
+    typeof body.location === "string" ? body.location.trim() : "";
   const manager_name =
     typeof body.manager_name === "string"
       ? body.manager_name.trim()
@@ -127,9 +133,7 @@ function parseBranch(body: Record<string, unknown>) {
     location.length > 250 ||
     manager_name.length > 150
   ) {
-    return {
-      error: "One or more branch fields exceed the allowed length.",
-    };
+    return { error: "One or more fields are too long." };
   }
 
   return {
@@ -143,24 +147,10 @@ function parseBranch(body: Record<string, unknown>) {
   };
 }
 
-async function readJson(request: NextRequest) {
+// GET: list branches
+export async function GET(request: NextRequest) {
   try {
-    const body: unknown = await request.json();
-
-    if (!body || typeof body !== "object" || Array.isArray(body)) {
-      return { error: "Please submit a valid JSON object." };
-    }
-
-    return { body: body as Record<string, unknown> };
-  } catch {
-    return { error: "Please submit valid JSON data." };
-  }
-}
-
-// GET /api/admin/branches — list branches
-export async function GET() {
-  try {
-    const auth = await getAdminSupabase();
+    const auth = await getAdminClient(request);
     if ("error" in auth) return auth.error;
 
     const { data, error } = await auth.supabase
@@ -170,10 +160,7 @@ export async function GET() {
 
     if (error) {
       console.error("Branch list failed:", error.code, error.message);
-      return jsonError(
-        "Unable to load branches. Check database permissions.",
-        500
-      );
+      return jsonError("Unable to load branches. Check database permissions.", 500);
     }
 
     return NextResponse.json(
@@ -186,30 +173,25 @@ export async function GET() {
   }
 }
 
-// POST /api/admin/branches — create a branch
+// POST: create a branch
 export async function POST(request: NextRequest) {
   try {
-    const auth = await getAdminSupabase();
+    const auth = await getAdminClient(request);
     if ("error" in auth) return auth.error;
 
-    const parsed = await readJson(request);
-
+    const parsed = await readBody(request);
     if (!parsed.body) {
       return jsonError(parsed.error ?? "Invalid request body.", 400);
     }
 
     const validated = parseBranch(parsed.body);
-
     if (!validated.data) {
       return jsonError(validated.error ?? "Invalid branch details.", 400);
     }
 
     const { data, error } = await auth.supabase
       .from("company_branches")
-      .insert({
-        ...validated.data,
-        is_active: true,
-      })
+      .insert({ ...validated.data, is_active: true })
       .select(BRANCH_COLUMNS)
       .single();
 
@@ -217,35 +199,19 @@ export async function POST(request: NextRequest) {
       console.error("Branch creation failed:", error.code, error.message);
 
       if (error.code === "23505") {
-        return jsonError(
-          "That branch code already exists. Please use a different code.",
-          409
-        );
+        return jsonError("That branch code already exists.", 409);
       }
 
       if (error.code === "42501") {
-        return jsonError(
-          "Database security policy does not permit creating branches.",
-          403
-        );
+        return jsonError("Database policy does not allow branch creation.", 403);
       }
 
-      return jsonError(
-        "Unable to create branch. Check database columns and permissions.",
-        500
-      );
+      return jsonError("Unable to create branch. Check database permissions.", 500);
     }
 
     return NextResponse.json(
-      {
-        success: true,
-        message: "Branch created successfully.",
-        branch: data,
-      },
-      {
-        status: 201,
-        headers: { "Cache-Control": "no-store" },
-      }
+      { success: true, message: "Branch created successfully.", branch: data },
+      { status: 201, headers: { "Cache-Control": "no-store" } }
     );
   } catch (error) {
     console.error("Branch creation error:", error);
@@ -253,14 +219,13 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PATCH /api/admin/branches — edit a branch or change its active status
+// PATCH: edit branch details or active status
 export async function PATCH(request: NextRequest) {
   try {
-    const auth = await getAdminSupabase();
+    const auth = await getAdminClient(request);
     if ("error" in auth) return auth.error;
 
-    const parsed = await readJson(request);
-
+    const parsed = await readBody(request);
     if (!parsed.body) {
       return jsonError(parsed.error ?? "Invalid request body.", 400);
     }
@@ -281,7 +246,6 @@ export async function PATCH(request: NextRequest) {
       update.is_active = body.is_active;
     } else {
       const validated = parseBranch(body);
-
       if (!validated.data) {
         return jsonError(validated.error ?? "Invalid branch details.", 400);
       }
@@ -306,38 +270,22 @@ export async function PATCH(request: NextRequest) {
       console.error("Branch update failed:", error.code, error.message);
 
       if (error.code === "23505") {
-        return jsonError(
-          "That branch code already exists. Please use a different code.",
-          409
-        );
+        return jsonError("That branch code already exists.", 409);
       }
 
       if (error.code === "42501") {
-        return jsonError(
-          "Database security policy does not permit updating branches.",
-          403
-        );
+        return jsonError("Database policy does not allow branch updates.", 403);
       }
 
-      return jsonError(
-        "Unable to update branch. Check database columns and permissions.",
-        500
-      );
+      return jsonError("Unable to update branch. Check database permissions.", 500);
     }
 
     if (!data) {
-      return jsonError(
-        "Branch not found or you do not have permission to update it.",
-        404
-      );
+      return jsonError("Branch not found or you do not have permission to update it.", 404);
     }
 
     return NextResponse.json(
-      {
-        success: true,
-        message: "Branch updated successfully.",
-        branch: data,
-      },
+      { success: true, message: "Branch updated successfully.", branch: data },
       { headers: { "Cache-Control": "no-store" } }
     );
   } catch (error) {
