@@ -1,572 +1,623 @@
+
 "use client";
 
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
 
-type StaffMember = {
+type Staff = {
   id: string;
-  staffNumber: string;
-  fullName: string;
+  staff_number: string;
+  full_name: string;
   department: string;
-  role: string;
-  phone: string;
-  email: string;
-  status: "Active" | "Inactive";
-  createdAt: string;
+  job_title: string;
+  phone: string | null;
+  email: string | null;
+  start_date: string | null;
+  status: "active" | "inactive" | "suspended";
+  notes: string | null;
+  created_at: string;
 };
 
-const STORAGE_KEY = "bestsalesgh-staff-records-v1";
-
-const DEPARTMENTS = [
-  "Support Team",
+const departments = [
+  "Customer Support Centre",
   "Marketing Team",
   "Advertisers",
   "Company Drivers",
-  "Delivery Team",
   "Sales Team",
-  "Administration",
+  "Delivery Team",
+  "Operations",
   "Finance",
+  "IT & Technical",
+  "Management",
   "Other",
 ];
 
-function getDepartmentPrefix(department: string) {
-  switch (department) {
-    case "Support Team":
-      return "SUP";
-    case "Marketing Team":
-      return "MKT";
-    case "Advertisers":
-      return "ADV";
-    case "Company Drivers":
-      return "DRV";
-    case "Delivery Team":
-      return "DEL";
-    case "Sales Team":
-      return "SAL";
-    case "Administration":
-      return "ADM";
-    case "Finance":
-      return "FIN";
-    default:
-      return "OTH";
-  }
-}
+const emptyForm = {
+  staff_number: "",
+  full_name: "",
+  department: "Customer Support Centre",
+  job_title: "",
+  phone: "",
+  email: "",
+  start_date: "",
+  status: "active" as Staff["status"],
+  notes: "",
+};
 
 export default function SupportStaffPage() {
-  const [staff, setStaff] = useState<StaffMember[]>([]);
-  const [loaded, setLoaded] = useState(false);
-  const [notice, setNotice] = useState("");
+  const [staff, setStaff] = useState<Staff[]>([]);
+  const [form, setForm] = useState(emptyForm);
+  const [editingId, setEditingId] = useState("");
   const [search, setSearch] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("All");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
-  const [fullName, setFullName] = useState("");
-  const [department, setDepartment] = useState("Support Team");
-  const [role, setRole] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [manualStaffNumber, setManualStaffNumber] = useState("");
+  const loadStaff = useCallback(async () => {
+    setLoading(true);
+    setError("");
 
-  useEffect(() => {
     try {
-      const saved = window.localStorage.getItem(STORAGE_KEY);
+      const response = await fetch("/api/admin/staff", {
+        method: "GET",
+        credentials: "same-origin",
+        cache: "no-store",
+      });
 
-      if (saved) {
-        const parsed: unknown = JSON.parse(saved);
+      const result = await response.json();
 
-        if (Array.isArray(parsed)) {
-          setStaff(parsed as StaffMember[]);
-        }
+      if (!response.ok) {
+        throw new Error(
+          result.error || "Unable to load staff records."
+        );
       }
-    } catch {
-      setNotice("Could not load saved staff records from this browser.");
+
+      setStaff(result.staff ?? []);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to load staff records."
+      );
     } finally {
-      setLoaded(true);
+      setLoading(false);
     }
   }, []);
 
-  function persistStaff(nextStaff: StaffMember[]) {
-    setStaff(nextStaff);
+  useEffect(() => {
+    void loadStaff();
+  }, [loadStaff]);
 
-    try {
-      window.localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify(nextStaff)
-      );
-      setNotice("Staff records saved in this browser.");
-    } catch {
-      setNotice("Unable to save. Check your browser storage.");
-    }
+  function updateField(
+    field: keyof typeof emptyForm,
+    value: string
+  ) {
+    setForm((previous) => ({ ...previous, [field]: value }));
   }
 
-  function registerWorker() {
-    if (!fullName.trim()) {
-      setNotice("Enter the worker's full name.");
-      return;
-    }
-
-    if (!role.trim()) {
-      setNotice("Enter the worker's job title.");
-      return;
-    }
-
-    const now = new Date();
-    const dateCode =
-      String(now.getFullYear()).slice(-2) +
-      String(now.getMonth() + 1).padStart(2, "0");
-
-    const prefix = getDepartmentPrefix(department);
-    const nextNumber =
-      staff.filter((item) => item.department === department).length + 1;
-
-    const generatedStaffNumber =
-      "BGS-" +
-      prefix +
-      "-" +
-      dateCode +
-      "-" +
-      String(nextNumber).padStart(4, "0");
-
-    const staffNumber =
-      manualStaffNumber.trim() || generatedStaffNumber;
-
-    const duplicate = staff.some(
-      (item) =>
-        item.staffNumber.toLowerCase() === staffNumber.toLowerCase()
-    );
-
-    if (duplicate) {
-      setNotice("That staff number already exists. Choose another number.");
-      return;
-    }
-
-    const workerId =
-      "BGS-" +
-      now.getTime().toString(36).toUpperCase() +
-      "-" +
-      Math.random().toString(36).slice(2, 7).toUpperCase();
-
-    const newMember: StaffMember = {
-      id: workerId,
-      staffNumber,
-      fullName: fullName.trim(),
-      department,
-      role: role.trim(),
-      phone: phone.trim(),
-      email: email.trim(),
-      status: "Active",
-      createdAt: now.toISOString(),
+  function generateStaffNumber() {
+    const prefixes: Record<string, string> = {
+      "Customer Support Centre": "SUP",
+      "Marketing Team": "MKT",
+      Advertisers: "ADV",
+      "Company Drivers": "DRV",
+      "Sales Team": "SAL",
+      "Delivery Team": "DEL",
+      Operations: "OPS",
+      Finance: "FIN",
+      "IT & Technical": "IT",
+      Management: "MGT",
+      Other: "OTH",
     };
 
-    persistStaff([newMember, ...staff]);
+    const prefix = prefixes[form.department] || "OTH";
 
-    setFullName("");
-    setRole("");
-    setPhone("");
-    setEmail("");
-    setManualStaffNumber("");
+    const numbers = staff
+      .filter((person) =>
+        person.staff_number.startsWith(`BSG-${prefix}-`)
+      )
+      .map((person) => {
+        const match = person.staff_number.match(/-(\d+)$/);
+        return match ? Number(match[1]) : 0;
+      });
 
-    setNotice(
-      "Worker registered. Worker ID: " +
-        workerId +
-        " | Staff number: " +
-        staffNumber
-    );
+    const nextNumber =
+      numbers.length > 0 ? Math.max(...numbers) + 1 : 1;
+
+    setForm((previous) => ({
+      ...previous,
+      staff_number: `BSG-${prefix}-${String(nextNumber).padStart(3, "0")}`,
+    }));
   }
 
-  function toggleStatus(id: string) {
-    const updated = staff.map((member) => {
-      if (member.id !== id) return member;
-
-      return {
-        ...member,
-        status: member.status === "Active" ? "Inactive" : "Active",
-      } as StaffMember;
+  function startEditing(person: Staff) {
+    setEditingId(person.id);
+    setForm({
+      staff_number: person.staff_number,
+      full_name: person.full_name,
+      department: person.department,
+      job_title: person.job_title,
+      phone: person.phone || "",
+      email: person.email || "",
+      start_date: person.start_date || "",
+      status: person.status,
+      notes: person.notes || "",
     });
 
-    persistStaff(updated);
+    setError("");
+    setNotice("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function deleteWorker(id: string) {
-    const member = staff.find((item) => item.id === id);
-    if (!member) return;
-
-    const confirmed = window.confirm(
-      "Delete the record for " + member.fullName + "?"
-    );
-
-    if (!confirmed) return;
-
-    persistStaff(staff.filter((item) => item.id !== id));
-    setNotice("Staff record deleted.");
+  function resetForm() {
+    setEditingId("");
+    setForm(emptyForm);
   }
 
-  async function copyText(value: string) {
+  async function saveStaff(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    setNotice("");
+
     try {
-      await navigator.clipboard.writeText(value);
-      setNotice("Copied to clipboard.");
-    } catch {
-      setNotice("Copy is unavailable. Please select and copy the text manually.");
+      const response = await fetch("/api/admin/staff", {
+        method: editingId ? "PATCH" : "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...(editingId ? { id: editingId } : {}),
+          ...form,
+          staff_number: form.staff_number.trim().toUpperCase(),
+          full_name: form.full_name.trim(),
+          department: form.department.trim(),
+          job_title: form.job_title.trim(),
+          phone: form.phone.trim() || null,
+          email: form.email.trim() || null,
+          start_date: form.start_date || null,
+          notes: form.notes.trim() || null,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Unable to save staff record.");
+      }
+
+      setNotice(
+        editingId
+          ? "Staff record updated successfully."
+          : "Staff member registered successfully."
+      );
+
+      resetForm();
+      await loadStaff();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Unable to save staff."
+      );
+    } finally {
+      setSaving(false);
     }
   }
 
-  function exportCsv() {
-    const headings = [
-      "Worker ID",
-      "Staff Number",
-      "Full Name",
-      "Department",
-      "Job Title",
-      "Phone",
-      "Email",
-      "Status",
-      "Created At",
-    ];
+  async function changeStatus(person: Staff) {
+    const nextStatus: Staff["status"] =
+      person.status === "active" ? "inactive" : "active";
 
-    const rows = staff.map((member) => [
-      member.id,
-      member.staffNumber,
-      member.fullName,
-      member.department,
-      member.role,
-      member.phone,
-      member.email,
-      member.status,
-      member.createdAt,
-    ]);
-
-    const csv = [headings, ...rows]
-      .map((row) =>
-        row
-          .map(
-            (value) =>
-              '"' + String(value).replace(/"/g, '""') + '"'
-          )
-          .join(",")
+    if (
+      !window.confirm(
+        `Change ${person.full_name}'s status to ${nextStatus}?`
       )
-      .join("\r\n");
+    ) {
+      return;
+    }
 
-    const blob = new Blob(["\uFEFF" + csv], {
-      type: "text/csv;charset=utf-8;",
-    });
+    setError("");
+    setNotice("");
 
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = "bestsalesgh-staff-records.csv";
-    anchor.click();
-    URL.revokeObjectURL(url);
+    try {
+      const response = await fetch("/api/admin/staff", {
+        method: "PATCH",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: person.id,
+          status: nextStatus,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Unable to update staff status.");
+      }
+
+      setNotice("Staff status updated successfully.");
+      await loadStaff();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Status update failed."
+      );
+    }
   }
 
-  const visibleStaff = staff.filter((member) => {
-    const matchesDepartment =
-      departmentFilter === "All" ||
-      member.department === departmentFilter;
-
+  const visibleStaff = staff.filter((person) => {
     const term = search.trim().toLowerCase();
 
     const matchesSearch =
       !term ||
       [
-        member.id,
-        member.staffNumber,
-        member.fullName,
-        member.department,
-        member.role,
-        member.phone,
-        member.email,
+        person.staff_number,
+        person.full_name,
+        person.department,
+        person.job_title,
+        person.phone,
+        person.email,
       ]
-        .join(" ")
-        .toLowerCase()
-        .includes(term);
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(term));
 
-    return matchesDepartment && matchesSearch;
+    const matchesDepartment =
+      departmentFilter === "All" ||
+      person.department === departmentFilter;
+
+    return matchesSearch && matchesDepartment;
   });
 
   const activeCount = staff.filter(
-    (member) => member.status === "Active"
+    (person) => person.status === "active"
   ).length;
 
-  if (!loaded) {
-    return (
-      <main className="min-h-screen bg-slate-50 p-6 text-slate-900">
-        Loading staff management...
-      </main>
-    );
-  }
+  const inactiveCount = staff.filter(
+    (person) => person.status === "inactive"
+  ).length;
+
+  const suspendedCount = staff.filter(
+    (person) => person.status === "suspended"
+  ).length;
 
   return (
-    <main className="min-h-screen bg-slate-50 p-4 text-slate-900 sm:p-6 lg:p-8">
+    <main className="min-h-screen bg-slate-50 p-4 text-slate-900 md:p-8">
       <div className="mx-auto max-w-7xl">
-        <header className="mb-8">
-          <p className="font-bold uppercase tracking-widest text-blue-700">
-            BEST SALES GHANA
+        <header className="mb-7">
+          <p className="font-semibold text-blue-700">
+            BEST SALES GHANA · SUPPORT CENTRE
           </p>
 
-          <h1 className="mt-2 text-3xl font-black sm:text-4xl">
-            Staff Management Centre
+          <h1 className="mt-2 text-3xl font-bold md:text-4xl">
+            Staff Management
           </h1>
 
-          <p className="mt-3 text-slate-600">
-            Register workers, generate worker IDs, assign staff numbers
-            and organise company departments.
+          <p className="mt-2 text-slate-600">
+            Register employees and manage staff records and departments.
           </p>
 
           <div className="mt-5 flex flex-wrap gap-3">
             <Link
-              href="/admin"
-              className="rounded-xl border border-slate-300 bg-white px-4 py-3 font-bold"
-            >
-              Back to Admin Dashboard
-            </Link>
-
-            <Link
               href="/admin/support"
-              className="rounded-xl border border-slate-300 bg-white px-4 py-3 font-bold"
+              className="rounded-lg bg-blue-700 px-4 py-3 font-semibold text-white"
             >
-              Customer Support Centre
+              Back to Support Centre
             </Link>
 
             <button
               type="button"
-              onClick={exportCsv}
-              disabled={staff.length === 0}
-              className="rounded-xl bg-blue-700 px-4 py-3 font-bold text-white disabled:opacity-50"
+              onClick={() => void loadStaff()}
+              disabled={loading}
+              className="rounded-lg border border-slate-300 bg-white px-4 py-3 font-semibold disabled:opacity-50"
             >
-              Export Staff CSV
+              {loading ? "Refreshing..." : "Refresh Staff"}
             </button>
           </div>
         </header>
 
+        {error && (
+          <div
+            role="alert"
+            className="mb-5 break-words rounded-xl border border-red-200 bg-red-50 p-4 text-red-800"
+          >
+            {error}
+          </div>
+        )}
+
         {notice && (
           <div
             role="status"
-            className="mb-5 break-words rounded-xl border border-blue-200 bg-blue-50 p-4 text-blue-900"
+            className="mb-5 break-words rounded-xl border border-green-200 bg-green-50 p-4 text-green-800"
           >
             {notice}
           </div>
         )}
 
-        <section className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatCard label="Total Staff" value={staff.length} />
-          <StatCard label="Active Staff" value={activeCount} />
-          <StatCard
-            label="Inactive Staff"
-            value={staff.length - activeCount}
-          />
-          <StatCard
-            label="Departments"
-            value={new Set(staff.map((item) => item.department)).size}
-          />
+        <section className="mb-7 grid grid-cols-2 gap-3 md:grid-cols-4">
+          {[
+            ["Total Staff", staff.length],
+            ["Active", activeCount],
+            ["Inactive", inactiveCount],
+            ["Suspended", suspendedCount],
+          ].map(([label, count]) => (
+            <div
+              key={String(label)}
+              className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
+            >
+              <p className="text-sm text-slate-500">{label}</p>
+              <p className="mt-2 text-3xl font-bold">{count}</p>
+            </div>
+          ))}
         </section>
 
-        <section className="mb-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
-          <h2 className="text-2xl font-black">Register a Worker</h2>
+        <section className="mb-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-7">
+          <h2 className="text-2xl font-bold">
+            {editingId ? "Edit Staff Member" : "Register New Staff Member"}
+          </h2>
 
           <p className="mt-2 text-sm text-slate-600">
-            Enter a staff number manually or leave it blank to generate one.
+            Generate a suggested staff number or enter your own unique number.
           </p>
 
-          <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            <label className="text-sm font-bold">
-              Full name *
-              <input
-                value={fullName}
-                onChange={(event) => setFullName(event.target.value)}
-                maxLength={120}
-                placeholder="Worker's full name"
-                className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 font-normal"
+          <form onSubmit={saveStaff} className="mt-6 space-y-5">
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="block text-sm font-semibold">
+                Department
+                <select
+                  value={form.department}
+                  onChange={(e) => updateField("department", e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-3"
+                  required
+                >
+                  {departments.map((department) => (
+                    <option key={department} value={department}>
+                      {department}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <div>
+                <label className="block text-sm font-semibold">
+                  Staff ID / Number
+                </label>
+                <div className="mt-1 flex gap-2">
+                  <input
+                    value={form.staff_number}
+                    onChange={(e) =>
+                      updateField("staff_number", e.target.value)
+                    }
+                    placeholder="e.g. BSG-SUP-001"
+                    className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-3"
+                    required
+                    maxLength={50}
+                  />
+                  <button
+                    type="button"
+                    onClick={generateStaffNumber}
+                    className="rounded-lg bg-blue-700 px-3 py-3 font-semibold text-white"
+                  >
+                    Generate
+                  </button>
+                </div>
+              </div>
+
+              <label className="block text-sm font-semibold">
+                Full Name
+                <input
+                  value={form.full_name}
+                  onChange={(e) => updateField("full_name", e.target.value)}
+                  placeholder="Worker's full name"
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-3"
+                  required
+                  maxLength={150}
+                />
+              </label>
+
+              <label className="block text-sm font-semibold">
+                Job Title
+                <input
+                  value={form.job_title}
+                  onChange={(e) => updateField("job_title", e.target.value)}
+                  placeholder="e.g. Support Officer"
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-3"
+                  required
+                  maxLength={100}
+                />
+              </label>
+
+              <label className="block text-sm font-semibold">
+                Phone Number
+                <input
+                  type="tel"
+                  value={form.phone}
+                  onChange={(e) => updateField("phone", e.target.value)}
+                  placeholder="Worker's phone"
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-3"
+                  maxLength={40}
+                />
+              </label>
+
+              <label className="block text-sm font-semibold">
+                Email Address
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => updateField("email", e.target.value)}
+                  placeholder="worker@example.com"
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-3"
+                  maxLength={254}
+                />
+              </label>
+
+              <label className="block text-sm font-semibold">
+                Start Date
+                <input
+                  type="date"
+                  value={form.start_date}
+                  onChange={(e) => updateField("start_date", e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-3"
+                />
+              </label>
+
+              <label className="block text-sm font-semibold">
+                Status
+                <select
+                  value={form.status}
+                  onChange={(e) => updateField("status", e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-3"
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                  <option value="suspended">Suspended</option>
+                </select>
+              </label>
+            </div>
+
+            <label className="block text-sm font-semibold">
+              Notes
+              <textarea
+                value={form.notes}
+                onChange={(e) => updateField("notes", e.target.value)}
+                rows={3}
+                maxLength={2000}
+                placeholder="Optional staff notes"
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-3"
               />
             </label>
 
-            <label className="text-sm font-bold">
-              Department *
-              <select
-                value={department}
-                onChange={(event) => setDepartment(event.target.value)}
-                className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 font-normal"
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="submit"
+                disabled={saving}
+                className="rounded-lg bg-blue-700 px-6 py-3 font-bold text-white disabled:opacity-50"
               >
-                {DEPARTMENTS.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-            </label>
+                {saving
+                  ? "Saving..."
+                  : editingId
+                    ? "Save Changes"
+                    : "Register Staff"}
+              </button>
 
-            <label className="text-sm font-bold">
-              Job title *
-              <input
-                value={role}
-                onChange={(event) => setRole(event.target.value)}
-                maxLength={100}
-                placeholder="e.g. Support Officer"
-                className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 font-normal"
-              />
-            </label>
-
-            <label className="text-sm font-bold">
-              Staff number
-              <input
-                value={manualStaffNumber}
-                onChange={(event) =>
-                  setManualStaffNumber(event.target.value)
-                }
-                maxLength={50}
-                placeholder="Optional: enter your own"
-                className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 font-normal"
-              />
-            </label>
-
-            <label className="text-sm font-bold">
-              Phone number
-              <input
-                value={phone}
-                onChange={(event) => setPhone(event.target.value)}
-                maxLength={40}
-                inputMode="tel"
-                placeholder="Contact number"
-                className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 font-normal"
-              />
-            </label>
-
-            <label className="text-sm font-bold">
-              Email address
-              <input
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                maxLength={150}
-                placeholder="worker@example.com"
-                className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 font-normal"
-              />
-            </label>
-          </div>
-
-          <button
-            type="button"
-            onClick={registerWorker}
-            className="mt-6 w-full rounded-xl bg-blue-700 px-6 py-4 font-bold text-white hover:bg-blue-800 sm:w-auto"
-          >
-            Generate ID and Register Worker
-          </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingId("");
+                  setForm(emptyForm);
+                  setError("");
+                  setNotice("");
+                }}
+                className="rounded-lg border border-slate-300 px-6 py-3 font-semibold"
+              >
+                Clear Form
+              </button>
+            </div>
+          </form>
         </section>
 
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 p-5 sm:p-6">
-            <h2 className="text-2xl font-black">Registered Staff</h2>
+          <div className="border-b border-slate-200 p-5">
+            <h2 className="text-2xl font-bold">Registered Staff</h2>
 
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               <input
                 value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search worker name, ID or staff number"
-                className="w-full rounded-xl border border-slate-300 px-4 py-3"
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search ID, name, phone or email"
+                className="w-full rounded-lg border border-slate-300 px-3 py-3"
               />
 
               <select
                 value={departmentFilter}
-                onChange={(event) =>
-                  setDepartmentFilter(event.target.value)
-                }
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3"
+                onChange={(e) => setDepartmentFilter(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-3"
               >
-                <option value="All">All departments</option>
-                {DEPARTMENTS.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
+                <option value="All">All Departments</option>
+                {departments.map((department) => (
+                  <option key={department} value={department}>
+                    {department}
                   </option>
                 ))}
               </select>
             </div>
           </div>
 
-          {visibleStaff.length === 0 ? (
+          {loading && staff.length === 0 ? (
+            <p className="p-6 text-slate-500">Loading staff records...</p>
+          ) : visibleStaff.length === 0 ? (
             <p className="p-8 text-center text-slate-500">
-              No staff records found. Register your first worker above.
+              No matching staff records found.
             </p>
           ) : (
             <div className="divide-y divide-slate-200">
-              {visibleStaff.map((member) => (
-                <article key={member.id} className="p-5 sm:p-6">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-lg font-black">
-                        {member.fullName}
-                      </h3>
-                      <p className="mt-1 text-sm text-slate-600">
-                        {member.department} · {member.role}
+              {visibleStaff.map((person) => (
+                <article key={person.id} className="p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="font-bold text-blue-800">
+                        {person.staff_number}
                       </p>
+                      <h3 className="mt-1 text-lg font-bold">
+                        {person.full_name}
+                      </h3>
+                      <p className="text-slate-600">
+                        {person.job_title} · {person.department}
+                      </p>
+                      {person.phone && (
+                        <p className="mt-1 text-sm">
+                          Phone: {person.phone}
+                        </p>
+                      )}
+                      {person.email && (
+                        <p className="break-all text-sm">
+                          Email: {person.email}
+                        </p>
+                      )}
+                      {person.start_date && (
+                        <p className="mt-1 text-sm text-slate-500">
+                          Start date: {person.start_date}
+                        </p>
+                      )}
+                      {person.notes && (
+                        <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">
+                          {person.notes}
+                        </p>
+                      )}
                     </div>
 
-                    <span
-                      className={
-                        member.status === "Active"
-                          ? "rounded-full bg-green-100 px-3 py-1 text-xs font-bold text-green-800"
-                          : "rounded-full bg-slate-200 px-3 py-1 text-xs font-bold text-slate-700"
-                      }
-                    >
-                      {member.status}
-                    </span>
-                  </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={`rounded-full px-3 py-1 text-sm font-semibold ${
+                          person.status === "active"
+                            ? "bg-green-100 text-green-800"
+                            : person.status === "suspended"
+                              ? "bg-red-100 text-red-800"
+                              : "bg-slate-100 text-slate-700"
+                        }`}
+                      >
+                        {person.status}
+                      </span>
 
-                  <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-                    <p className="break-all">
-                      <strong>Worker ID:</strong> {member.id}
-                    </p>
-                    <p className="break-all">
-                      <strong>Staff number:</strong> {member.staffNumber}
-                    </p>
-                    <p>
-                      <strong>Phone:</strong> {member.phone || "Not provided"}
-                    </p>
-                    <p className="break-all">
-                      <strong>Email:</strong> {member.email || "Not provided"}
-                    </p>
-                    <p>
-                      <strong>Registered:</strong>{" "}
-                      {new Date(member.createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
+                      <button
+                        type="button"
+                        onClick={() => startEditing(person)}
+                        className="rounded-lg border border-slate-300 px-3 py-2 font-semibold"
+                      >
+                        Edit
+                      </button>
 
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void copyText(
-                          "Worker ID: " +
-                            member.id +
-                            "\nStaff Number: " +
-                            member.staffNumber +
-                            "\nName: " +
-                            member.fullName +
-                            "\nDepartment: " +
-                            member.department +
-                            "\nJob Title: " +
-                            member.role
-                        )
-                      }
-                      className="rounded-lg border border-slate-300 px-4 py-2 font-semibold"
-                    >
-                      Copy Staff Details
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => toggleStatus(member.id)}
-                      className="rounded-lg border border-blue-200 px-4 py-2 font-semibold text-blue-800"
-                    >
-                      {member.status === "Active"
-                        ? "Deactivate Worker"
-                        : "Activate Worker"}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => deleteWorker(member.id)}
-                      className="rounded-lg border border-red-200 px-4 py-2 font-semibold text-red-700"
-                    >
-                      Delete Record
-                    </button>
+                      {person.status !== "suspended" && (
+                        <button
+                          type="button"
+                          onClick={() => void changeStatus(person)}
+                          className="rounded-lg border border-slate-300 px-3 py-2 font-semibold"
+                        >
+                          {person.status === "active"
+                            ? "Deactivate"
+                            : "Activate"}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </article>
               ))}
@@ -575,24 +626,9 @@ export default function SupportStaffPage() {
         </section>
 
         <footer className="py-8 text-center text-sm text-slate-500">
-          BEST SALES GHANA · Staff Management Centre
+          BEST SALES GHANA · Support Centre Staff Management
         </footer>
       </div>
     </main>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-}: {
-  label: string;
-  value: number;
-}) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <p className="text-sm text-slate-500">{label}</p>
-      <p className="mt-2 text-3xl font-black">{value}</p>
-    </div>
   );
 }
