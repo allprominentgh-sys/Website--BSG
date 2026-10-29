@@ -7,208 +7,328 @@ import { randomUUID } from "crypto";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const ALLOWED_ROLES = ["admin", "administrator"];
+const ALLOWED_ROLES = ["admin", "administrator"] as const;
+const ALLOWED_STATUSES = ["active", "inactive", "suspended"] as const;
+
+const STAFF_COLUMNS =
+  "id, staff_number, full_name, department, job_title, phone, email, start_date, status, notes, created_at, updated_at";
+
+type StaffStatus = (typeof ALLOWED_STATUSES)[number];
 
 function jsonError(message: string, status: number) {
-  return NextResponse.json({ success: false, error: message }, { status });
+  return NextResponse.json(
+    { success: false, error: message },
+    {
+      status,
+      headers: { "Cache-Control": "no-store" },
+    }
+  );
 }
 
-export async function POST(request: NextRequest) {
-  try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+async function getAdminSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-    if (!supabaseUrl || !supabaseAnonKey) {
-      return jsonError("Supabase configuration is missing.", 500);
-    }
+  if (!url || !anonKey) {
+    throw new Error("Supabase configuration is missing.");
+  }
 
-    const cookieStore = cookies();
+  const cookieStore = await cookies();
 
-    const supabase = createServerClient(
-      supabaseUrl,
-      supabaseAnonKey,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) => {
-                cookieStore.set(name, value, options);
-              });
-            } catch {
-              // Some request contexts do not allow cookie updates.
-            }
-          },
-        },
-      }
-    );
+  const supabase = createServerClient(url, anonKey, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll();
+      },
+      setAll(cookiesToSet) {
+        try {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            cookieStore.set(name, value, options);
+          });
+        } catch {
+          // Cookie updates may not be available in every request context.
+        }
+      },
+    },
+  });
 
-    // Verify the real Supabase session on the server.
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
 
-    if (authError || !user) {
-      return jsonError("Please sign in as an administrator.", 401);
-    }
+  if (authError || !user) {
+    return { error: jsonError("Please sign in as an administrator.", 401) };
+  }
 
-    // Verify the administrator role from the existing profile.
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("id, account_type")
-      .eq("id", user.id)
-      .maybeSingle();
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("id, account_type")
+    .eq("id", user.id)
+    .maybeSingle();
 
-    if (profileError) {
-      console.error("Staff API profile verification failed:", profileError.message);
-      return jsonError("Unable to verify administrator access.", 500);
-    }
-
-    const role = (profile?.account_type ?? "").toLowerCase();
-
-    if (!profile || !ALLOWED_ROLES.includes(role)) {
-      return jsonError("Administrator access required.", 403);
-    }
-
-    let body: {
-      full_name?: unknown;
-      department?: unknown;
-      job_title?: unknown;
-      phone?: unknown;
-      email?: unknown;
-      start_date?: unknown;
-      status?: unknown;
-      notes?: unknown;
+  if (profileError) {
+    console.error("Staff API profile verification failed:", profileError.message);
+    return {
+      error: jsonError("Unable to verify administrator access.", 500),
     };
+  }
 
-    try {
-      body = await request.json();
-    } catch {
-      return jsonError("Please submit valid JSON data.", 400);
+  const role = String(profile?.account_type ?? "").trim().toLowerCase();
+
+  if (!profile || !ALLOWED_ROLES.includes(role as (typeof ALLOWED_ROLES)[number])) {
+    return { error: jsonError("Administrator access required.", 403) };
+  }
+
+  return { supabase, user };
+}
+
+function validDate(value: string) {
+  if (!value) return true;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+
+  const parsed = new Date(`${value}T00:00:00Z`);
+
+  return (
+    !Number.isNaN(parsed.getTime()) &&
+    parsed.toISOString().slice(0, 10) === value
+  );
+}
+
+function parseStaffBody(body: Record<string, unknown>) {
+  const full_name =
+    typeof body.full_name === "string" ? body.full_name.trim() : "";
+  const department =
+    typeof body.department === "string" ? body.department.trim() : "";
+  const job_title =
+    typeof body.job_title === "string" ? body.job_title.trim() : "";
+  const staff_number =
+    typeof body.staff_number === "string"
+      ? body.staff_number.trim().toUpperCase()
+      : "";
+  const phone =
+    typeof body.phone === "string" ? body.phone.trim() : "";
+  const email =
+    typeof body.email === "string"
+      ? body.email.trim().toLowerCase()
+      : "";
+  const start_date =
+    typeof body.start_date === "string" ? body.start_date.trim() : "";
+  const notes =
+    typeof body.notes === "string" ? body.notes.trim() : "";
+  const status =
+    typeof body.status === "string"
+      ? body.status.trim().toLowerCase()
+      : "active";
+
+  if (!full_name || !department || !job_title) {
+    return { error: "Full name, department and job title are required." };
+  }
+
+  if (
+    full_name.length > 150 ||
+    department.length > 100 ||
+    job_title.length > 100 ||
+    staff_number.length > 50 ||
+    phone.length > 40 ||
+    email.length > 254 ||
+    notes.length > 2000
+  ) {
+    return { error: "One or more fields exceed the allowed length." };
+  }
+
+  if (!staff_number) {
+    return { error: "Staff number is required." };
+  }
+
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { error: "Enter a valid email address." };
+  }
+
+  if (!(ALLOWED_STATUSES as readonly string[]).includes(status)) {
+    return { error: "Status must be active, inactive or suspended." };
+  }
+
+  if (!validDate(start_date)) {
+    return { error: "Enter a valid start date in YYYY-MM-DD format." };
+  }
+
+  return {
+    data: {
+      staff_number,
+      full_name,
+      department,
+      job_title,
+      phone: phone || null,
+      email: email || null,
+      start_date: start_date || null,
+      status: status as StaffStatus,
+      notes: notes || null,
+    },
+  };
+}
+
+async function readJson(request: NextRequest) {
+  try {
+    const body: unknown = await request.json();
+
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return { error: "Please submit a valid JSON object." };
     }
 
-    const fullName =
-      typeof body.full_name === "string" ? body.full_name.trim() : "";
-    const department =
-      typeof body.department === "string" ? body.department.trim() : "";
-    const jobTitle =
-      typeof body.job_title === "string" ? body.job_title.trim() : "";
+    return { body: body as Record<string, unknown> };
+  } catch {
+    return { error: "Please submit valid JSON data." };
+  }
+}
 
-    const phone =
-      typeof body.phone === "string" ? body.phone.trim() : "";
-    const email =
-      typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
-    const startDate =
-      typeof body.start_date === "string" ? body.start_date.trim() : "";
-    const notes =
-      typeof body.notes === "string" ? body.notes.trim() : "";
+// GET /api/admin/staff — list staff records
+export async function GET() {
+  try {
+    const auth = await getAdminSupabase();
+    if ("error" in auth) return auth.error;
 
-    const status =
-      typeof body.status === "string" ? body.status.trim().toLowerCase() : "active";
-
-    if (!fullName || !department || !jobTitle) {
-      return jsonError(
-        "Full name, department and job title are required.",
-        400
-      );
-    }
-
-    if (
-      fullName.length > 150 ||
-      department.length > 100 ||
-      jobTitle.length > 100 ||
-      phone.length > 40 ||
-      email.length > 254 ||
-      notes.length > 2000
-    ) {
-      return jsonError("One or more fields exceed the allowed length.", 400);
-    }
-
-    if (
-      email &&
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
-    ) {
-      return jsonError("Enter a valid email address.", 400);
-    }
-
-    if (!["active", "inactive", "suspended"].includes(status)) {
-      return jsonError(
-        "Status must be active, inactive or suspended.",
-        400
-      );
-    }
-
-    if (
-      startDate &&
-      (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) ||
-        Number.isNaN(Date.parse(`${startDate}T00:00:00Z`)) ||
-        new Date(`${startDate}T00:00:00Z`).toISOString().slice(0, 10) !== startDate)
-    ) {
-      return jsonError("Enter a valid start date in YYYY-MM-DD format.", 400);
-    }
-
-    // A random identifier reduces collisions; the database UNIQUE
-    // constraint remains the final protection against duplicate IDs.
-    const staffNumber = `BSG-STAFF-${randomUUID()
-      .replace(/-/g, "")
-      .slice(0, 12)
-      .toUpperCase()}`;
-
-    // Use the authenticated session client so existing RLS policies apply.
-    const { data: staff, error: insertError } = await supabase
+    const { data, error } = await auth.supabase
       .from("staff_members")
-      .insert({
-        staff_number: staffNumber,
-        full_name: fullName,
-        department,
-        job_title: jobTitle,
-        phone: phone || null,
-        email: email || null,
-        start_date: startDate || null,
-        status,
-        notes: notes || null,
-      })
-      .select(
-        "id, staff_number, full_name, department, job_title, phone, email, start_date, status, created_at"
-      )
-      .single();
+      .select(STAFF_COLUMNS)
+      .order("created_at", { ascending: false });
 
-    if (insertError) {
-      console.error("Staff registration insert failed:", insertError.code, insertError.message);
-
-      if (insertError.code === "23505") {
-        return jsonError(
-          "A duplicate staff number was detected. Please try again.",
-          409
-        );
-      }
-
-      if (insertError.code === "42501") {
-        return jsonError(
-          "Your account is not permitted by the database security policy to register staff.",
-          403
-        );
-      }
-
-      return jsonError(
-        "Staff registration failed. Check the database permissions and try again.",
-        500
-      );
+    if (error) {
+      console.error("Staff list query failed:", error.code, error.message);
+      return jsonError("Unable to load staff records. Check database permissions.", 500);
     }
 
     return NextResponse.json(
-      {
-        success: true,
-        message: "Staff member registered successfully.",
-        staff,
-      },
-      { status: 201 }
+      { success: true, staff: data ?? [] },
+      { headers: { "Cache-Control": "no-store" } }
     );
   } catch (error) {
-    console.error("Unexpected staff registration error:", error);
+    console.error("Staff list error:", error);
+    return jsonError("An unexpected server error occurred.", 500);
+  }
+}
+
+// POST /api/admin/staff — register a staff member
+export async function POST(request: NextRequest) {
+  try {
+    const auth = await getAdminSupabase();
+    if ("error" in auth) return auth.error;
+
+    const parsed = await readJson(request);
+    if (!parsed.body) {
+      return jsonError(parsed.error ?? "Invalid request body.", 400);
+    }
+
+    const validated = parseStaffBody(parsed.body);
+    if (!validated.data) {
+      return jsonError(validated.error ?? "Invalid staff details.", 400);
+    }
+
+    const { data, error } = await auth.supabase
+      .from("staff_members")
+      .insert(validated.data)
+      .select(STAFF_COLUMNS)
+      .single();
+
+    if (error) {
+      console.error("Staff insert failed:", error.code, error.message);
+
+      if (error.code === "23505") {
+        return jsonError("That staff number already exists. Choose another.", 409);
+      }
+
+      if (error.code === "42501") {
+        return jsonError("Database security policy does not permit this operation.", 403);
+      }
+
+      return jsonError("Staff registration failed. Check database columns and permissions.", 500);
+    }
+
+    return NextResponse.json(
+      { success: true, message: "Staff member registered successfully.", staff: data },
+      { status: 201, headers: { "Cache-Control": "no-store" } }
+    );
+  } catch (error) {
+    console.error("Staff registration error:", error);
+    return jsonError("An unexpected server error occurred.", 500);
+  }
+}
+
+// PATCH /api/admin/staff — edit details or change status
+export async function PATCH(request: NextRequest) {
+  try {
+    const auth = await getAdminSupabase();
+    if ("error" in auth) return auth.error;
+
+    const parsed = await readJson(request);
+    if (!parsed.body) {
+      return jsonError(parsed.error ?? "Invalid request body.", 400);
+    }
+
+    const body = parsed.body;
+    const id = typeof body.id === "string" ? body.id.trim() : "";
+
+    if (!id || id.length > 100) {
+      return jsonError("A valid staff record ID is required.", 400);
+    }
+
+    const update: Record<string, unknown> = {};
+
+    // Status-only requests come from the Activate/Deactivate button.
+    if (Object.keys(body).length === 2 && "status" in body) {
+      const status =
+        typeof body.status === "string"
+          ? body.status.trim().toLowerCase()
+          : "";
+
+      if (!(ALLOWED_STATUSES as readonly string[]).includes(status)) {
+        return jsonError("Invalid staff status.", 400);
+      }
+
+      update.status = status;
+    } else {
+      const validated = parseStaffBody(body);
+
+      if (!validated.data) {
+        return jsonError(validated.error ?? "Invalid staff details.", 400);
+      }
+
+      Object.assign(update, validated.data);
+    }
+
+    update.updated_at = new Date().toISOString();
+
+    const { data, error } = await auth.supabase
+      .from("staff_members")
+      .update(update)
+      .eq("id", id)
+      .select(STAFF_COLUMNS)
+      .maybeSingle();
+
+    if (error) {
+      console.error("Staff update failed:", error.code, error.message);
+
+      if (error.code === "23505") {
+        return jsonError("That staff number already exists. Choose another.", 409);
+      }
+
+      if (error.code === "42501") {
+        return jsonError("Database security policy does not permit this operation.", 403);
+      }
+
+      return jsonError("Staff update failed. Check database columns and permissions.", 500);
+    }
+
+    if (!data) {
+      return jsonError("Staff record was not found or cannot be updated.", 404);
+    }
+
+    return NextResponse.json(
+      { success: true, message: "Staff record updated successfully.", staff: data },
+      { headers: { "Cache-Control": "no-store" } }
+    );
+  } catch (error) {
+    console.error("Staff update error:", error);
     return jsonError("An unexpected server error occurred.", 500);
   }
 }
