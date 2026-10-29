@@ -1,16 +1,13 @@
 
 import { NextRequest, NextResponse } from "next/server";
+import { createHmac, timingSafeEqual } from "crypto";
 import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const ALLOWED_ROLES = [
-  "admin",
-  "administrator",
-  "super_admin",
-  "superadmin",
-] as const;
+const ADMIN_EMAIL = "admin@bestsalesgh.com";
+const COOKIE_NAME = "bsg_admin_session";
 
 const BRANCH_COLUMNS =
   "id, company_id, branch_code, branch_name, location, manager_name, is_active, created_at, updated_at";
@@ -18,95 +15,77 @@ const BRANCH_COLUMNS =
 function jsonError(message: string, status: number) {
   return NextResponse.json(
     { success: false, error: message },
-    {
-      status,
-      headers: { "Cache-Control": "no-store" },
-    }
+    { status, headers: { "Cache-Control": "no-store" } }
   );
 }
 
-async function getAdminClient(request: NextRequest) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const authorization = request.headers.get("authorization");
-  const token = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
+function verifyAdminSession(token: string, secret: string): boolean {
+  const parts = token.split(".");
+  if (parts.length !== 2) return false;
 
-  if (!url || !anonKey) {
-    return {
-      error: jsonError("Supabase configuration is missing.", 500),
-    };
+  const [payload, suppliedSignature] = parts;
+
+  const expectedSignature = createHmac("sha256", secret)
+    .update(payload)
+    .digest("base64url");
+
+  const supplied = Buffer.from(suppliedSignature);
+  const expected = Buffer.from(expectedSignature);
+
+  if (
+    supplied.length !== expected.length ||
+    !timingSafeEqual(supplied, expected)
+  ) {
+    return false;
   }
 
-  if (!token) {
-    return {
-      error: jsonError("Please sign in as an administrator.", 401),
-    };
-  }
-
-  const supabase = createClient(url, anonKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-    global: {
-      headers: { Authorization: `Bearer ${token}` },
-    },
-  });
-
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser(token);
-
-  if (authError || !user) {
-    return {
-      error: jsonError(
-        "Your session is invalid or expired. Please sign in again.",
-        401
-      ),
-    };
-  }
-
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("id, account_type")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (profileError) {
-    console.error(
-      "Branch API profile check failed:",
-      profileError.code,
-      profileError.message
+  try {
+    const session = JSON.parse(
+      Buffer.from(payload, "base64url").toString("utf8")
     );
 
+    return (
+      session.email === ADMIN_EMAIL &&
+      typeof session.expiresAt === "number" &&
+      Number.isFinite(session.expiresAt) &&
+      session.expiresAt > Date.now()
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function getAdminClient(request: NextRequest) {
+  const secret = process.env.ADMIN_SESSION_SECRET;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!secret || !url || !serviceKey) {
     return {
       error: jsonError(
-        "Unable to verify administrator permissions.",
+        "Administrator or database server configuration is missing.",
         500
       ),
     };
   }
 
-  const role = String(profile?.account_type ?? "")
-    .trim()
-    .toLowerCase()
-    .replace(/[\s-]+/g, "_");
+  const token = request.cookies.get(COOKIE_NAME)?.value;
 
-  if (
-    !profile ||
-    !ALLOWED_ROLES.includes(role as (typeof ALLOWED_ROLES)[number])
-  ) {
-    // Do not log tokens or expose account details to the browser.
-    console.warn("Branch API denied access: profile role not allowlisted.");
-
+  if (!token || !verifyAdminSession(token, secret)) {
     return {
       error: jsonError(
-        "Administrator access required. Verify your profile role.",
-        403
+        "Administrator session is missing, invalid or expired. Please sign in again.",
+        401
       ),
     };
   }
+
+  const supabase = createClient(url, serviceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
 
   return { supabase };
 }
@@ -179,7 +158,7 @@ function parseBranch(body: Record<string, unknown>) {
   };
 }
 
-// GET: list existing branches.
+// GET: list branches.
 export async function GET(request: NextRequest) {
   try {
     const auth = await getAdminClient(request);
@@ -191,16 +170,8 @@ export async function GET(request: NextRequest) {
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error(
-        "Branch list failed:",
-        error.code,
-        error.message
-      );
-
-      return jsonError(
-        "Unable to load branches. Check database permissions.",
-        500
-      );
+      console.error("Branch list failed:", error.code, error.message);
+      return jsonError("Unable to load branches.", 500);
     }
 
     return NextResponse.json(
@@ -226,43 +197,23 @@ export async function POST(request: NextRequest) {
 
     const validated = parseBranch(parsed.body);
     if (!validated.data) {
-      return jsonError(
-        validated.error ?? "Invalid branch details.",
-        400
-      );
+      return jsonError(validated.error ?? "Invalid branch details.", 400);
     }
 
     const { data, error } = await auth.supabase
       .from("company_branches")
-      .insert({
-        ...validated.data,
-        is_active: true,
-      })
+      .insert({ ...validated.data, is_active: true })
       .select(BRANCH_COLUMNS)
       .single();
 
     if (error) {
-      console.error(
-        "Branch creation failed:",
-        error.code,
-        error.message
-      );
+      console.error("Branch creation failed:", error.code, error.message);
 
       if (error.code === "23505") {
         return jsonError("That branch code already exists.", 409);
       }
 
-      if (error.code === "42501") {
-        return jsonError(
-          "Database policy does not allow branch creation.",
-          403
-        );
-      }
-
-      return jsonError(
-        "Unable to create branch. Check database permissions.",
-        500
-      );
+      return jsonError("Unable to create branch.", 500);
     }
 
     return NextResponse.json(
@@ -282,7 +233,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PATCH: edit branch details or active status.
+// PATCH: update branch details or active status.
 export async function PATCH(request: NextRequest) {
   try {
     const auth = await getAdminClient(request);
@@ -337,34 +288,17 @@ export async function PATCH(request: NextRequest) {
       .maybeSingle();
 
     if (error) {
-      console.error(
-        "Branch update failed:",
-        error.code,
-        error.message
-      );
+      console.error("Branch update failed:", error.code, error.message);
 
       if (error.code === "23505") {
         return jsonError("That branch code already exists.", 409);
       }
 
-      if (error.code === "42501") {
-        return jsonError(
-          "Database policy does not allow branch updates.",
-          403
-        );
-      }
-
-      return jsonError(
-        "Unable to update branch. Check database permissions.",
-        500
-      );
+      return jsonError("Unable to update branch.", 500);
     }
 
     if (!data) {
-      return jsonError(
-        "Branch not found or you do not have permission to update it.",
-        404
-      );
+      return jsonError("Branch not found.", 404);
     }
 
     return NextResponse.json(
