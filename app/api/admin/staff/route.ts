@@ -1,13 +1,14 @@
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
-import { randomUUID } from "crypto";
+import { createClient } from "@supabase/supabase-js";
+import { createHmac, timingSafeEqual } from "crypto";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const ALLOWED_ROLES = ["admin", "administrator"] as const;
+const ADMIN_EMAIL = "admin@bestsalesgh.com";
+const COOKIE_NAME = "bsg_admin_session";
+
 const ALLOWED_STATUSES = ["active", "inactive", "suspended"] as const;
 
 const STAFF_COLUMNS =
@@ -18,69 +19,74 @@ type StaffStatus = (typeof ALLOWED_STATUSES)[number];
 function jsonError(message: string, status: number) {
   return NextResponse.json(
     { success: false, error: message },
-    {
-      status,
-      headers: { "Cache-Control": "no-store" },
-    }
+    { status, headers: { "Cache-Control": "no-store" } }
   );
 }
 
-async function getAdminSupabase() {
+function verifyAdminSession(token: string, secret: string): boolean {
+  const parts = token.split(".");
+  if (parts.length !== 2) return false;
+
+  const [payload, signature] = parts;
+
+  const expected = createHmac("sha256", secret)
+    .update(payload)
+    .digest("base64url");
+
+  const suppliedBuffer = Buffer.from(signature);
+  const expectedBuffer = Buffer.from(expected);
+
+  if (
+    suppliedBuffer.length !== expectedBuffer.length ||
+    !timingSafeEqual(suppliedBuffer, expectedBuffer)
+  ) {
+    return false;
+  }
+
+  try {
+    const session = JSON.parse(
+      Buffer.from(payload, "base64url").toString("utf8")
+    );
+
+    return (
+      session.email === ADMIN_EMAIL &&
+      typeof session.expiresAt === "number" &&
+      session.expiresAt > Date.now()
+    );
+  } catch {
+    return false;
+  }
+}
+
+function getDatabase(request: NextRequest) {
+  const secret = process.env.ADMIN_SESSION_SECRET;
+  const token = request.cookies.get(COOKIE_NAME)?.value;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!url || !anonKey) {
-    throw new Error("Supabase configuration is missing.");
-  }
-
-  const cookieStore = await cookies();
-
-  const supabase = createServerClient(url, anonKey, {
-    cookies: {
-      getAll() {
-        return cookieStore.getAll();
-      },
-      setAll(cookiesToSet) {
-        try {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options);
-          });
-        } catch {
-          // Cookie updates may not be available in every request context.
-        }
-      },
-    },
-  });
-
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return { error: jsonError("Please sign in as an administrator.", 401) };
-  }
-
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("id, account_type")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (profileError) {
-    console.error("Staff API profile verification failed:", profileError.message);
+  if (!secret || !url || !serviceKey) {
     return {
-      error: jsonError("Unable to verify administrator access.", 500),
+      error: jsonError("Server configuration is incomplete.", 500),
     };
   }
 
-  const role = String(profile?.account_type ?? "").trim().toLowerCase();
-
-  if (!profile || !ALLOWED_ROLES.includes(role as (typeof ALLOWED_ROLES)[number])) {
-    return { error: jsonError("Administrator access required.", 403) };
+  if (!token || !verifyAdminSession(token, secret)) {
+    return {
+      error: jsonError(
+        "Administrator session is missing or expired. Sign in again.",
+        401
+      ),
+    };
   }
 
-  return { supabase, user };
+  const db = createClient(url, serviceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+
+  return { db };
 }
 
 function validDate(value: string) {
@@ -121,8 +127,11 @@ function parseStaffBody(body: Record<string, unknown>) {
       ? body.status.trim().toLowerCase()
       : "active";
 
-  if (!full_name || !department || !job_title) {
-    return { error: "Full name, department and job title are required." };
+  if (!full_name || !department || !job_title || !staff_number) {
+    return {
+      error:
+        "Full name, department, job title and staff number are required.",
+    };
   }
 
   if (
@@ -137,16 +146,14 @@ function parseStaffBody(body: Record<string, unknown>) {
     return { error: "One or more fields exceed the allowed length." };
   }
 
-  if (!staff_number) {
-    return { error: "Staff number is required." };
-  }
-
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return { error: "Enter a valid email address." };
   }
 
   if (!(ALLOWED_STATUSES as readonly string[]).includes(status)) {
-    return { error: "Status must be active, inactive or suspended." };
+    return {
+      error: "Status must be active, inactive or suspended.",
+    };
   }
 
   if (!validDate(start_date)) {
@@ -182,20 +189,19 @@ async function readJson(request: NextRequest) {
   }
 }
 
-// GET /api/admin/staff — list staff records
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const auth = await getAdminSupabase();
+    const auth = getDatabase(request);
     if ("error" in auth) return auth.error;
 
-    const { data, error } = await auth.supabase
+    const { data, error } = await auth.db
       .from("staff_members")
       .select(STAFF_COLUMNS)
       .order("created_at", { ascending: false });
 
     if (error) {
       console.error("Staff list query failed:", error.code, error.message);
-      return jsonError("Unable to load staff records. Check database permissions.", 500);
+      return jsonError("Unable to load staff records.", 500);
     }
 
     return NextResponse.json(
@@ -208,10 +214,9 @@ export async function GET() {
   }
 }
 
-// POST /api/admin/staff — register a staff member
 export async function POST(request: NextRequest) {
   try {
-    const auth = await getAdminSupabase();
+    const auth = getDatabase(request);
     if ("error" in auth) return auth.error;
 
     const parsed = await readJson(request);
@@ -224,7 +229,7 @@ export async function POST(request: NextRequest) {
       return jsonError(validated.error ?? "Invalid staff details.", 400);
     }
 
-    const { data, error } = await auth.supabase
+    const { data, error } = await auth.db
       .from("staff_members")
       .insert(validated.data)
       .select(STAFF_COLUMNS)
@@ -234,19 +239,22 @@ export async function POST(request: NextRequest) {
       console.error("Staff insert failed:", error.code, error.message);
 
       if (error.code === "23505") {
-        return jsonError("That staff number already exists. Choose another.", 409);
+        return jsonError("That staff number already exists.", 409);
       }
 
-      if (error.code === "42501") {
-        return jsonError("Database security policy does not permit this operation.", 403);
-      }
-
-      return jsonError("Staff registration failed. Check database columns and permissions.", 500);
+      return jsonError("Staff registration failed.", 500);
     }
 
     return NextResponse.json(
-      { success: true, message: "Staff member registered successfully.", staff: data },
-      { status: 201, headers: { "Cache-Control": "no-store" } }
+      {
+        success: true,
+        message: "Staff member registered successfully.",
+        staff: data,
+      },
+      {
+        status: 201,
+        headers: { "Cache-Control": "no-store" },
+      }
     );
   } catch (error) {
     console.error("Staff registration error:", error);
@@ -254,10 +262,9 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PATCH /api/admin/staff — edit details or change status
 export async function PATCH(request: NextRequest) {
   try {
-    const auth = await getAdminSupabase();
+    const auth = getDatabase(request);
     if ("error" in auth) return auth.error;
 
     const parsed = await readJson(request);
@@ -274,7 +281,6 @@ export async function PATCH(request: NextRequest) {
 
     const update: Record<string, unknown> = {};
 
-    // Status-only requests come from the Activate/Deactivate button.
     if (Object.keys(body).length === 2 && "status" in body) {
       const status =
         typeof body.status === "string"
@@ -298,7 +304,7 @@ export async function PATCH(request: NextRequest) {
 
     update.updated_at = new Date().toISOString();
 
-    const { data, error } = await auth.supabase
+    const { data, error } = await auth.db
       .from("staff_members")
       .update(update)
       .eq("id", id)
@@ -309,22 +315,22 @@ export async function PATCH(request: NextRequest) {
       console.error("Staff update failed:", error.code, error.message);
 
       if (error.code === "23505") {
-        return jsonError("That staff number already exists. Choose another.", 409);
+        return jsonError("That staff number already exists.", 409);
       }
 
-      if (error.code === "42501") {
-        return jsonError("Database security policy does not permit this operation.", 403);
-      }
-
-      return jsonError("Staff update failed. Check database columns and permissions.", 500);
+      return jsonError("Staff update failed.", 500);
     }
 
     if (!data) {
-      return jsonError("Staff record was not found or cannot be updated.", 404);
+      return jsonError("Staff record was not found.", 404);
     }
 
     return NextResponse.json(
-      { success: true, message: "Staff record updated successfully.", staff: data },
+      {
+        success: true,
+        message: "Staff record updated successfully.",
+        staff: data,
+      },
       { headers: { "Cache-Control": "no-store" } }
     );
   } catch (error) {
