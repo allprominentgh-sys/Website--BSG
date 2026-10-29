@@ -2,7 +2,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { FormEvent, ReactNode } from "react";
+import type { ReactNode } from "react";
 
 type SupportMessage = {
   id: string;
@@ -47,6 +47,7 @@ type Conversation = {
 type ManagementOption = {
   label: string;
   target: string;
+  external?: boolean;
 };
 
 type ManagementCard = {
@@ -60,83 +61,6 @@ type ManagementCard = {
 
 const inputClass =
   "w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-3 text-sm outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-100";
-
-const labelClass = "mb-1 block text-sm font-semibold text-slate-700";
-
-const navigationCards: ManagementCard[] = [
-  {
-    id: "administrator-controls",
-    title: "Administrator Controls",
-    description: "Administration and access oversight",
-    icon: "🛡️",
-    color: "border-blue-200 bg-blue-50",
-    options: [
-      { label: "Administrator session", target: "administrator-session" },
-      { label: "Access permissions", target: "access-permissions" },
-      { label: "Company settings", target: "company-settings" },
-    ],
-  },
-  {
-    id: "branch-management",
-    title: "Branch Management",
-    description: "Company IDs, branches and locations",
-    icon: "🏢",
-    color: "border-sky-200 bg-sky-50",
-    options: [
-      { label: "Add a branch", target: "branch-add" },
-      { label: "Branch details", target: "branch-details" },
-      { label: "Branch manager", target: "branch-manager" },
-    ],
-  },
-  {
-    id: "staff-departments",
-    title: "Staff & Departments",
-    description: "Staff registration and department setup",
-    icon: "👥",
-    color: "border-indigo-200 bg-indigo-50",
-    options: [
-      { label: "Staff registration", target: "staff-registration" },
-      { label: "Staff ID generator", target: "staff-id-generator" },
-      { label: "Manage departments", target: "department-management" },
-    ],
-  },
-  {
-    id: "support-delivery",
-    title: "Support & Delivery",
-    description: "Support and delivery assignments",
-    icon: "🚚",
-    color: "border-cyan-200 bg-cyan-50",
-    options: [
-      { label: "Support assignments", target: "support-assignments" },
-      { label: "Delivery assignments", target: "delivery-assignments" },
-      { label: "Track assignments", target: "track-assignments" },
-    ],
-  },
-  {
-    id: "customer-support",
-    title: "Customer Support",
-    description: "Customer conversations and agents",
-    icon: "💬",
-    color: "border-blue-200 bg-blue-50",
-    options: [
-      { label: "View conversations", target: "view-conversations" },
-      { label: "Monitor support agents", target: "monitor-agents" },
-      { label: "Search messages", target: "search-messages" },
-    ],
-  },
-  {
-    id: "audit-monitoring",
-    title: "Audit & Monitoring",
-    description: "Activity and administrative records",
-    icon: "📋",
-    color: "border-slate-200 bg-slate-50",
-    options: [
-      { label: "Activity records", target: "activity-records" },
-      { label: "Assignment history", target: "assignment-history" },
-      { label: "Administrative changes", target: "administrative-changes" },
-    ],
-  },
-];
 
 function formatDate(value: string): string {
   const date = new Date(value);
@@ -186,6 +110,105 @@ function SectionCard({
   );
 }
 
+const navigationCards: ManagementCard[] = [
+  {
+    id: "administrator-controls",
+    title: "Administrator Controls",
+    description: "Administrator session and company settings",
+    icon: "🛡️",
+    color: "border-blue-200 bg-blue-50",
+    options: [
+      { label: "Administrator session", target: "administrator-session" },
+      { label: "Access permissions", target: "access-permissions" },
+      { label: "Company settings", target: "company-settings" },
+    ],
+  },
+  {
+    id: "branch-management",
+    title: "Branch Management",
+    description: "Manage company branches and locations",
+    icon: "🏢",
+    color: "border-sky-200 bg-sky-50",
+    options: [
+      {
+        label: "Manage branches",
+        target: "/admin/branches",
+        external: true,
+      },
+      {
+        label: "Add a branch",
+        target: "/admin/branches",
+        external: true,
+      },
+      {
+        label: "Branch managers",
+        target: "/admin/branches",
+        external: true,
+      },
+    ],
+  },
+  {
+    id: "staff-departments",
+    title: "Staff & Departments",
+    description: "Manage staff records and departments",
+    icon: "👥",
+    color: "border-indigo-200 bg-indigo-50",
+    options: [
+      {
+        label: "Staff registration",
+        target: "/admin/staff",
+        external: true,
+      },
+      {
+        label: "Staff ID generator",
+        target: "/admin/staff",
+        external: true,
+      },
+      {
+        label: "Manage departments",
+        target: "/admin/staff",
+        external: true,
+      },
+    ],
+  },
+  {
+    id: "support-delivery",
+    title: "Support & Delivery",
+    description: "Support and delivery assignments",
+    icon: "🚚",
+    color: "border-cyan-200 bg-cyan-50",
+    options: [
+      { label: "Support assignments", target: "support-assignments" },
+      { label: "Delivery assignments", target: "delivery-assignments" },
+      { label: "Track assignments", target: "track-assignments" },
+    ],
+  },
+  {
+    id: "customer-support",
+    title: "Customer Support",
+    description: "Customer conversations and agents",
+    icon: "💬",
+    color: "border-blue-200 bg-blue-50",
+    options: [
+      { label: "View conversations", target: "view-conversations" },
+      { label: "Monitor support agents", target: "monitor-agents" },
+      { label: "Search messages", target: "search-messages" },
+    ],
+  },
+  {
+    id: "audit-monitoring",
+    title: "Audit & Monitoring",
+    description: "Administrative activity and records",
+    icon: "📋",
+    color: "border-slate-200 bg-slate-50",
+    options: [
+      { label: "Activity records", target: "activity-records" },
+      { label: "Assignment history", target: "assignment-history" },
+      { label: "Administrative changes", target: "administrative-changes" },
+    ],
+  },
+];
+
 export default function AdminSupportPage() {
   const [messages, setMessages] = useState<SupportMessage[]>([]);
   const [agents, setAgents] = useState<SupportAgent[]>([]);
@@ -196,15 +219,6 @@ export default function AdminSupportPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedConversation, setSelectedConversation] = useState("");
-
-  // Branch fields intentionally start blank.
-  // This page does not create or update database records.
-  const [companyId, setCompanyId] = useState("");
-  const [branchName, setBranchName] = useState("");
-  const [branchCode, setBranchCode] = useState("");
-  const [branchLocation, setBranchLocation] = useState("");
-  const [branchManager, setBranchManager] = useState("");
-  const [branchNotice, setBranchNotice] = useState("");
 
   const loadInbox = useCallback(async (manual = false) => {
     if (manual) setRefreshing(true);
@@ -357,22 +371,6 @@ export default function AdminSupportPage() {
       .join(", ");
   }
 
-  function clearBranchForm() {
-    setCompanyId("");
-    setBranchName("");
-    setBranchCode("");
-    setBranchLocation("");
-    setBranchManager("");
-    setBranchNotice("");
-  }
-
-  function prepareBranchForm(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setBranchNotice(
-      "Preview only. No branch has been created or saved. Database integration is not enabled."
-    );
-  }
-
   return (
     <main className="min-h-screen bg-slate-50 p-4 text-slate-800 sm:p-8">
       <div className="mx-auto max-w-7xl">
@@ -382,8 +380,8 @@ export default function AdminSupportPage() {
           </p>
           <h1 className="mt-2 text-3xl font-bold">Support Centre</h1>
           <p className="mt-2 max-w-2xl text-sm text-blue-100">
-            Administration, branch setup, staff planning and customer
-            support in one workspace.
+            Administration, staff and branch management, and customer support
+            in one workspace.
           </p>
 
           <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -404,13 +402,12 @@ export default function AdminSupportPage() {
           </div>
         </header>
 
-        {/* Dashboard cards and their individual destinations */}
         <section className="mt-6">
           <h2 className="text-xl font-bold text-slate-900">
             Management Dashboard
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            Select an option to jump directly to its own section.
+            Open a management page or jump to a section below.
           </p>
 
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -434,8 +431,12 @@ export default function AdminSupportPage() {
                 <div className="mt-4 space-y-2 border-t border-slate-200/80 pt-3">
                   {card.options.map((option) => (
                     <a
-                      key={option.target}
-                      href={`#${option.target}`}
+                      key={option.target + option.label}
+                      href={
+                        option.external
+                          ? option.target
+                          : `#${option.target}`
+                      }
                       className="flex items-center justify-between gap-2 rounded-lg bg-white/90 px-3 py-3 text-sm font-medium text-blue-900 transition hover:bg-white hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <span>{option.label}</span>
@@ -465,7 +466,6 @@ export default function AdminSupportPage() {
           </section>
         )}
 
-        {/* Administrator Controls */}
         <section
           id="administrator-controls"
           className="mt-6 scroll-mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
@@ -481,27 +481,26 @@ export default function AdminSupportPage() {
             <SectionCard
               id="administrator-session"
               title="Administrator session"
-              description="The existing inbox API checks access when loading support records."
+              description="Uses the existing administrator session system."
             />
             <SectionCard
               id="access-permissions"
               title="Access permissions"
-              description="Permission management is not connected. Protect administrative actions with server-side role checks before enabling changes."
+              description="Permission management is not connected. Administrative changes must use protected server APIs."
             />
             <SectionCard
               id="company-settings"
               title="Company settings"
-              description="Company configuration is a preview only. No company settings are being changed."
+              description="Company configuration is not connected to a settings API."
             />
           </div>
 
           <SetupNotice>
-            This page does not grant new permissions or change administrator
-            accounts. Additional controls require protected server APIs.
+            This page does not grant permissions or modify administrator
+            accounts.
           </SetupNotice>
         </section>
 
-        {/* Branch Management */}
         <section
           id="branch-management"
           className="mt-6 scroll-mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
@@ -509,109 +508,18 @@ export default function AdminSupportPage() {
           <h2 className="text-xl font-bold text-slate-900">
             Branch Management
           </h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Branch fields are intentionally blank and ready for future setup.
+          <p className="mt-2 text-sm text-slate-600">
+            Use the existing Branch Management page to register branches,
+            update details and manage active status.
           </p>
-
-          <form
-            onSubmit={prepareBranchForm}
-            className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2"
+          <a
+            href="/admin/branches"
+            className="mt-4 inline-flex rounded-lg bg-blue-900 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-800"
           >
-            <div id="branch-add" className="scroll-mt-6">
-              <label htmlFor="company-id" className={labelClass}>
-                Company ID
-              </label>
-              <input
-                id="company-id"
-                value={companyId}
-                onChange={(event) => setCompanyId(event.target.value)}
-                placeholder="Enter company ID"
-                className={inputClass}
-              />
-              <label htmlFor="branch-name" className={`${labelClass} mt-4`}>
-                Branch name
-              </label>
-              <input
-                id="branch-name"
-                value={branchName}
-                onChange={(event) => setBranchName(event.target.value)}
-                placeholder="Enter branch name"
-                className={inputClass}
-              />
-            </div>
-
-            <div id="branch-details" className="scroll-mt-6">
-              <label htmlFor="branch-code" className={labelClass}>
-                Branch code
-              </label>
-              <input
-                id="branch-code"
-                value={branchCode}
-                onChange={(event) => setBranchCode(event.target.value)}
-                placeholder="Enter branch code"
-                className={inputClass}
-              />
-              <label
-                htmlFor="branch-location"
-                className={`${labelClass} mt-4`}
-              >
-                Branch location
-              </label>
-              <input
-                id="branch-location"
-                value={branchLocation}
-                onChange={(event) => setBranchLocation(event.target.value)}
-                placeholder="Enter town or full address"
-                className={inputClass}
-              />
-            </div>
-
-            <div id="branch-manager" className="scroll-mt-6 sm:col-span-2">
-              <label htmlFor="branch-manager-input" className={labelClass}>
-                Branch manager
-              </label>
-              <input
-                id="branch-manager-input"
-                value={branchManager}
-                onChange={(event) => setBranchManager(event.target.value)}
-                placeholder="Enter manager name when appointed"
-                className={inputClass}
-              />
-            </div>
-
-            <div className="flex flex-wrap gap-3 sm:col-span-2">
-              <button
-                type="submit"
-                className="rounded-lg bg-blue-900 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-800"
-              >
-                Prepare branch
-              </button>
-              <button
-                type="button"
-                onClick={clearBranchForm}
-                className="rounded-lg border border-slate-300 px-5 py-3 text-sm font-semibold hover:bg-slate-50"
-              >
-                Clear fields
-              </button>
-            </div>
-
-            {branchNotice && (
-              <p
-                role="status"
-                className="rounded-lg bg-blue-50 p-3 text-sm text-blue-900 sm:col-span-2"
-              >
-                {branchNotice}
-              </p>
-            )}
-          </form>
-
-          <SetupNotice>
-            UI-only form. Submitting it does not create or save a branch.
-            Database integration is not enabled.
-          </SetupNotice>
+            Open Branch Management →
+          </a>
         </section>
 
-        {/* Staff and Departments */}
         <section
           id="staff-departments"
           className="mt-6 scroll-mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
@@ -619,46 +527,21 @@ export default function AdminSupportPage() {
           <h2 className="text-xl font-bold text-slate-900">
             Staff & Departments
           </h2>
-
-          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
-            <SectionCard
-              id="staff-registration"
-              title="Staff registration"
-              description="Staff details, job titles and branch membership."
-            >
-              <span className="mt-3 inline-block rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                Not connected
-              </span>
-            </SectionCard>
-
-            <SectionCard
-              id="staff-id-generator"
-              title="Staff ID generator"
-              description="Plan unique staff identifiers and future login setup."
-            >
-              <span className="mt-3 inline-block rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                Not connected
-              </span>
-            </SectionCard>
-
-            <SectionCard
-              id="department-management"
-              title="Manage departments"
-              description="Department setup and maintenance for the company."
-            >
-              <span className="mt-3 inline-block rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                Not connected
-              </span>
-            </SectionCard>
-          </div>
-
+          <p className="mt-2 text-sm text-slate-600">
+            Open the existing staff management page to manage employee records.
+          </p>
+          <a
+            href="/admin/staff"
+            className="mt-4 inline-flex rounded-lg bg-blue-900 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-800"
+          >
+            Open Staff Management →
+          </a>
           <SetupNotice>
-            Staff and department changes require protected server APIs and
-            database integration. No staff records are created here.
+            Department management is not connected to a separate department
+            API yet.
           </SetupNotice>
         </section>
 
-        {/* Support and Delivery */}
         <section
           id="support-delivery"
           className="mt-6 scroll-mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
@@ -666,32 +549,29 @@ export default function AdminSupportPage() {
           <h2 className="text-xl font-bold text-slate-900">
             Support & Delivery
           </h2>
-
           <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
             <SectionCard
               id="support-assignments"
               title="Support assignments"
-              description="The inbox currently displays existing assignment information. Changing an assignment is not enabled on this page."
+              description="Assignment editing is not enabled on this page."
             />
             <SectionCard
               id="delivery-assignments"
               title="Delivery assignments"
-              description="Delivery allocations for branches and authorised staff are not connected."
+              description="Delivery allocation is not connected yet."
             />
             <SectionCard
               id="track-assignments"
               title="Track assignments"
-              description="Assignment tracking history is not connected to a tracking API."
+              description="Assignment tracking history is not connected yet."
             />
           </div>
-
           <SetupNotice>
-            These sections are navigation destinations only. They do not
-            create, update or reassign support or delivery records.
+            These sections are informational only until protected assignment
+            APIs are implemented.
           </SetupNotice>
         </section>
 
-        {/* Customer Support */}
         <section
           id="customer-support"
           className="mt-6 scroll-mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
@@ -702,7 +582,7 @@ export default function AdminSupportPage() {
                 Customer Support
               </h2>
               <p className="mt-1 text-sm text-slate-500">
-                Read-only customer conversations and support agent monitoring.
+                Customer conversations and support agent monitoring.
               </p>
             </div>
             {lastUpdated && (
@@ -889,7 +769,6 @@ export default function AdminSupportPage() {
           </div>
         </section>
 
-        {/* Conversation details */}
         {selected && (
           <section
             id="conversation-details"
@@ -951,13 +830,12 @@ export default function AdminSupportPage() {
             </div>
 
             <SetupNotice>
-              This view is read-only. Replies, assignments, status changes
-              and escalations require separate server-side permission checks.
+              This conversation view is read-only. Replies, assignments,
+              status changes and escalations require protected server APIs.
             </SetupNotice>
           </section>
         )}
 
-        {/* Audit and Monitoring */}
         <section
           id="audit-monitoring"
           className="mt-6 scroll-mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
@@ -965,31 +843,28 @@ export default function AdminSupportPage() {
           <h2 className="text-xl font-bold text-slate-900">
             Audit & Monitoring
           </h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Review areas for administrative actions and assignment history.
-          </p>
 
           <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
             <SectionCard
               id="activity-records"
               title="Activity records"
-              description="A place for authorised administrators to review recorded system activity once the audit API is connected."
+              description="Audit log viewing is not connected yet."
             />
             <SectionCard
               id="assignment-history"
               title="Assignment history"
-              description="Historical support and delivery assignment records are not connected."
+              description="Assignment history is not connected yet."
             />
             <SectionCard
               id="administrative-changes"
               title="Administrative changes"
-              description="Administrative change history is not connected. No audit records are created or modified here."
+              description="Administrative change history is not connected yet."
             />
           </div>
 
           <SetupNotice>
-            Audit history integration is pending. Connect a protected
-            administrator API before displaying live records.
+            Audit history requires a protected API before it can display live
+            records. No audit data is modified by this page.
           </SetupNotice>
         </section>
 
