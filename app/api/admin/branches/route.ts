@@ -5,7 +5,12 @@ import { createClient } from "@supabase/supabase-js";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const ALLOWED_ROLES = ["admin", "administrator"] as const;
+const ALLOWED_ROLES = [
+  "admin",
+  "administrator",
+  "super_admin",
+  "superadmin",
+] as const;
 
 const BRANCH_COLUMNS =
   "id, company_id, branch_code, branch_name, location, manager_name, is_active, created_at, updated_at";
@@ -55,7 +60,10 @@ async function getAdminClient(request: NextRequest) {
 
   if (authError || !user) {
     return {
-      error: jsonError("Your session is invalid or expired. Please sign in again.", 401),
+      error: jsonError(
+        "Your session is invalid or expired. Please sign in again.",
+        401
+      ),
     };
   }
 
@@ -66,20 +74,37 @@ async function getAdminClient(request: NextRequest) {
     .maybeSingle();
 
   if (profileError) {
-    console.error("Branch API profile check failed:", profileError.message);
+    console.error(
+      "Branch API profile check failed:",
+      profileError.code,
+      profileError.message
+    );
+
     return {
-      error: jsonError("Unable to verify administrator permissions.", 500),
+      error: jsonError(
+        "Unable to verify administrator permissions.",
+        500
+      ),
     };
   }
 
-  const role = String(profile?.account_type ?? "").trim().toLowerCase();
+  const role = String(profile?.account_type ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
 
   if (
     !profile ||
     !ALLOWED_ROLES.includes(role as (typeof ALLOWED_ROLES)[number])
   ) {
+    // Do not log tokens or expose account details to the browser.
+    console.warn("Branch API denied access: profile role not allowlisted.");
+
     return {
-      error: jsonError("Administrator access required.", 403),
+      error: jsonError(
+        "Administrator access required. Verify your profile role.",
+        403
+      ),
     };
   }
 
@@ -105,16 +130,22 @@ function parseBranch(body: Record<string, unknown>) {
     typeof body.company_id === "string"
       ? body.company_id.trim()
       : "BSGH-HQ-0001";
+
   const branch_code =
     typeof body.branch_code === "string"
       ? body.branch_code.trim().toUpperCase()
       : "";
+
   const branch_name =
     typeof body.branch_name === "string"
       ? body.branch_name.trim()
       : "";
+
   const location =
-    typeof body.location === "string" ? body.location.trim() : "";
+    typeof body.location === "string"
+      ? body.location.trim()
+      : "";
+
   const manager_name =
     typeof body.manager_name === "string"
       ? body.manager_name.trim()
@@ -122,7 +153,8 @@ function parseBranch(body: Record<string, unknown>) {
 
   if (!company_id || !branch_code || !branch_name || !location) {
     return {
-      error: "Company ID, branch code, branch name and location are required.",
+      error:
+        "Company ID, branch code, branch name and location are required.",
     };
   }
 
@@ -147,7 +179,7 @@ function parseBranch(body: Record<string, unknown>) {
   };
 }
 
-// GET: list branches
+// GET: list existing branches.
 export async function GET(request: NextRequest) {
   try {
     const auth = await getAdminClient(request);
@@ -159,8 +191,16 @@ export async function GET(request: NextRequest) {
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error("Branch list failed:", error.code, error.message);
-      return jsonError("Unable to load branches. Check database permissions.", 500);
+      console.error(
+        "Branch list failed:",
+        error.code,
+        error.message
+      );
+
+      return jsonError(
+        "Unable to load branches. Check database permissions.",
+        500
+      );
     }
 
     return NextResponse.json(
@@ -173,7 +213,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST: create a branch
+// POST: create a branch.
 export async function POST(request: NextRequest) {
   try {
     const auth = await getAdminClient(request);
@@ -186,32 +226,55 @@ export async function POST(request: NextRequest) {
 
     const validated = parseBranch(parsed.body);
     if (!validated.data) {
-      return jsonError(validated.error ?? "Invalid branch details.", 400);
+      return jsonError(
+        validated.error ?? "Invalid branch details.",
+        400
+      );
     }
 
     const { data, error } = await auth.supabase
       .from("company_branches")
-      .insert({ ...validated.data, is_active: true })
+      .insert({
+        ...validated.data,
+        is_active: true,
+      })
       .select(BRANCH_COLUMNS)
       .single();
 
     if (error) {
-      console.error("Branch creation failed:", error.code, error.message);
+      console.error(
+        "Branch creation failed:",
+        error.code,
+        error.message
+      );
 
       if (error.code === "23505") {
         return jsonError("That branch code already exists.", 409);
       }
 
       if (error.code === "42501") {
-        return jsonError("Database policy does not allow branch creation.", 403);
+        return jsonError(
+          "Database policy does not allow branch creation.",
+          403
+        );
       }
 
-      return jsonError("Unable to create branch. Check database permissions.", 500);
+      return jsonError(
+        "Unable to create branch. Check database permissions.",
+        500
+      );
     }
 
     return NextResponse.json(
-      { success: true, message: "Branch created successfully.", branch: data },
-      { status: 201, headers: { "Cache-Control": "no-store" } }
+      {
+        success: true,
+        message: "Branch created successfully.",
+        branch: data,
+      },
+      {
+        status: 201,
+        headers: { "Cache-Control": "no-store" },
+      }
     );
   } catch (error) {
     console.error("Branch creation error:", error);
@@ -219,7 +282,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PATCH: edit branch details or active status
+// PATCH: edit branch details or active status.
 export async function PATCH(request: NextRequest) {
   try {
     const auth = await getAdminClient(request);
@@ -239,15 +302,22 @@ export async function PATCH(request: NextRequest) {
 
     const update: Record<string, unknown> = {};
 
-    if (
+    const statusOnly =
       typeof body.is_active === "boolean" &&
-      Object.keys(body).every((key) => ["id", "is_active"].includes(key))
-    ) {
+      Object.keys(body).every((key) =>
+        ["id", "is_active"].includes(key)
+      );
+
+    if (statusOnly) {
       update.is_active = body.is_active;
     } else {
       const validated = parseBranch(body);
+
       if (!validated.data) {
-        return jsonError(validated.error ?? "Invalid branch details.", 400);
+        return jsonError(
+          validated.error ?? "Invalid branch details.",
+          400
+        );
       }
 
       Object.assign(update, validated.data);
@@ -267,25 +337,42 @@ export async function PATCH(request: NextRequest) {
       .maybeSingle();
 
     if (error) {
-      console.error("Branch update failed:", error.code, error.message);
+      console.error(
+        "Branch update failed:",
+        error.code,
+        error.message
+      );
 
       if (error.code === "23505") {
         return jsonError("That branch code already exists.", 409);
       }
 
       if (error.code === "42501") {
-        return jsonError("Database policy does not allow branch updates.", 403);
+        return jsonError(
+          "Database policy does not allow branch updates.",
+          403
+        );
       }
 
-      return jsonError("Unable to update branch. Check database permissions.", 500);
+      return jsonError(
+        "Unable to update branch. Check database permissions.",
+        500
+      );
     }
 
     if (!data) {
-      return jsonError("Branch not found or you do not have permission to update it.", 404);
+      return jsonError(
+        "Branch not found or you do not have permission to update it.",
+        404
+      );
     }
 
     return NextResponse.json(
-      { success: true, message: "Branch updated successfully.", branch: data },
+      {
+        success: true,
+        message: "Branch updated successfully.",
+        branch: data,
+      },
       { headers: { "Cache-Control": "no-store" } }
     );
   } catch (error) {
