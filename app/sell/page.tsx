@@ -3,6 +3,7 @@
 
 import Link from "next/link";
 import {
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -22,90 +23,18 @@ type GPSCoordinates = {
 };
 
 type ProductCondition = "New" | "Used" | "Refurbished";
+type AccountType = "buyer" | "seller" | "business";
 
 const categories: Category[] = [
-  {
-    name: "Vehicles",
-    subcategories: [
-      "Cars", "SUVs", "Pickup Trucks", "Trucks", "Buses",
-      "Motorcycles", "Commercial Vehicles", "Trailers",
-      "Vehicle Parts", "Vehicle Accessories", "Car Rentals",
-      "Other Vehicles",
-    ],
-  },
-  {
-    name: "Property",
-    subcategories: [
-      "Houses for Sale", "Houses for Rent", "Apartments",
-      "Rooms", "Office Spaces", "Shops", "Warehouses",
-      "Industrial Property", "Land", "Commercial Land",
-      "Farm Land", "Hotels", "Guest Houses", "Other Property",
-    ],
-  },
-  {
-    name: "Electronics",
-    subcategories: [
-      "Mobile Phones", "Tablets", "Laptops", "Desktop Computers",
-      "Televisions", "Cameras", "Audio Equipment", "Printers",
-      "Gaming", "Networking Equipment", "Computer Accessories",
-      "Other Electronics",
-    ],
-  },
-  {
-    name: "Machinery",
-    subcategories: [
-      "Industrial Machinery", "Printing Equipment",
-      "DTF Printing Machines", "DTG Printing Machines",
-      "UV Printing Machines", "Laser Machines", "CNC Machines",
-      "Construction Equipment", "Excavators", "Generators",
-      "Compressors", "Welding Machines", "Factory Equipment",
-      "Tools", "Other Machinery",
-    ],
-  },
-  {
-    name: "Agriculture",
-    subcategories: [
-      "Tractors", "Farm Machinery", "Irrigation Equipment",
-      "Poultry Equipment", "Livestock Equipment",
-      "Processing Machines", "Harvesting Equipment",
-      "Planting Equipment", "Greenhouse Equipment", "Animal Feed",
-      "Seeds", "Fertilizer", "Livestock", "Farm Produce",
-      "Other Agriculture",
-    ],
-  },
-  {
-    name: "Services",
-    subcategories: [
-      "Construction", "Graphic Design", "Printing Services",
-      "Transport", "Delivery", "Cleaning", "Repairs", "IT Services",
-      "Marketing", "Business Consulting", "Photography", "Events",
-      "Security", "Professional Services", "Other Services",
-    ],
-  },
-  {
-    name: "Fashion",
-    subcategories: [
-      "Men's Clothing", "Women's Clothing", "Children's Clothing",
-      "Shoes", "Bags", "Watches", "Jewelry", "Accessories",
-      "Traditional Wear", "Other Fashion",
-    ],
-  },
-  {
-    name: "Home & Garden",
-    subcategories: [
-      "Furniture", "Kitchen Equipment", "Home Appliances",
-      "Garden Equipment", "Decorations", "Building Materials",
-      "Lighting", "Mattresses", "Other Home & Garden",
-    ],
-  },
-  {
-    name: "Jobs & Business",
-    subcategories: [
-      "Jobs", "Business Opportunities", "Companies for Sale",
-      "Franchises", "Investments", "Partnerships",
-      "Business Equipment", "Other Business",
-    ],
-  },
+  { name: "Vehicles", subcategories: ["Cars", "SUVs", "Pickup Trucks", "Trucks", "Buses", "Motorcycles", "Commercial Vehicles", "Trailers", "Vehicle Parts", "Vehicle Accessories", "Car Rentals", "Other Vehicles"] },
+  { name: "Property", subcategories: ["Houses for Sale", "Houses for Rent", "Apartments", "Rooms", "Office Spaces", "Shops", "Warehouses", "Industrial Property", "Land", "Commercial Land", "Farm Land", "Hotels", "Guest Houses", "Other Property"] },
+  { name: "Electronics", subcategories: ["Mobile Phones", "Tablets", "Laptops", "Desktop Computers", "Televisions", "Cameras", "Audio Equipment", "Printers", "Gaming", "Networking Equipment", "Computer Accessories", "Other Electronics"] },
+  { name: "Machinery", subcategories: ["Industrial Machinery", "Printing Equipment", "DTF Printing Machines", "DTG Printing Machines", "UV Printing Machines", "Laser Machines", "CNC Machines", "Construction Equipment", "Excavators", "Generators", "Compressors", "Welding Machines", "Factory Equipment", "Tools", "Other Machinery"] },
+  { name: "Agriculture", subcategories: ["Tractors", "Farm Machinery", "Irrigation Equipment", "Poultry Equipment", "Livestock Equipment", "Processing Machines", "Harvesting Equipment", "Planting Equipment", "Greenhouse Equipment", "Animal Feed", "Seeds", "Fertilizer", "Livestock", "Farm Produce", "Other Agriculture"] },
+  { name: "Services", subcategories: ["Construction", "Graphic Design", "Printing Services", "Transport", "Delivery", "Cleaning", "Repairs", "IT Services", "Marketing", "Business Consulting", "Photography", "Events", "Security", "Professional Services", "Other Services"] },
+  { name: "Fashion", subcategories: ["Men's Clothing", "Women's Clothing", "Children's Clothing", "Shoes", "Bags", "Watches", "Jewelry", "Accessories", "Traditional Wear", "Other Fashion"] },
+  { name: "Home & Garden", subcategories: ["Furniture", "Kitchen Equipment", "Home Appliances", "Garden Equipment", "Decorations", "Building Materials", "Lighting", "Mattresses", "Other Home & Garden"] },
+  { name: "Jobs & Business", subcategories: ["Jobs", "Business Opportunities", "Companies for Sale", "Franchises", "Investments", "Partnerships", "Business Equipment", "Other Business"] },
 ];
 
 const regions = [
@@ -126,6 +55,9 @@ const ALLOWED_TYPES = [
   "video/mp4",
 ];
 
+const inputClass =
+  "mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-blue-600";
+
 function getFileExtension(file: File) {
   const parts = file.name.split(".");
   return parts.length > 1
@@ -136,9 +68,6 @@ function getFileExtension(file: File) {
 function isVideo(file: File) {
   return file.type === "video/mp4";
 }
-
-const inputClass =
-  "mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-blue-600";
 
 function StepHeading({
   step,
@@ -163,9 +92,10 @@ function StepHeading({
 }
 
 export default function SellPage() {
-  const [sellerType, setSellerType] = useState<
-    "individual" | "company"
-  >("individual");
+  const [accountType, setAccountType] = useState<AccountType | null>(null);
+  const [companyName, setCompanyName] = useState("");
+  const [accountLoading, setAccountLoading] = useState(true);
+  const [accountError, setAccountError] = useState("");
 
   const [category, setCategory] = useState("");
   const [subcategory, setSubcategory] = useState("");
@@ -186,6 +116,77 @@ export default function SellPage() {
   const [gettingLocation, setGettingLocation] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSellerAccount() {
+      try {
+        const supabase = supabaseBrowser();
+
+        const {
+          data: { user },
+          error: authError,
+        } = await supabase.auth.getUser();
+
+        if (authError || !user) {
+          window.location.replace("/login");
+          return;
+        }
+
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("account_type")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (profileError) throw profileError;
+
+        const type = String(profile?.account_type || "").toLowerCase();
+
+        if (type !== "buyer" && type !== "seller" && type !== "business") {
+          throw new Error(
+            "Your account type could not be confirmed. Please contact support."
+          );
+        }
+
+        if (cancelled) return;
+
+        setAccountType(type);
+
+        if (type === "business") {
+          const { data: company, error: companyError } = await supabase
+            .from("company_profiles")
+            .select("company_name")
+            .eq("user_id", user.id)
+            .maybeSingle();
+
+          if (companyError) throw companyError;
+
+          if (!cancelled) {
+            setCompanyName(String(company?.company_name || "").trim());
+          }
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error("SELLER ACCOUNT ERROR:", error);
+          setAccountError(
+            error instanceof Error
+              ? error.message
+              : "Unable to confirm your seller account."
+          );
+        }
+      } finally {
+        if (!cancelled) setAccountLoading(false);
+      }
+    }
+
+    void loadSellerAccount();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const selectedCategory = useMemo(
     () => categories.find((item) => item.name === category),
@@ -307,6 +308,60 @@ export default function SellPage() {
         return;
       }
 
+      // Re-check account type before publishing.
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("account_type")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (profileError) {
+        alert("Unable to verify your seller account. Please try again.");
+        setPublishing(false);
+        return;
+      }
+
+      const verifiedAccountType = String(
+        profile?.account_type || ""
+      ).toLowerCase();
+
+      if (
+        verifiedAccountType !== "seller" &&
+        verifiedAccountType !== "business"
+      ) {
+        alert(
+          "Only registered seller and business accounts can publish advertisements."
+        );
+        setPublishing(false);
+        return;
+      }
+
+      let verifiedCompanyName = "";
+
+      if (verifiedAccountType === "business") {
+        const { data: company, error: companyError } = await supabase
+          .from("company_profiles")
+          .select("company_name")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (companyError) {
+          alert("Unable to verify your company profile.");
+          setPublishing(false);
+          return;
+        }
+
+        verifiedCompanyName = String(
+          company?.company_name || ""
+        ).trim();
+
+        if (!verifiedCompanyName) {
+          alert("Please complete your company profile before publishing.");
+          setPublishing(false);
+          return;
+        }
+      }
+
       const title = String(formData.get("title") || "").trim();
       const description = String(
         formData.get("description") || ""
@@ -317,10 +372,16 @@ export default function SellPage() {
         formData.get("currency") || "GHS"
       ).trim();
 
-      const companyName = String(
-        formData.get("companyName") || ""
+      const enteredShopName = String(
+        formData.get("shopName") || ""
       ).trim();
-      const shopName = String(formData.get("shopName") || "").trim();
+
+      const shopName =
+        enteredShopName ||
+        (verifiedAccountType === "business"
+          ? verifiedCompanyName
+          : "");
+
       const shopAddress = String(
         formData.get("shopAddress") || ""
       ).trim();
@@ -330,7 +391,6 @@ export default function SellPage() {
       const region = String(formData.get("region") || "").trim();
       const city = String(formData.get("city") || "").trim();
 
-      // Validate required information.
       if (!title) {
         alert("Please enter an advertisement title.");
         setPublishing(false);
@@ -382,7 +442,6 @@ export default function SellPage() {
         .filter(Boolean)
         .join(", ");
 
-      // Create the listing.
       const {
         data: listing,
         error: listingError,
@@ -400,14 +459,10 @@ export default function SellPage() {
           category,
           subcategory,
           currency: currencyCode,
-
-          // New listing fields: add these columns in Supabase first.
           condition,
           shop_name: shopName || null,
           shop_address: shopAddress,
           shop_landmark: shopLandmark || null,
-
-          // Existing location columns from your schema.
           item_region: region,
           item_city: city,
           item_area: shopLandmark || null,
@@ -504,6 +559,95 @@ export default function SellPage() {
     }
   }
 
+  if (accountLoading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
+        <div className="text-center">
+          <p className="text-lg font-black text-blue-900">
+            Checking your seller account...
+          </p>
+          <p className="mt-2 text-sm text-slate-500">Please wait.</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (accountError || accountType === null) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
+        <div className="w-full max-w-lg rounded-2xl border border-red-200 bg-white p-7 text-center shadow-sm">
+          <h1 className="text-xl font-black text-red-700">
+            Account verification required
+          </h1>
+          <p className="mt-3 text-sm text-slate-600">
+            {accountError || "We could not confirm your account type."}
+          </p>
+          <Link
+            href="/dashboard/profile"
+            className="mt-5 inline-flex rounded-xl bg-blue-700 px-5 py-3 font-bold text-white"
+          >
+            View My Account
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
+  if (accountType === "buyer") {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
+        <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+          <div className="text-5xl">🛍️</div>
+          <h1 className="mt-4 text-2xl font-black text-slate-900">
+            Become a Seller
+          </h1>
+          <p className="mt-3 leading-7 text-slate-600">
+            Your current account is registered as a buyer. To publish
+            advertisements, you need to register or upgrade to a seller or
+            business account.
+          </p>
+          <Link
+            href="/dashboard/profile"
+            className="mt-6 inline-flex rounded-xl bg-blue-700 px-6 py-3 font-bold text-white"
+          >
+            View My Account →
+          </Link>
+          <div>
+            <Link
+              href="/"
+              className="mt-4 inline-block text-sm font-bold text-blue-700"
+            >
+              Back to Marketplace
+            </Link>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (accountType === "business" && !companyName) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
+        <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+          <div className="text-5xl">🏢</div>
+          <h1 className="mt-4 text-2xl font-black text-slate-900">
+            Complete Your Company Profile
+          </h1>
+          <p className="mt-3 leading-7 text-slate-600">
+            Your account is correctly recognised as a business account, but
+            you need to add your company name before publishing advertisements.
+          </p>
+          <Link
+            href="/dashboard/company"
+            className="mt-6 inline-flex rounded-xl bg-blue-700 px-6 py-3 font-bold text-white"
+          >
+            Complete Company Profile →
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
       <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur">
@@ -523,18 +667,10 @@ export default function SellPage() {
           </Link>
 
           <nav className="hidden items-center gap-6 md:flex">
-            <Link href="/" className="font-semibold text-slate-700 hover:text-blue-700">
-              Home
-            </Link>
-            <Link href="/categories" className="font-semibold text-slate-700 hover:text-blue-700">
-              Categories
-            </Link>
-            <Link href="/listings" className="font-semibold text-slate-700 hover:text-blue-700">
-              Listings
-            </Link>
-            <Link href="/login" className="rounded-xl border border-blue-700 px-5 py-3 font-bold text-blue-700 hover:bg-blue-50">
-              Login
-            </Link>
+            <Link href="/" className="font-semibold text-slate-700 hover:text-blue-700">Home</Link>
+            <Link href="/categories" className="font-semibold text-slate-700 hover:text-blue-700">Categories</Link>
+            <Link href="/listings" className="font-semibold text-slate-700 hover:text-blue-700">Listings</Link>
+            <Link href="/login" className="rounded-xl border border-blue-700 px-5 py-3 font-bold text-blue-700 hover:bg-blue-50">Login</Link>
           </nav>
         </div>
       </header>
@@ -564,54 +700,42 @@ export default function SellPage() {
             <StepHeading
               step="Step 1"
               title="Seller Information"
-              description="Tell buyers whether you are selling as an individual or business."
+              description="Your registered account determines how your advertisement is presented."
             />
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <button
-                type="button"
-                onClick={() => setSellerType("individual")}
-                className={`rounded-2xl border-2 p-5 text-left transition ${
-                  sellerType === "individual"
-                    ? "border-blue-700 bg-blue-50"
-                    : "border-slate-200 hover:border-blue-300"
-                }`}
-              >
+            {accountType === "seller" && (
+              <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5">
                 <div className="text-3xl">👤</div>
-                <div className="mt-3 font-black">Individual Seller</div>
-                <p className="mt-1 text-sm text-slate-500">
-                  I am selling as an individual.
+                <h3 className="mt-3 font-black text-blue-900">
+                  Individual Seller
+                </h3>
+                <p className="mt-1 text-sm text-blue-800">
+                  Your advertisement will be published under your individual seller account.
                 </p>
-              </button>
+              </div>
+            )}
 
-              <button
-                type="button"
-                onClick={() => setSellerType("company")}
-                className={`rounded-2xl border-2 p-5 text-left transition ${
-                  sellerType === "company"
-                    ? "border-blue-700 bg-blue-50"
-                    : "border-slate-200 hover:border-blue-300"
-                }`}
-              >
+            {accountType === "business" && (
+              <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5">
                 <div className="text-3xl">🏢</div>
-                <div className="mt-3 font-black">Company / Business</div>
-                <p className="mt-1 text-sm text-slate-500">
-                  I am selling for a company or business.
+                <h3 className="mt-3 font-black text-blue-900">
+                  Company / Business Seller
+                </h3>
+                <p className="mt-2 text-sm text-blue-800">
+                  Registered company name
                 </p>
-              </button>
-            </div>
-
-            {sellerType === "company" && (
-              <div className="mt-5">
-                <label className="text-sm font-bold">
-                  Company / Business Name
-                </label>
-                <input
-                  name="companyName"
-                  type="text"
-                  placeholder="Enter company name"
-                  className={inputClass}
-                />
+                <p className="mt-1 text-lg font-black text-blue-950">
+                  {companyName}
+                </p>
+                <p className="mt-3 text-xs text-slate-600">
+                  Business account recognition does not mean that your business has been verified.
+                </p>
+                <Link
+                  href="/dashboard/company"
+                  className="mt-4 inline-flex text-sm font-bold text-blue-700 underline"
+                >
+                  Manage Company Profile
+                </Link>
               </div>
             )}
           </section>
@@ -669,9 +793,7 @@ export default function SellPage() {
                 required
                 name="condition"
                 value={condition}
-                onChange={(e) =>
-                  setCondition(e.target.value as ProductCondition)
-                }
+                onChange={(e) => setCondition(e.target.value as ProductCondition)}
                 className={inputClass}
               >
                 <option value="New">New</option>
@@ -684,9 +806,7 @@ export default function SellPage() {
             </div>
 
             <div className="mt-5">
-              <label className="text-sm font-bold">
-                Advertisement Title *
-              </label>
+              <label className="text-sm font-bold">Advertisement Title *</label>
               <input
                 required
                 name="title"
@@ -708,7 +828,6 @@ export default function SellPage() {
               <p className="mt-2 text-xs text-slate-500">
                 Only include specifications and claims you can verify.
               </p>
-
               <button
                 type="button"
                 disabled
@@ -843,7 +962,6 @@ export default function SellPage() {
                   ))}
                 </select>
               </div>
-
               <div>
                 <label className="text-sm font-bold">City / Town *</label>
                 <input
@@ -861,6 +979,7 @@ export default function SellPage() {
               <input
                 name="shopName"
                 type="text"
+                defaultValue={accountType === "business" ? companyName : ""}
                 placeholder="Example: ABC Printing Solutions"
                 className={inputClass}
               />
@@ -895,7 +1014,6 @@ export default function SellPage() {
                 You can publish without GPS. If you allow location access,
                 coordinates will be saved with the listing.
               </p>
-
               <button
                 type="button"
                 disabled={gettingLocation}
@@ -904,7 +1022,6 @@ export default function SellPage() {
               >
                 {gettingLocation ? "Getting Location..." : "📍 Use My Location"}
               </button>
-
               {gpsCoordinates && (
                 <div className="mt-4 rounded-xl border border-green-200 bg-green-50 p-4">
                   <p className="font-bold text-green-800">
@@ -1035,7 +1152,6 @@ export default function SellPage() {
           {/* STEP 6 */}
           <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
             <StepHeading step="Step 6" title="Seller Contact" />
-
             <div className="grid gap-5 md:grid-cols-2">
               <div>
                 <label className="text-sm font-bold">Seller Name *</label>
@@ -1058,7 +1174,6 @@ export default function SellPage() {
                 />
               </div>
             </div>
-
             <div className="mt-5">
               <label className="text-sm font-bold">Email Address</label>
               <input
@@ -1085,7 +1200,6 @@ export default function SellPage() {
                   account.
                 </p>
               </div>
-
               <button
                 type="submit"
                 disabled={publishing}
