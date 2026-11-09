@@ -1,7 +1,7 @@
+
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { supabaseBrowser } from "@/supabase-browser";
 
 type Seller = {
   id: string;
@@ -25,12 +25,19 @@ type Listing = {
   title?: string;
   status?: string;
   price?: number | string;
+  currency_code?: string;
+  currency?: string;
   created_at?: string;
   is_featured?: boolean;
   featured?: boolean;
 };
 
-const SELLER_TYPES = ["seller", "business", "individual", "company"];
+type SellersApiResponse = {
+  sellers?: Seller[];
+  listings?: Listing[];
+  listingNotice?: string;
+  error?: string;
+};
 
 function display(value: unknown): string {
   if (value === null || value === undefined || value === "") {
@@ -60,22 +67,52 @@ function isVerified(seller: Seller): boolean {
   );
 }
 
-function formatMoney(value: number | string | undefined): string {
-  if (value === undefined || value === "") return "Not available";
+function formatMoney(
+  value: number | string | undefined,
+  currency = "GHS"
+): string {
+  if (value === undefined || value === "") {
+    return "Not available";
+  }
 
   const amount = Number(value);
 
   if (!Number.isFinite(amount)) return String(value);
 
-  return new Intl.NumberFormat("en-GH", {
-    style: "currency",
-    currency: "GHS",
-  }).format(amount);
+  try {
+    return new Intl.NumberFormat("en-GH", {
+      style: "currency",
+      currency,
+    }).format(amount);
+  } catch {
+    return `${currency} ${amount.toLocaleString("en-GH")}`;
+  }
+}
+
+function verificationLabel(seller: Seller): string {
+  if (isVerified(seller)) return "Verified";
+
+  const status = (seller.verification_status ?? "").trim();
+
+  if (!status || status === "not_required") {
+    return "Not verified";
+  }
+
+  return status.replace(/_/g, " ");
+}
+
+function csvCell(value: unknown): string {
+  let text = String(value ?? "");
+
+  // Prevent spreadsheet formula execution when CSV is opened.
+  if (/^[\s]*[=+\-@]/.test(text)) {
+    text = "'" + text;
+  }
+
+  return `"${text.replace(/"/g, '""')}"`;
 }
 
 export default function AdminSellersPage() {
-  const supabase = useMemo(() => supabaseBrowser(), []);
-
   const [checking, setChecking] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
 
@@ -92,6 +129,8 @@ export default function AdminSellersPage() {
   const [listingNotice, setListingNotice] = useState("");
 
   const checkAdminSession = useCallback(async () => {
+    setChecking(true);
+
     try {
       const response = await fetch("/api/admin/session", {
         method: "GET",
@@ -99,9 +138,14 @@ export default function AdminSellersPage() {
         cache: "no-store",
       });
 
+      if (!response.ok) {
+        setIsAdmin(false);
+        return;
+      }
+
       const result = await response.json();
 
-      setIsAdmin(response.ok && result.authenticated === true);
+      setIsAdmin(result.authenticated === true);
     } catch (err) {
       console.error("Admin session check failed:", err);
       setIsAdmin(false);
@@ -116,52 +160,39 @@ export default function AdminSellersPage() {
     setListingNotice("");
 
     try {
-      const { data, error: sellerError } = await supabase
-        .from("profiles")
-        .select(
-          "id, full_name, phone, location, account_type, verified, verification_status, created_at, delivery_region, delivery_city, delivery_area, delivery_address, ghana_post_gps"
-        )
-        .in("account_type", SELLER_TYPES)
-        .order("created_at", { ascending: false })
-        .limit(500);
+      const response = await fetch("/api/admin/sellers", {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+      });
 
-      if (sellerError) throw sellerError;
+      const result =
+        (await response.json()) as SellersApiResponse;
 
-      const sellerRecords = (data ?? []) as Seller[];
-      setSellers(sellerRecords);
-
-      if (sellerRecords.length === 0) {
-        setListings([]);
-        return;
-      }
-
-      const sellerIds = sellerRecords.map((seller) => seller.id);
-
-      const { data: listingData, error: listingError } = await supabase
-        .from("listings")
-        .select("*")
-        .in("seller_id", sellerIds)
-        .order("created_at", { ascending: false })
-        .limit(1000);
-
-      if (listingError) {
-        console.error("Seller listings could not be loaded:", listingError);
-        setListings([]);
-        setListingNotice(
-          "Seller profiles loaded, but listings could not be loaded. Check the listings table columns and Supabase access policies."
+      if (!response.ok) {
+        throw new Error(
+          result.error || "Unable to load seller accounts."
         );
-      } else {
-        setListings((listingData ?? []) as Listing[]);
       }
+
+      setSellers(Array.isArray(result.sellers) ? result.sellers : []);
+      setListings(Array.isArray(result.listings) ? result.listings : []);
+      setListingNotice(result.listingNotice ?? "");
     } catch (err) {
       console.error("Seller loading failed:", err);
+
       setError(
-        "Unable to load sellers. Check the profiles columns, account_type values, and Supabase access policies."
+        err instanceof Error
+          ? err.message
+          : "Unable to load seller accounts."
       );
+
+      setSellers([]);
+      setListings([]);
     } finally {
       setLoading(false);
     }
-  }, [supabase]);
+  }, []);
 
   useEffect(() => {
     void checkAdminSession();
@@ -172,6 +203,22 @@ export default function AdminSellersPage() {
       void loadSellers();
     }
   }, [isAdmin, loadSellers]);
+
+  const listingsBySeller = useMemo(() => {
+    const map = new Map<string, Listing[]>();
+
+    for (const listing of listings) {
+      const sellerId = listing.seller_id;
+
+      if (!sellerId) continue;
+
+      const existing = map.get(sellerId) ?? [];
+      existing.push(listing);
+      map.set(sellerId, existing);
+    }
+
+    return map;
+  }, [listings]);
 
   const filteredSellers = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -191,11 +238,21 @@ export default function AdminSellersPage() {
           seller.delivery_area,
           seller.delivery_address,
           seller.ghana_post_gps,
-        ].some((value) => String(value ?? "").toLowerCase().includes(term));
+        ].some((value) =>
+          String(value ?? "").toLowerCase().includes(term)
+        );
+
+      const type = (seller.account_type ?? "").toLowerCase();
 
       const matchesAccount =
         accountFilter === "all" ||
-        (seller.account_type ?? "").toLowerCase() === accountFilter;
+        (accountFilter === "seller" &&
+          ["seller", "individual"].includes(type)) ||
+        (accountFilter === "business" &&
+          ["business", "company"].includes(type)) ||
+        (accountFilter !== "seller" &&
+          accountFilter !== "business" &&
+          type === accountFilter);
 
       const verified = isVerified(seller);
 
@@ -204,12 +261,16 @@ export default function AdminSellersPage() {
         (verificationFilter === "verified" && verified) ||
         (verificationFilter === "unverified" && !verified);
 
-      return matchesSearch && matchesAccount && matchesVerification;
+      return (
+        matchesSearch &&
+        matchesAccount &&
+        matchesVerification
+      );
     });
   }, [sellers, search, accountFilter, verificationFilter]);
 
-  function sellerListings(sellerId: string) {
-    return listings.filter((listing) => listing.seller_id === sellerId);
+  function sellerListings(sellerId: string): Listing[] {
+    return listingsBySeller.get(sellerId) ?? [];
   }
 
   function exportSellers() {
@@ -248,11 +309,7 @@ export default function AdminSellersPage() {
     ]);
 
     const csv = [headers, ...rows]
-      .map((row) =>
-        row
-          .map((value) => `"${String(value ?? "").replace(/"/g, '""')}"`)
-          .join(",")
-      )
+      .map((row) => row.map(csvCell).join(","))
       .join("\r\n");
 
     const blob = new Blob(["\uFEFF", csv], {
@@ -264,12 +321,27 @@ export default function AdminSellersPage() {
 
     link.href = url;
     link.download = "bestsalesgh-sellers.csv";
+
     document.body.appendChild(link);
     link.click();
     link.remove();
 
     URL.revokeObjectURL(url);
   }
+
+  const verifiedCount = sellers.filter(isVerified).length;
+
+  const individualCount = sellers.filter((seller) =>
+    ["seller", "individual"].includes(
+      (seller.account_type ?? "").toLowerCase()
+    )
+  ).length;
+
+  const businessCount = sellers.filter((seller) =>
+    ["business", "company"].includes(
+      (seller.account_type ?? "").toLowerCase()
+    )
+  ).length;
 
   if (checking) {
     return (
@@ -288,34 +360,20 @@ export default function AdminSellersPage() {
           </h1>
 
           <p className="mt-2 text-sm text-slate-600">
-            Sign in with the BestSalesGH central admin account before opening
-            seller management.
+            Sign in with the BestSalesGH central admin account
+            before opening seller management.
           </p>
 
           <a
-            href="/login"
+            href="/admin/login"
             className="mt-5 inline-flex rounded-lg bg-blue-800 px-5 py-3 font-semibold text-white"
           >
-            Go to login
+            Go to admin login
           </a>
         </div>
       </main>
     );
   }
-
-  const verifiedCount = sellers.filter(isVerified).length;
-
-  const individualCount = sellers.filter((seller) =>
-    ["seller", "individual"].includes(
-      (seller.account_type ?? "").toLowerCase()
-    )
-  ).length;
-
-  const businessCount = sellers.filter((seller) =>
-    ["business", "company"].includes(
-      (seller.account_type ?? "").toLowerCase()
-    )
-  ).length;
 
   return (
     <main className="min-h-screen bg-slate-50 p-4 text-slate-800 sm:p-6">
@@ -331,8 +389,8 @@ export default function AdminSellersPage() {
             </h1>
 
             <p className="mt-2 text-sm text-slate-600">
-              Review individual sellers, business accounts, verification,
-              addresses and available listings.
+              Review individual sellers, business accounts,
+              verification, addresses and available listings.
             </p>
           </div>
 
@@ -356,7 +414,7 @@ export default function AdminSellersPage() {
             <button
               type="button"
               onClick={exportSellers}
-              disabled={filteredSellers.length === 0}
+              disabled={filteredSellers.length === 0 || loading}
               className="rounded-lg border border-slate-300 bg-white px-4 py-2 font-medium disabled:opacity-50"
             >
               Export CSV
@@ -366,22 +424,36 @@ export default function AdminSellersPage() {
 
         <section className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-xl border bg-white p-5">
-            <p className="text-sm text-slate-500">Seller accounts</p>
-            <p className="mt-2 text-3xl font-bold">{sellers.length}</p>
+            <p className="text-sm text-slate-500">
+              Seller accounts
+            </p>
+            <p className="mt-2 text-3xl font-bold">
+              {sellers.length}
+            </p>
           </div>
 
           <div className="rounded-xl border bg-white p-5">
-            <p className="text-sm text-slate-500">Individual accounts</p>
-            <p className="mt-2 text-3xl font-bold">{individualCount}</p>
+            <p className="text-sm text-slate-500">
+              Individual accounts
+            </p>
+            <p className="mt-2 text-3xl font-bold">
+              {individualCount}
+            </p>
           </div>
 
           <div className="rounded-xl border bg-white p-5">
-            <p className="text-sm text-slate-500">Business accounts</p>
-            <p className="mt-2 text-3xl font-bold">{businessCount}</p>
+            <p className="text-sm text-slate-500">
+              Business accounts
+            </p>
+            <p className="mt-2 text-3xl font-bold">
+              {businessCount}
+            </p>
           </div>
 
           <div className="rounded-xl border bg-white p-5">
-            <p className="text-sm text-slate-500">Verified accounts</p>
+            <p className="text-sm text-slate-500">
+              Verified accounts
+            </p>
             <p className="mt-2 text-3xl font-bold text-green-700">
               {verifiedCount}
             </p>
@@ -400,14 +472,26 @@ export default function AdminSellersPage() {
 
             <select
               value={accountFilter}
-              onChange={(event) => setAccountFilter(event.target.value)}
+              onChange={(event) =>
+                setAccountFilter(event.target.value)
+              }
               className="rounded-lg border border-slate-300 bg-white px-4 py-3"
             >
-              <option value="all">All seller account types</option>
-              <option value="seller">Seller / individual</option>
-              <option value="individual">Individual</option>
-              <option value="business">Business</option>
-              <option value="company">Company</option>
+              <option value="all">
+                All seller account types
+              </option>
+              <option value="seller">
+                Seller / Individual
+              </option>
+              <option value="business">
+                Business / Company
+              </option>
+              <option value="individual">
+                Individual (legacy)
+              </option>
+              <option value="company">
+                Company (legacy)
+              </option>
             </select>
 
             <select
@@ -417,9 +501,15 @@ export default function AdminSellersPage() {
               }
               className="rounded-lg border border-slate-300 bg-white px-4 py-3"
             >
-              <option value="all">All verification statuses</option>
-              <option value="verified">Verified</option>
-              <option value="unverified">Not verified</option>
+              <option value="all">
+                All verification statuses
+              </option>
+              <option value="verified">
+                Verified
+              </option>
+              <option value="unverified">
+                Not verified
+              </option>
             </select>
           </div>
 
@@ -436,8 +526,8 @@ export default function AdminSellersPage() {
           )}
 
           <p className="mt-4 text-sm text-slate-600">
-            Showing {filteredSellers.length} of {sellers.length} loaded seller
-            accounts.
+            Showing {filteredSellers.length} of {sellers.length} loaded
+            seller accounts.
           </p>
 
           <div className="mt-3 overflow-x-auto">
@@ -459,11 +549,15 @@ export default function AdminSellersPage() {
                   const verified = isVerified(seller);
 
                   return (
-                    <tr key={seller.id} className="border-b hover:bg-slate-50">
+                    <tr
+                      key={seller.id}
+                      className="border-b hover:bg-slate-50"
+                    >
                       <td className="p-3">
                         <p className="font-semibold text-slate-900">
                           {display(seller.full_name)}
                         </p>
+
                         <p className="mt-1 break-all text-xs text-slate-500">
                           ID: {seller.id}
                         </p>
@@ -476,7 +570,9 @@ export default function AdminSellersPage() {
                         </p>
                       </td>
 
-                      <td className="p-3">{display(seller.account_type)}</td>
+                      <td className="p-3">
+                        {display(seller.account_type)}
+                      </td>
 
                       <td className="p-3">
                         <span
@@ -486,7 +582,7 @@ export default function AdminSellersPage() {
                               : "bg-amber-100 text-amber-800"
                           }`}
                         >
-                          {verified ? "Verified" : "Not verified"}
+                          {verificationLabel(seller)}
                         </span>
                       </td>
 
@@ -494,7 +590,9 @@ export default function AdminSellersPage() {
                         {sellerListings(seller.id).length}
                       </td>
 
-                      <td className="p-3">{formatDate(seller.created_at)}</td>
+                      <td className="p-3">
+                        {formatDate(seller.created_at)}
+                      </td>
 
                       <td className="p-3">
                         <button
@@ -511,20 +609,27 @@ export default function AdminSellersPage() {
 
                 {loading && (
                   <tr>
-                    <td colSpan={7} className="p-8 text-center text-slate-500">
+                    <td
+                      colSpan={7}
+                      className="p-8 text-center text-slate-500"
+                    >
                       Loading seller accounts...
                     </td>
                   </tr>
                 )}
 
-                {!loading && !error && filteredSellers.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="p-8 text-center text-slate-500">
-                      No seller accounts found. Confirm the actual seller
-                      account_type values in Supabase.
-                    </td>
-                  </tr>
-                )}
+                {!loading &&
+                  !error &&
+                  filteredSellers.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={7}
+                        className="p-8 text-center text-slate-500"
+                      >
+                        No matching seller accounts found.
+                      </td>
+                    </tr>
+                  )}
               </tbody>
             </table>
           </div>
@@ -564,29 +669,54 @@ export default function AdminSellersPage() {
 
               <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {[
-                  ["Full name / profile name", selectedSeller.full_name],
+                  [
+                    "Full name / profile name",
+                    selectedSeller.full_name,
+                  ],
                   ["Phone", selectedSeller.phone],
                   ["Account type", selectedSeller.account_type],
                   [
                     "Verification status",
-                    isVerified(selectedSeller)
-                      ? "Verified"
-                      : selectedSeller.verification_status ??
-                        "Not verified",
+                    verificationLabel(selectedSeller),
                   ],
-                  ["Registration date", formatDate(selectedSeller.created_at)],
+                  [
+                    "Registration date",
+                    formatDate(selectedSeller.created_at),
+                  ],
                   ["Location", selectedSeller.location],
-                  ["Delivery region", selectedSeller.delivery_region],
-                  ["Delivery city", selectedSeller.delivery_city],
-                  ["Delivery area", selectedSeller.delivery_area],
-                  ["Delivery address", selectedSeller.delivery_address],
-                  ["GhanaPost GPS", selectedSeller.ghana_post_gps],
-                  ["Listings loaded", sellerListings(selectedSeller.id).length],
+                  [
+                    "Delivery region",
+                    selectedSeller.delivery_region,
+                  ],
+                  [
+                    "Delivery city",
+                    selectedSeller.delivery_city,
+                  ],
+                  [
+                    "Delivery area",
+                    selectedSeller.delivery_area,
+                  ],
+                  [
+                    "Delivery address",
+                    selectedSeller.delivery_address,
+                  ],
+                  [
+                    "GhanaPost GPS",
+                    selectedSeller.ghana_post_gps,
+                  ],
+                  [
+                    "Listings loaded",
+                    sellerListings(selectedSeller.id).length,
+                  ],
                 ].map(([label, value]) => (
-                  <div key={label} className="rounded-lg border p-4">
+                  <div
+                    key={String(label)}
+                    className="rounded-lg border p-4"
+                  >
                     <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
                       {label}
                     </p>
+
                     <p className="mt-1 break-words font-medium text-slate-900">
                       {display(value)}
                     </p>
@@ -601,8 +731,7 @@ export default function AdminSellersPage() {
 
                 {sellerListings(selectedSeller.id).length === 0 ? (
                   <p className="mt-3 rounded-lg bg-slate-50 p-4 text-sm text-slate-600">
-                    No listings were returned for this seller, or listing
-                    records are not accessible.
+                    No listings were returned for this seller.
                   </p>
                 ) : (
                   <div className="mt-3 overflow-x-auto">
@@ -618,26 +747,39 @@ export default function AdminSellersPage() {
                       </thead>
 
                       <tbody>
-                        {sellerListings(selectedSeller.id).map((listing) => (
-                          <tr
-                            key={String(listing.id)}
-                            className="border-b"
-                          >
-                            <td className="p-3">{listing.id}</td>
-                            <td className="p-3">
-                              {display(listing.title)}
-                            </td>
-                            <td className="p-3">
-                              {formatMoney(listing.price)}
-                            </td>
-                            <td className="p-3">
-                              {display(listing.status)}
-                            </td>
-                            <td className="p-3">
-                              {formatDate(listing.created_at)}
-                            </td>
-                          </tr>
-                        ))}
+                        {sellerListings(selectedSeller.id).map(
+                          (listing) => (
+                            <tr
+                              key={String(listing.id)}
+                              className="border-b"
+                            >
+                              <td className="p-3">
+                                {listing.id}
+                              </td>
+
+                              <td className="p-3">
+                                {display(listing.title)}
+                              </td>
+
+                              <td className="p-3">
+                                {formatMoney(
+                                  listing.price,
+                                  listing.currency_code ||
+                                    listing.currency ||
+                                    "GHS"
+                                )}
+                              </td>
+
+                              <td className="p-3">
+                                {display(listing.status)}
+                              </td>
+
+                              <td className="p-3">
+                                {formatDate(listing.created_at)}
+                              </td>
+                            </tr>
+                          )
+                        )}
                       </tbody>
                     </table>
                   </div>
