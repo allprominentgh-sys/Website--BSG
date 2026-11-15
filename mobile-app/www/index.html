@@ -1,13 +1,14 @@
 
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#123B82" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#17438B">
   <title>BEST SALES GHANA</title>
   <style>
     * { box-sizing: border-box; }
+
     body {
       margin: 0;
       min-height: 100vh;
@@ -15,46 +16,73 @@
       place-items: center;
       padding: 24px;
       background: #f4f7fc;
+      color: #17438B;
       font-family: Arial, sans-serif;
       text-align: center;
-      color: #14233d;
     }
+
     main { width: 100%; max-width: 420px; }
+
     .logo {
-      width: 78px;
-      height: 78px;
+      width: 82px;
+      height: 82px;
+      margin: 0 auto 22px;
       display: grid;
       place-items: center;
-      margin: 0 auto 22px;
-      border-radius: 22px;
-      background: #123B82;
+      border-radius: 24px;
+      background: #17438B;
       color: white;
-      font-size: 25px;
+      font-size: 27px;
       font-weight: 800;
     }
-    h1 { color: #123B82; }
-    p { color: #64748b; line-height: 1.6; }
+
+    h1 { font-size: 27px; }
+
+    p {
+      color: #64748b;
+      line-height: 1.5;
+    }
+
     a {
       display: block;
-      padding: 17px;
       margin-top: 25px;
-      border-radius: 12px;
-      background: #123B82;
+      padding: 17px;
+      border-radius: 13px;
+      background: #17438B;
       color: white;
       text-decoration: none;
       font-weight: bold;
     }
-    small { display: block; margin-top: 25px; color: #8995a8; }
+
+    small {
+      display: block;
+      margin-top: 24px;
+      color: #8995a8;
+    }
   </style>
 </head>
+
 <body>
   <main>
     <div class="logo">BSG</div>
     <h1>BEST SALES GHANA</h1>
     <p>Your marketplace for discovering products and connecting with sellers across Ghana.</p>
-    <p>Opening your marketplace...</p>
-    <a href="https://www.bestsalesgh.com/">OPEN MARKETPLACE</a>
+    <p id="status">Opening your marketplace...</p>
+
+    <a href="https://www.bestsalesgh.com/" id="open">
+      OPEN MARKETPLACE
+    </a>
+
     <small>ALL PROMINENT GHANA LIMITED</small>
   </main>
+
+  <script>
+    const marketplace = "https://www.bestsalesgh.com/";
+
+    document.getElementById("open").href = marketplace;
+
+    // Open the live marketplace inside the app.
+    window.location.replace(marketplace);
+  </script>
 </body>
 </html>
