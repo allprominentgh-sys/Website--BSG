@@ -1,7 +1,7 @@
+
 "use client";
 
 import Link from "next/link";
-import LatestListings from "@/components/LatestListings";
 import { useEffect, useMemo, useState } from "react";
 import { supabaseBrowser } from "@/supabase-browser";
 import { useMarketPreferences } from "@/app/components/MarketPreferencesProvider";
@@ -221,8 +221,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     filtersActive: "Filtres actifs",
     loadingMarketplace: "Chargement de la marketplace...",
     noListings: "Aucune annonce trouvée",
-    noListingsDescription:
-      "Essayez un autre terme ou modifiez les filtres.",
+    noListingsDescription: "Essayez un autre terme ou modifiez les filtres.",
     clearSearch: "Effacer la recherche",
     untitled: "Annonce sans titre",
     noDescription: "Aucune description fournie.",
@@ -230,8 +229,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     viewListing: "Voir l'annonce",
     chatSeller: "Contacter le vendeur",
     searchAcross: "Rechercher sur BEST SALES GHANA",
-    searchAcrossDescription:
-      "Trouvez des annonces sur toute la marketplace.",
+    searchAcrossDescription: "Trouvez des annonces sur toute la marketplace.",
     priceOnRequest: "Prix sur demande",
     locationUnsupported: "La détection de position n'est pas prise en charge.",
     locationDetected:
@@ -310,8 +308,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     filtersActive: "Filtros activos",
     loadingMarketplace: "Cargando anuncios...",
     noListings: "No se encontraron anuncios",
-    noListingsDescription:
-      "Prueba otro término o cambia los filtros.",
+    noListingsDescription: "Prueba otro término o cambia los filtros.",
     clearSearch: "Borrar búsqueda",
     untitled: "Anuncio sin título",
     noDescription: "Sin descripción.",
@@ -322,7 +319,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     searchAcrossDescription: "Busca anuncios en todo el mercado.",
     priceOnRequest: "Precio a consultar",
     locationUnsupported: "Este dispositivo no admite la detección de ubicación.",
-    locationDetected: "Se detectó tu ubicación. Selecciona región, ciudad y zona para filtrar.",
+    locationDetected:
+      "Se detectó tu ubicación. Selecciona región, ciudad y zona para filtrar.",
     locationFailed: "No se pudo detectar tu ubicación.",
     priceRateUnavailable: "Tipo de cambio no disponible",
   },
@@ -365,7 +363,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     searchAcrossDescription: "Encontre anúncios em todo o marketplace.",
     priceOnRequest: "Preço sob consulta",
     locationUnsupported: "Este dispositivo não suporta deteção de localização.",
-    locationDetected: "A sua localização foi detetada. Selecione região, cidade e área para filtrar.",
+    locationDetected:
+      "A sua localização foi detetada. Selecione região, cidade e área para filtrar.",
     locationFailed: "Não foi possível detetar a localização.",
     priceRateUnavailable: "Taxa de câmbio indisponível",
   },
@@ -408,7 +407,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     searchAcrossDescription: "ابحث في جميع إعلانات السوق.",
     priceOnRequest: "السعر عند الطلب",
     locationUnsupported: "هذا الجهاز لا يدعم تحديد الموقع.",
-    locationDetected: "تم تحديد موقعك. اختر المنطقة والمدينة والحي لتصفية الإعلانات.",
+    locationDetected:
+      "تم تحديد موقعك. اختر المنطقة والمدينة والحي لتصفية الإعلانات.",
     locationFailed: "تعذر تحديد موقعك.",
     priceRateUnavailable: "سعر الصرف غير متاح",
   },
@@ -440,7 +440,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     filtersActive: "Filter aktiv",
     loadingMarketplace: "Marktplatzangebote werden geladen...",
     noListings: "Keine Angebote gefunden",
-    noListingsDescription: "Versuchen Sie einen anderen Suchbegriff oder andere Filter.",
+    noListingsDescription:
+      "Versuchen Sie einen anderen Suchbegriff oder andere Filter.",
     clearSearch: "Suche löschen",
     untitled: "Unbenanntes Angebot",
     noDescription: "Keine Beschreibung vorhanden.",
@@ -448,10 +449,13 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     viewListing: "Angebot ansehen",
     chatSeller: "Verkäufer kontaktieren",
     searchAcross: "BEST SALES GHANA durchsuchen",
-    searchAcrossDescription: "Finden Sie Angebote auf dem gesamten Marktplatz.",
+    searchAcrossDescription:
+      "Finden Sie Angebote auf dem gesamten Marktplatz.",
     priceOnRequest: "Preis auf Anfrage",
-    locationUnsupported: "Standorterkennung wird auf diesem Gerät nicht unterstützt.",
-    locationDetected: "Standort erkannt. Wählen Sie Region, Stadt und Gebiet, um Angebote zu filtern.",
+    locationUnsupported:
+      "Standorterkennung wird auf diesem Gerät nicht unterstützt.",
+    locationDetected:
+      "Standort erkannt. Wählen Sie Region, Stadt und Gebiet, um Angebote zu filtern.",
     locationFailed: "Standort konnte nicht erkannt werden.",
     priceRateUnavailable: "Wechselkurs nicht verfügbar",
   },
@@ -491,10 +495,13 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     viewListing: "Visualizza annuncio",
     chatSeller: "Contatta il venditore",
     searchAcross: "Cerca su BEST SALES GHANA",
-    searchAcrossDescription: "Trova annunci in tutto il marketplace.",
+    searchAcrossDescription:
+      "Trova annunci in tutto il marketplace.",
     priceOnRequest: "Prezzo su richiesta",
-    locationUnsupported: "Questo dispositivo non supporta il rilevamento della posizione.",
-    locationDetected: "Posizione rilevata. Seleziona regione, città e zona per filtrare.",
+    locationUnsupported:
+      "Questo dispositivo non supporta il rilevamento della posizione.",
+    locationDetected:
+      "Posizione rilevata. Seleziona regione, città e zona per filtrare.",
     locationFailed: "Impossibile rilevare la posizione.",
     priceRateUnavailable: "Tasso di cambio non disponibile",
   },
@@ -526,7 +533,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     filtersActive: "フィルター適用中",
     loadingMarketplace: "商品を読み込み中...",
     noListings: "商品が見つかりません",
-    noListingsDescription: "別の検索語を試すか、フィルターを変更してください。",
+    noListingsDescription:
+      "別の検索語を試すか、フィルターを変更してください。",
     clearSearch: "検索をクリア",
     untitled: "タイトルなしの商品",
     noDescription: "説明はありません。",
@@ -534,10 +542,12 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     viewListing: "商品を見る",
     chatSeller: "販売者に連絡",
     searchAcross: "BEST SALES GHANAを検索",
-    searchAcrossDescription: "マーケットプレイス全体の商品を検索できます。",
+    searchAcrossDescription:
+      "マーケットプレイス全体の商品を検索できます。",
     priceOnRequest: "価格はお問い合わせください",
     locationUnsupported: "この端末では位置情報を検出できません。",
-    locationDetected: "位置を検出しました。地域、市、エリアを選択して商品を絞り込んでください。",
+    locationDetected:
+      "位置を検出しました。地域、市、エリアを選択して商品を絞り込んでください。",
     locationFailed: "位置を検出できませんでした。",
     priceRateUnavailable: "為替レートを利用できません",
   },
@@ -569,7 +579,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     filtersActive: "필터 적용 중",
     loadingMarketplace: "마켓플레이스 상품을 불러오는 중...",
     noListings: "상품을 찾을 수 없습니다",
-    noListingsDescription: "다른 검색어를 입력하거나 필터를 변경해 보세요.",
+    noListingsDescription:
+      "다른 검색어를 입력하거나 필터를 변경해 보세요.",
     clearSearch: "검색 지우기",
     untitled: "제목 없는 상품",
     noDescription: "설명이 없습니다.",
@@ -577,10 +588,13 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     viewListing: "상품 보기",
     chatSeller: "판매자에게 문의",
     searchAcross: "BEST SALES GHANA 검색",
-    searchAcrossDescription: "마켓플레이스 전체에서 상품을 찾아보세요.",
+    searchAcrossDescription:
+      "마켓플레이스 전체에서 상품을 찾아보세요.",
     priceOnRequest: "가격 문의",
-    locationUnsupported: "이 기기에서는 위치 감지를 지원하지 않습니다.",
-    locationDetected: "위치가 감지되었습니다. 지역, 도시 및 구역을 선택해 상품을 필터링하세요.",
+    locationUnsupported:
+      "이 기기에서는 위치 감지를 지원하지 않습니다.",
+    locationDetected:
+      "위치가 감지되었습니다. 지역, 도시 및 구역을 선택해 상품을 필터링하세요.",
     locationFailed: "위치를 감지할 수 없습니다.",
     priceRateUnavailable: "환율을 사용할 수 없습니다",
   },
@@ -615,8 +629,6 @@ function formatListingPrice(
   const source = (sourceCurrency || "GHS").toUpperCase();
   const target = selectedCurrency.toUpperCase();
 
-  // Rates from /api/currencies are foreign currency units per GH₵1.
-  // GHS is fixed at 1 by the existing currency API.
   const sourceRate = rates[source];
   const targetRate = rates[target];
 
@@ -628,7 +640,6 @@ function formatListingPrice(
     !Number.isFinite(targetRate) ||
     targetRate <= 0
   ) {
-    // Never invent an exchange rate. Show the original amount instead.
     try {
       return new Intl.NumberFormat(LOCALES[language] || "en-GH", {
         style: "currency",
@@ -722,786 +733,4 @@ function promotionStyle(packageId: string) {
     default:
       return "bg-sky-100 text-sky-900";
   }
-}
-
-export default function ListingsPage() {
-  const { currency, language, rates } = useMarketPreferences();
-  const t = TRANSLATIONS[language] || TRANSLATIONS.en;
-  const isRtl = language === "ar";
-
-  const [listings, setListings] = useState<Listing[]>([]);
-  const [listingImages, setListingImages] = useState<Record<number, string>>({});
-  const [promotions, setPromotions] = useState<Record<number, Promotion>>({});
-  const [regions, setRegions] = useState<GhanaRegion[]>([]);
-  const [locations, setLocations] = useState<GhanaLocation[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [promotionWarning, setPromotionWarning] = useState("");
-  const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({});
-
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("All Categories");
-  const [subcategory, setSubcategory] = useState("");
-  const [region, setRegion] = useState("");
-  const [city, setCity] = useState("");
-  const [area, setArea] = useState("");
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    setSearch(
-      params.get("q") ||
-        params.get("search") ||
-        params.get("query") ||
-        ""
-    );
-    setCategory(params.get("category") || "All Categories");
-    setSubcategory(params.get("subcategory") || "");
-    setRegion(params.get("region") || "");
-    setCity(params.get("city") || "");
-    setArea(params.get("area") || "");
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadData() {
-      setLoading(true);
-      setPromotionWarning("");
-
-      try {
-        const db = supabaseBrowser() as any;
-
-        const [
-          listingsResponse,
-          regionsResponse,
-          locationsResponse,
-          promotionsResponse,
-        ] = await Promise.all([
-          db
-            .from("listings")
-            .select(`
-              id,title,description,price,currency_code,currency,location,
-              category,subcategory,seller_id,status,featured,created_at,
-              item_region,item_city,item_area,item_ghana_post_gps,
-              item_latitude,item_longitude
-            `)
-            .eq("status", "active")
-            .order("created_at", { ascending: false }),
-
-          db
-            .from("ghana_regions")
-            .select("id,name,sort_order")
-            .order("sort_order", { ascending: true })
-            .order("name", { ascending: true }),
-
-          db
-            .from("ghana_locations")
-            .select("id,region_id,name,location_type,parent_name,sort_order")
-            .order("sort_order", { ascending: true })
-            .order("name", { ascending: true }),
-
-          db
-            .from("active_listing_promotions")
-            .select("listing_id,package_id,promotion_rank,starts_at,ends_at"),
-        ]);
-
-        if (cancelled) return;
-
-        if (listingsResponse.error) {
-          console.error("Listings loading error:", listingsResponse.error);
-        } else {
-          setListings((listingsResponse.data || []) as Listing[]);
-        }
-
-        if (regionsResponse.error) {
-          console.error("Regions loading error:", regionsResponse.error);
-        } else {
-          setRegions((regionsResponse.data || []) as GhanaRegion[]);
-        }
-
-        if (locationsResponse.error) {
-          console.error("Locations loading error:", locationsResponse.error);
-        } else {
-          setLocations((locationsResponse.data || []) as GhanaLocation[]);
-        }
-
-        if (promotionsResponse.error) {
-          console.error("Promotion loading error:", promotionsResponse.error);
-          setPromotionWarning(
-            "Promotional placements are temporarily unavailable. Listings are still shown."
-          );
-          setPromotions({});
-        } else {
-          const promotionMap: Record<number, Promotion> = {};
-
-          for (const item of (promotionsResponse.data || []) as Promotion[]) {
-            const id = Number(item.listing_id);
-            if (!Number.isFinite(id)) continue;
-
-            const existing = promotionMap[id];
-
-            if (
-              !existing ||
-              promotionRank(item.package_id) <
-                promotionRank(existing.package_id)
-            ) {
-              promotionMap[id] = item;
-            }
-          }
-
-          setPromotions(promotionMap);
-        }
-
-        const loadedListings = (listingsResponse.data || []) as Listing[];
-        const ids = loadedListings.map((listing) => listing.id);
-
-        if (ids.length) {
-          const imagesResponse = await db
-            .from("listing_images")
-            .select("listing_id,image_url")
-            .in("listing_id", ids);
-
-          if (cancelled) return;
-
-          if (imagesResponse.error) {
-            console.error(
-              "Listing images loading error:",
-              imagesResponse.error
-            );
-          } else {
-            const imageMap: Record<number, string> = {};
-
-            for (const image of (imagesResponse.data || []) as ListingImage[]) {
-              const id = Number(image.listing_id);
-              const url =
-                typeof image.image_url === "string"
-                  ? image.image_url.trim()
-                  : "";
-
-              if (Number.isFinite(id) && url && !imageMap[id]) {
-                imageMap[id] = url;
-              }
-            }
-
-            setListingImages(imageMap);
-          }
-        } else {
-          setListingImages({});
-        }
-      } catch (error) {
-        console.error("Marketplace loading error:", error);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
-    void loadData();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-
-    document.documentElement.lang = language;
-    document.documentElement.dir = isRtl ? "rtl" : "ltr";
-  }, [language, isRtl]);
-
-  const regionLocations = useMemo(() => {
-    const selected = regions.find((item) => item.name === region);
-
-    return selected
-      ? locations.filter((item) => item.region_id === selected.id)
-      : [];
-  }, [region, regions, locations]);
-
-  const cities = useMemo(
-    () =>
-      regionLocations
-        .filter(
-          (item) =>
-            item.location_type === "city" ||
-            item.location_type === "town"
-        )
-        .sort(
-          (a, b) =>
-            a.sort_order - b.sort_order ||
-            a.name.localeCompare(b.name)
-        ),
-    [regionLocations]
-  );
-
-  const areas = useMemo(
-    () =>
-      city
-        ? regionLocations
-            .filter(
-              (item) =>
-                item.location_type === "area" &&
-                item.parent_name === city
-            )
-            .sort(
-              (a, b) =>
-                a.sort_order - b.sort_order ||
-                a.name.localeCompare(b.name)
-            )
-        : [],
-    [city, regionLocations]
-  );
-
-  const filteredListings = useMemo(() => {
-    const q = normalise(search);
-
-    return listings
-      .filter((listing) => {
-        const searchableText = [
-          listing.title,
-          listing.description,
-          listing.category,
-          listing.subcategory,
-          listing.location,
-          listing.item_region,
-          listing.item_city,
-          listing.item_area,
-          listing.item_ghana_post_gps,
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
-
-        const matchesSearch = !q || searchableText.includes(q);
-        const matchesCategory = listingMatchesCategory(listing, category);
-
-        const matchesSubcategory =
-          !subcategory ||
-          normalise(listing.subcategory) === normalise(subcategory) ||
-          normalise(listing.title).includes(normalise(subcategory));
-
-        const oldLocation = normalise(listing.location);
-
-        const matchesRegion =
-          !region ||
-          normalise(listing.item_region) === normalise(region) ||
-          oldLocation.includes(normalise(region));
-
-        const matchesCity =
-          !city ||
-          normalise(listing.item_city) === normalise(city) ||
-          oldLocation.includes(normalise(city));
-
-        const matchesArea =
-          !area ||
-          normalise(listing.item_area) === normalise(area) ||
-          oldLocation.includes(normalise(area));
-
-        return (
-          matchesSearch &&
-          matchesCategory &&
-          matchesSubcategory &&
-          matchesRegion &&
-          matchesCity &&
-          matchesArea
-        );
-      })
-      .sort((a, b) => {
-        const aPromotion = promotions[a.id];
-        const bPromotion = promotions[b.id];
-
-        const aRank = aPromotion
-          ? promotionRank(aPromotion.package_id)
-          : 4;
-        const bRank = bPromotion
-          ? promotionRank(bPromotion.package_id)
-          : 4;
-
-        if (aRank !== bRank) return aRank - bRank;
-
-        const aDate = a.created_at
-          ? new Date(a.created_at).getTime()
-          : 0;
-        const bDate = b.created_at
-          ? new Date(b.created_at).getTime()
-          : 0;
-
-        return bDate - aDate;
-      });
-  }, [
-    listings,
-    promotions,
-    search,
-    category,
-    subcategory,
-    region,
-    city,
-    area,
-  ]);
-
-  function performSearch(event?: React.FormEvent) {
-    event?.preventDefault();
-
-    const params = new URLSearchParams();
-
-    if (search.trim()) params.set("q", search.trim());
-    if (category !== "All Categories") {
-      params.set("category", category);
-    }
-    if (subcategory) params.set("subcategory", subcategory);
-    if (region) params.set("region", region);
-    if (city) params.set("city", city);
-    if (area) params.set("area", area);
-
-    const query = params.toString();
-
-    window.history.pushState(
-      {},
-      "",
-      query ? `/listings?${query}` : "/listings"
-    );
-  }
-
-  function clearFilters() {
-    setSearch("");
-    setCategory("All Categories");
-    setSubcategory("");
-    setRegion("");
-    setCity("");
-    setArea("");
-    window.history.replaceState({}, "", "/listings");
-  }
-
-  function detectLocation() {
-    if (!navigator.geolocation) {
-      alert(t.locationUnsupported);
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        console.log("GPS coordinates:", {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        });
-
-        alert(t.locationDetected);
-      },
-      () => alert(t.locationFailed),
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 60000,
-      }
-    );
-  }
-
-  return (
-    <main
-      dir={isRtl ? "rtl" : "ltr"}
-      className="min-h-screen bg-gray-50 text-gray-900"
-    >
-      <section className="bg-gradient-to-r from-blue-800 via-blue-700 to-sky-500 text-white">
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <Link
-                href="/"
-                className="text-sm font-semibold text-blue-100 hover:text-white"
-              >
-                ← BEST SALES GHANA
-              </Link>
-
-              <h1 className="mt-3 text-3xl font-bold sm:text-4xl">
-                {t.searchMarketplace}
-              </h1>
-
-              <p className="mt-2 max-w-2xl text-blue-100">
-                {t.searchDescription}
-              </p>
-            </div>
-
-            <Link
-              href="/post-ad"
-              className="inline-flex w-fit rounded-xl bg-white px-5 py-3 font-bold text-blue-800 shadow-lg hover:bg-blue-50"
-            >
-              {t.postAd}
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        <form
-          onSubmit={performSearch}
-          className="rounded-2xl bg-white p-4 shadow-md ring-1 ring-gray-200"
-        >
-          <div className="grid gap-3 lg:grid-cols-12">
-            <div className="lg:col-span-4">
-              <label className="mb-1 block text-sm font-semibold text-gray-700">
-                {t.searchProducts}
-              </label>
-
-              <input
-                type="search"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder={t.searchPlaceholder}
-                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
-              />
-            </div>
-
-            <div className="lg:col-span-2">
-              <label className="mb-1 block text-sm font-semibold text-gray-700">
-                {t.category}
-              </label>
-
-              <select
-                value={category}
-                onChange={(event) => {
-                  setCategory(event.target.value);
-                  setSubcategory("");
-                }}
-                className="w-full rounded-xl border border-gray-300 bg-white px-3 py-3"
-              >
-                {CATEGORY_OPTIONS.map((item) => (
-                  <option key={item} value={item}>
-                    {item === "All Categories" ? t.allCategories : item}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="lg:col-span-2">
-              <label className="mb-1 block text-sm font-semibold text-gray-700">
-                {t.subcategory}
-              </label>
-
-              <select
-                value={subcategory}
-                onChange={(event) => setSubcategory(event.target.value)}
-                disabled={
-                  category === "All Categories" ||
-                  !SUBCATEGORY_OPTIONS[category]
-                }
-                className="w-full rounded-xl border border-gray-300 bg-white px-3 py-3 disabled:bg-gray-100"
-              >
-                <option value="">{t.allSubcategories}</option>
-                {(SUBCATEGORY_OPTIONS[category] || []).map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="lg:col-span-2">
-              <label className="mb-1 block text-sm font-semibold text-gray-700">
-                {t.region}
-              </label>
-
-              <select
-                value={region}
-                onChange={(event) => {
-                  setRegion(event.target.value);
-                  setCity("");
-                  setArea("");
-                }}
-                className="w-full rounded-xl border border-gray-300 bg-white px-3 py-3"
-              >
-                <option value="">{t.allGhana}</option>
-                {regions.map((item) => (
-                  <option key={item.id} value={item.name}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="lg:col-span-2">
-              <label className="mb-1 block text-sm font-semibold text-gray-700">
-                {t.cityTown}
-              </label>
-
-              <select
-                value={city}
-                onChange={(event) => {
-                  setCity(event.target.value);
-                  setArea("");
-                }}
-                disabled={!region}
-                className="w-full rounded-xl border border-gray-300 bg-white px-3 py-3 disabled:bg-gray-100"
-              >
-                <option value="">
-                  {region ? t.allCities : t.selectRegion}
-                </option>
-                {cities.map((item) => (
-                  <option key={item.id} value={item.name}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="lg:col-span-2">
-              <label className="mb-1 block text-sm font-semibold text-gray-700">
-                {t.area}
-              </label>
-
-              <select
-                value={area}
-                onChange={(event) => setArea(event.target.value)}
-                disabled={!city}
-                className="w-full rounded-xl border border-gray-300 bg-white px-3 py-3 disabled:bg-gray-100"
-              >
-                <option value="">
-                  {city ? t.allAreas : t.selectCity}
-                </option>
-                {areas.map((item) => (
-                  <option key={item.id} value={item.name}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-3">
-            <button
-              type="submit"
-              className="rounded-xl bg-blue-700 px-6 py-3 font-bold text-white hover:bg-blue-800"
-            >
-              🔍 {t.search}
-            </button>
-
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="rounded-xl border border-gray-300 bg-white px-6 py-3 font-semibold text-gray-700 hover:bg-gray-50"
-            >
-              {t.clearFilters}
-            </button>
-
-            <button
-              type="button"
-              onClick={detectLocation}
-              className="rounded-xl border border-sky-300 bg-sky-50 px-6 py-3 font-semibold text-sky-800 hover:bg-sky-100"
-            >
-              {t.detectLocation}
-            </button>
-          </div>
-        </form>
-
-        {promotionWarning && (
-          <p
-            role="status"
-            className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
-          >
-            {promotionWarning}
-          </p>
-        )}
-
-        <div className="mt-8 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">
-              {t.listings}
-            </h2>
-
-            <p className="text-sm text-gray-600">
-              {loading
-                ? t.loading
-                : `${filteredListings.length} ${t.found}`}
-            </p>
-          </div>
-
-          {(search ||
-            category !== "All Categories" ||
-            subcategory ||
-            region ||
-            city ||
-            area) && (
-            <span className="rounded-full bg-blue-50 px-4 py-2 text-sm font-medium text-blue-800">
-              {t.filtersActive}
-            </span>
-          )}
-        </div>
-
-        {loading ? (
-          <div className="mt-6 rounded-2xl bg-white p-10 text-center shadow-sm">
-            <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-blue-200 border-t-blue-700" />
-            <p className="mt-4 text-gray-600">
-              {t.loadingMarketplace}
-            </p>
-          </div>
-        ) : filteredListings.length === 0 ? (
-          <div className="mt-6 rounded-2xl bg-white p-10 text-center shadow-sm ring-1 ring-gray-200">
-            <div className="text-5xl">🔎</div>
-
-            <h3 className="mt-4 text-xl font-bold text-gray-900">
-              {t.noListings}
-            </h3>
-
-            <p className="mx-auto mt-2 max-w-lg text-gray-600">
-              {t.noListingsDescription}
-            </p>
-
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="mt-5 rounded-xl bg-blue-700 px-5 py-3 font-bold text-white hover:bg-blue-800"
-            >
-              {t.clearSearch}
-            </button>
-          </div>
-        ) : (
-          <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {filteredListings.map((listing) => {
-              const imageUrl = listingImages[listing.id];
-              const showImage =
-                Boolean(imageUrl) && !imageErrors[listing.id];
-              const promotion = promotions[listing.id];
-              const label = promotion
-                ? promotionLabel(promotion.package_id)
-                : "";
-
-              return (
-                <article
-                  key={listing.id}
-                  className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200 transition hover:-translate-y-1 hover:shadow-lg"
-                >
-                  <div className="relative flex h-48 items-center justify-center overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
-                    {showImage ? (
-                      <img
-                        src={imageUrl}
-                        alt={listing.title || t.untitled}
-                        loading="lazy"
-                        className="h-full w-full object-contain"
-                        onError={() =>
-                          setImageErrors((previous) => ({
-                            ...previous,
-                            [listing.id]: true,
-                          }))
-                        }
-                      />
-                    ) : (
-                      <div className="flex flex-col items-center gap-2 text-gray-400">
-                        <span className="text-5xl">🛍️</span>
-                        <span className="text-xs">
-                          {t.imageUnavailable}
-                        </span>
-                      </div>
-                    )}
-
-                    {label && promotion && (
-                      <span
-                        className={`absolute left-3 top-3 rounded-full px-3 py-1 text-xs font-extrabold shadow-sm ${promotionStyle(
-                          promotion.package_id
-                        )}`}
-                      >
-                        {label}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="p-4">
-                    <h3 className="mt-1 line-clamp-2 text-lg font-bold text-gray-900">
-                      {listing.title || t.untitled}
-                    </h3>
-
-                    <p className="mt-2 line-clamp-2 text-sm text-gray-600">
-                      {listing.description || t.noDescription}
-                    </p>
-
-                    <div className="mt-3 text-xl font-bold text-blue-700">
-                      {formatListingPrice(
-                        listing.price,
-                        listing.currency_code || listing.currency,
-                        currency,
-                        rates,
-                        language
-                      )}
-                    </div>
-
-                    <div className="mt-3 space-y-1 text-sm text-gray-500">
-                      {(listing.item_region ||
-                        listing.item_city ||
-                        listing.item_area ||
-                        listing.location) && (
-                        <div>
-                          📍{" "}
-                          {[
-                            listing.item_area,
-                            listing.item_city,
-                            listing.item_region,
-                          ]
-                            .filter(Boolean)
-                            .join(", ") || listing.location}
-                        </div>
-                      )}
-
-                      {(listing.category || listing.subcategory) && (
-                        <div>
-                          🏷️{" "}
-                          {[listing.category, listing.subcategory]
-                            .filter(Boolean)
-                            .join(" • ")}
-                        </div>
-                      )}
-
-                      {listing.item_ghana_post_gps && (
-                        <div className="break-words">
-                          📮 GhanaPostGPS: {listing.item_ghana_post_gps}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="mt-4 grid grid-cols-2 gap-2">
-                      <Link
-                        href={`/listings/${listing.id}`}
-                        className="rounded-xl bg-blue-700 px-3 py-2.5 text-center text-sm font-bold text-white hover:bg-blue-800"
-                      >
-                        {t.viewListing}
-                      </Link>
-
-                      <Link
-                        href={`/chat?listing=${listing.id}`}
-                        className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5 text-center text-sm font-bold text-blue-800 hover:bg-blue-100"
-                      >
-                        {t.chatSeller}
-                      </Link>
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        )}
-
-        <section className="mt-12 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
-          <h2 className="text-xl font-bold text-gray-900">
-            {t.searchAcross}
-          </h2>
-
-          <p className="mt-2 text-gray-600">
-            {t.searchAcrossDescription}
-          </p>
-
-          <div className="mt-5 flex flex-wrap gap-2">
-            {CATEGORY_OPTIONS.slice(1).map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => {
-                  setCategory(item);
-                  setSubcategory("");
-                  window.scrollTo({ top: 0, behavior: "smooth" });
-                }}
-                className="rounded-full border border-gray-200 bg-gray-50 px-4 py-2 text-sm font-semibold text-gray-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800"
-              >
-                {item}
-              </button>
-            ))}
-          </div>
-        </section>
-      </section>
-    </main>
-  );
 }
