@@ -22,12 +22,19 @@ export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
   const [notificationError, setNotificationError] = useState("");
 
   const closeMenu = () => setMenuOpen(false);
+
+  const sellHref = authLoading
+    ? "/login?next=%2Fpost-ad"
+    : userId
+      ? "/post-ad"
+      : "/login?next=%2Fpost-ad";
 
   const loadNotifications = useCallback(
     async (currentUserId: string) => {
@@ -69,19 +76,22 @@ export default function Header() {
     let active = true;
 
     async function checkUser() {
-      const { data, error } = await supabase.auth.getUser();
+      try {
+        const { data, error } = await supabase.auth.getUser();
 
-      if (!active) return;
+        if (!active) return;
 
-      if (error || !data.user) {
-        setUserId(null);
-        setNotifications([]);
-        setUnreadCount(0);
-        return;
+        if (error || !data.user) {
+          setUserId(null);
+          setNotifications([]);
+          setUnreadCount(0);
+        } else {
+          setUserId(data.user.id);
+          void loadNotifications(data.user.id);
+        }
+      } finally {
+        if (active) setAuthLoading(false);
       }
-
-      setUserId(data.user.id);
-      void loadNotifications(data.user.id);
     }
 
     void checkUser();
@@ -93,6 +103,7 @@ export default function Header() {
 
       const nextUserId = session?.user?.id ?? null;
       setUserId(nextUserId);
+      setAuthLoading(false);
 
       if (nextUserId) {
         void loadNotifications(nextUserId);
@@ -374,7 +385,7 @@ export default function Header() {
             </div>
           )}
 
-          <Link href="/post-ad" className="sell-button">
+          <Link href={sellHref} className="sell-button">
             + Sell an Item
           </Link>
         </div>
@@ -429,7 +440,11 @@ export default function Header() {
             <option value="CNY">¥ CNY</option>
           </select>
 
-          <Link href="/post-ad" className="mobile-sell" onClick={closeMenu}>
+          <Link
+            href={sellHref}
+            className="mobile-sell"
+            onClick={closeMenu}
+          >
             + Sell an Item
           </Link>
         </div>
