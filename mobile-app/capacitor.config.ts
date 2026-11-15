@@ -5,6 +5,10 @@ const config = {
   webDir: "www",
   server: {
     androidScheme: "https",
+    allowNavigation: [
+      "bestsalesgh.com",
+      "www.bestsalesgh.com",
+    ],
   },
 };
 
