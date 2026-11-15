@@ -734,3 +734,757 @@ function promotionStyle(packageId: string) {
       return "bg-sky-100 text-sky-900";
   }
 }
+
+export default function ListingsPage() {
+  const { currency, language, rates } = useMarketPreferences();
+  const t = TRANSLATIONS[language] || TRANSLATIONS.en;
+  const isRtl = language === "ar";
+
+  const [listings, setListings] = useState<Listing[]>([]);
+  const [listingImages, setListingImages] = useState<Record<number, string>>({});
+  const [promotions, setPromotions] = useState<Record<number, Promotion>>({});
+  const [regions, setRegions] = useState<GhanaRegion[]>([]);
+  const [locations, setLocations] = useState<GhanaLocation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [promotionWarning, setPromotionWarning] = useState("");
+  const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({});
+
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("All Categories");
+  const [subcategory, setSubcategory] = useState("");
+  const [region, setRegion] = useState("");
+  const [city, setCity] = useState("");
+  const [area, setArea] = useState("");
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+
+    setSearch(
+      params.get("q") ||
+        params.get("search") ||
+        params.get("query") ||
+        ""
+    );
+    setCategory(params.get("category") || "All Categories");
+    setSubcategory(params.get("subcategory") || "");
+    setRegion(params.get("region") || "");
+    setCity(params.get("city") || "");
+    setArea(params.get("area") || "");
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadData() {
+      setLoading(true);
+      setPromotionWarning("");
+
+      try {
+        const db = supabaseBrowser() as any;
+
+        const [
+          listingsResponse,
+          regionsResponse,
+          locationsResponse,
+          promotionsResponse,
+        ] = await Promise.all([
+          db
+            .from("listings")
+            .select(`
+              id,title,description,price,currency_code,currency,location,
+              category,subcategory,seller_id,status,featured,created_at,
+              item_region,item_city,item_area,item_ghana_post_gps,
+              item_latitude,item_longitude
+            `)
+            .eq("status", "active")
+            .order("created_at", { ascending: false }),
+
+          db
+            .from("ghana_regions")
+            .select("id,name,sort_order")
+            .order("sort_order", { ascending: true })
+            .order("name", { ascending: true }),
+
+          db
+            .from("ghana_locations")
+            .select("id,region_id,name,location_type,parent_name,sort_order")
+            .order("sort_order", { ascending: true })
+            .order("name", { ascending: true }),
+
+          db
+            .from("active_listing_promotions")
+            .select("listing_id,package_id,promotion_rank,starts_at,ends_at"),
+        ]);
+
+        if (cancelled) return;
+
+        if (listingsResponse.error) {
+          console.error("Listings loading error:", listingsResponse.error);
+        } else {
+          setListings((listingsResponse.data || []) as Listing[]);
+        }
+
+        if (regionsResponse.error) {
+          console.error("Regions loading error:", regionsResponse.error);
+        } else {
+          setRegions((regionsResponse.data || []) as GhanaRegion[]);
+        }
+
+        if (locationsResponse.error) {
+          console.error("Locations loading error:", locationsResponse.error);
+        } else {
+          setLocations((locationsResponse.data || []) as GhanaLocation[]);
+        }
+
+        if (promotionsResponse.error) {
+          console.error("Promotion loading error:", promotionsResponse.error);
+          setPromotionWarning(
+            "Promotional placements are temporarily unavailable. Listings are still shown."
+          );
+          setPromotions({});
+        } else {
+          const promotionMap: Record<number, Promotion> = {};
+
+          for (const item of (promotionsResponse.data || []) as Promotion[]) {
+            const id = Number(item.listing_id);
+            if (!Number.isFinite(id)) continue;
+
+            const existing = promotionMap[id];
+
+            if (
+              !existing ||
+              promotionRank(item.package_id) <
+                promotionRank(existing.package_id)
+            ) {
+              promotionMap[id] = item;
+            }
+          }
+
+          setPromotions(promotionMap);
+        }
+
+        const loadedListings = (listingsResponse.data || []) as Listing[];
+        const ids = loadedListings.map((listing) => listing.id);
+
+        if (ids.length) {
+          const imagesResponse = await db
+            .from("listing_images")
+            .select("listing_id,image_url")
+            .in("listing_id", ids);
+
+          if (cancelled) return;
+
+          if (imagesResponse.error) {
+            console.error("Listing images loading error:", imagesResponse.error);
+          } else {
+            const imageMap: Record<number, string> = {};
+
+            for (const image of (imagesResponse.data || []) as ListingImage[]) {
+              const id = Number(image.listing_id);
+              const url =
+                typeof image.image_url === "string"
+                  ? image.image_url.trim()
+                  : "";
+
+              if (Number.isFinite(id) && url && !imageMap[id]) {
+                imageMap[id] = url;
+              }
+            }
+
+            setListingImages(imageMap);
+          }
+        } else {
+          setListingImages({});
+        }
+      } catch (error) {
+        console.error("Marketplace loading error:", error);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    void loadData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    document.documentElement.lang = language;
+    document.documentElement.dir = isRtl ? "rtl" : "ltr";
+  }, [language, isRtl]);
+
+  const regionLocations = useMemo(() => {
+    const selected = regions.find((item) => item.name === region);
+
+    return selected
+      ? locations.filter((item) => item.region_id === selected.id)
+      : [];
+  }, [region, regions, locations]);
+
+  const cities = useMemo(
+    () =>
+      regionLocations
+        .filter(
+          (item) =>
+            item.location_type === "city" ||
+            item.location_type === "town"
+        )
+        .sort(
+          (a, b) =>
+            a.sort_order - b.sort_order ||
+            a.name.localeCompare(b.name)
+        ),
+    [regionLocations]
+  );
+
+  const areas = useMemo(
+    () =>
+      city
+        ? regionLocations
+            .filter(
+              (item) =>
+                item.location_type === "area" &&
+                item.parent_name === city
+            )
+            .sort(
+              (a, b) =>
+                a.sort_order - b.sort_order ||
+                a.name.localeCompare(b.name)
+            )
+        : [],
+    [city, regionLocations]
+  );
+
+  const filteredListings = useMemo(() => {
+    const q = normalise(search);
+
+    return listings
+      .filter((listing) => {
+        const searchableText = [
+          listing.title,
+          listing.description,
+          listing.category,
+          listing.subcategory,
+          listing.location,
+          listing.item_region,
+          listing.item_city,
+          listing.item_area,
+          listing.item_ghana_post_gps,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+
+        const matchesSearch = !q || searchableText.includes(q);
+        const matchesCategory = listingMatchesCategory(listing, category);
+
+        const matchesSubcategory =
+          !subcategory ||
+          normalise(listing.subcategory) === normalise(subcategory) ||
+          normalise(listing.title).includes(normalise(subcategory));
+
+        const oldLocation = normalise(listing.location);
+
+        const matchesRegion =
+          !region ||
+          normalise(listing.item_region) === normalise(region) ||
+          oldLocation.includes(normalise(region));
+
+        const matchesCity =
+          !city ||
+          normalise(listing.item_city) === normalise(city) ||
+          oldLocation.includes(normalise(city));
+
+        const matchesArea =
+          !area ||
+          normalise(listing.item_area) === normalise(area) ||
+          oldLocation.includes(normalise(area));
+
+        return (
+          matchesSearch &&
+          matchesCategory &&
+          matchesSubcategory &&
+          matchesRegion &&
+          matchesCity &&
+          matchesArea
+        );
+      })
+      .sort((a, b) => {
+        const aRank = promotions[a.id]
+          ? promotionRank(promotions[a.id].package_id)
+          : 4;
+
+        const bRank = promotions[b.id]
+          ? promotionRank(promotions[b.id].package_id)
+          : 4;
+
+        if (aRank !== bRank) return aRank - bRank;
+
+        const aDate = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const bDate = b.created_at ? new Date(b.created_at).getTime() : 0;
+
+        return bDate - aDate;
+      });
+  }, [
+    listings,
+    promotions,
+    search,
+    category,
+    subcategory,
+    region,
+    city,
+    area,
+  ]);
+
+  function performSearch(event?: React.FormEvent) {
+    event?.preventDefault();
+
+    const params = new URLSearchParams();
+
+    if (search.trim()) params.set("q", search.trim());
+    if (category !== "All Categories") params.set("category", category);
+    if (subcategory) params.set("subcategory", subcategory);
+    if (region) params.set("region", region);
+    if (city) params.set("city", city);
+    if (area) params.set("area", area);
+
+    const query = params.toString();
+
+    window.history.pushState(
+      {},
+      "",
+      query ? `/listings?${query}` : "/listings"
+    );
+  }
+
+  function clearFilters() {
+    setSearch("");
+    setCategory("All Categories");
+    setSubcategory("");
+    setRegion("");
+    setCity("");
+    setArea("");
+    window.history.replaceState({}, "", "/listings");
+  }
+
+  function detectLocation() {
+    if (!navigator.geolocation) {
+      alert(t.locationUnsupported);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        console.log("GPS coordinates:", {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
+
+        alert(t.locationDetected);
+      },
+      () => alert(t.locationFailed),
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000,
+      }
+    );
+  }
+
+  return (
+    <main
+      dir={isRtl ? "rtl" : "ltr"}
+      className="min-h-screen bg-gray-50 text-gray-900"
+    >
+      <section className="bg-gradient-to-r from-blue-800 via-blue-700 to-sky-500 text-white">
+        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <Link
+                href="/"
+                className="text-sm font-semibold text-blue-100 hover:text-white"
+              >
+                ← BEST SALES GHANA
+              </Link>
+
+              <h1 className="mt-3 text-2xl font-bold sm:text-3xl">
+                {t.searchMarketplace}
+              </h1>
+
+              <p className="mt-2 max-w-2xl text-sm text-blue-100">
+                {t.searchDescription}
+              </p>
+            </div>
+
+            <Link
+              href="/post-ad"
+              className="inline-flex w-fit rounded-xl bg-white px-5 py-3 text-sm font-bold text-blue-800 shadow-lg hover:bg-blue-50"
+            >
+              {t.postAd}
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-3 py-5 sm:px-6 lg:px-8">
+        <form
+          onSubmit={performSearch}
+          className="rounded-2xl bg-white p-4 shadow-md ring-1 ring-gray-200"
+        >
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+            <div className="sm:col-span-2">
+              <label className="mb-1 block text-sm font-semibold text-gray-700">
+                {t.searchProducts}
+              </label>
+              <input
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder={t.searchPlaceholder}
+                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-gray-700">
+                {t.category}
+              </label>
+              <select
+                value={category}
+                onChange={(event) => {
+                  setCategory(event.target.value);
+                  setSubcategory("");
+                }}
+                className="w-full rounded-xl border border-gray-300 bg-white px-3 py-3"
+              >
+                {CATEGORY_OPTIONS.map((item) => (
+                  <option key={item} value={item}>
+                    {item === "All Categories" ? t.allCategories : item}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-gray-700">
+                {t.subcategory}
+              </label>
+              <select
+                value={subcategory}
+                onChange={(event) => setSubcategory(event.target.value)}
+                disabled={
+                  category === "All Categories" ||
+                  !SUBCATEGORY_OPTIONS[category]
+                }
+                className="w-full rounded-xl border border-gray-300 bg-white px-3 py-3 disabled:bg-gray-100"
+              >
+                <option value="">{t.allSubcategories}</option>
+                {(SUBCATEGORY_OPTIONS[category] || []).map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-gray-700">
+                {t.region}
+              </label>
+              <select
+                value={region}
+                onChange={(event) => {
+                  setRegion(event.target.value);
+                  setCity("");
+                  setArea("");
+                }}
+                className="w-full rounded-xl border border-gray-300 bg-white px-3 py-3"
+              >
+                <option value="">{t.allGhana}</option>
+                {regions.map((item) => (
+                  <option key={item.id} value={item.name}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-gray-700">
+                {t.cityTown}
+              </label>
+              <select
+                value={city}
+                onChange={(event) => {
+                  setCity(event.target.value);
+                  setArea("");
+                }}
+                disabled={!region}
+                className="w-full rounded-xl border border-gray-300 bg-white px-3 py-3 disabled:bg-gray-100"
+              >
+                <option value="">
+                  {region ? t.allCities : t.selectRegion}
+                </option>
+                {cities.map((item) => (
+                  <option key={item.id} value={item.name}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-gray-700">
+                {t.area}
+              </label>
+              <select
+                value={area}
+                onChange={(event) => setArea(event.target.value)}
+                disabled={!city}
+                className="w-full rounded-xl border border-gray-300 bg-white px-3 py-3 disabled:bg-gray-100"
+              >
+                <option value="">
+                  {city ? t.allAreas : t.selectCity}
+                </option>
+                {areas.map((item) => (
+                  <option key={item.id} value={item.name}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-3">
+            <button
+              type="submit"
+              className="rounded-xl bg-blue-700 px-6 py-3 font-bold text-white hover:bg-blue-800"
+            >
+              🔍 {t.search}
+            </button>
+
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="rounded-xl border border-gray-300 bg-white px-6 py-3 font-semibold text-gray-700 hover:bg-gray-50"
+            >
+              {t.clearFilters}
+            </button>
+
+            <button
+              type="button"
+              onClick={detectLocation}
+              className="rounded-xl border border-sky-300 bg-sky-50 px-6 py-3 font-semibold text-sky-800 hover:bg-sky-100"
+            >
+              {t.detectLocation}
+            </button>
+          </div>
+        </form>
+
+        {promotionWarning && (
+          <p
+            role="status"
+            className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
+          >
+            {promotionWarning}
+          </p>
+        )}
+
+        <div className="mt-7 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 sm:text-2xl">
+              {t.listings}
+            </h2>
+            <p className="text-sm text-gray-600">
+              {loading
+                ? t.loading
+                : `${filteredListings.length} ${t.found}`}
+            </p>
+          </div>
+
+          {(search ||
+            category !== "All Categories" ||
+            subcategory ||
+            region ||
+            city ||
+            area) && (
+            <span className="w-fit rounded-full bg-blue-50 px-4 py-2 text-sm font-medium text-blue-800">
+              {t.filtersActive}
+            </span>
+          )}
+        </div>
+
+        {loading ? (
+          <div className="mt-5 rounded-2xl bg-white p-10 text-center shadow-sm">
+            <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-blue-200 border-t-blue-700" />
+            <p className="mt-4 text-gray-600">{t.loadingMarketplace}</p>
+          </div>
+        ) : filteredListings.length === 0 ? (
+          <div className="mt-5 rounded-2xl bg-white p-10 text-center shadow-sm ring-1 ring-gray-200">
+            <div className="text-5xl">🔎</div>
+            <h3 className="mt-4 text-xl font-bold text-gray-900">
+              {t.noListings}
+            </h3>
+            <p className="mx-auto mt-2 max-w-lg text-gray-600">
+              {t.noListingsDescription}
+            </p>
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="mt-5 rounded-xl bg-blue-700 px-5 py-3 font-bold text-white hover:bg-blue-800"
+            >
+              {t.clearSearch}
+            </button>
+          </div>
+        ) : (
+          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
+            {filteredListings.map((listing) => {
+              const imageUrl = listingImages[listing.id];
+              const showImage =
+                Boolean(imageUrl) && !imageErrors[listing.id];
+
+              const promotion = promotions[listing.id];
+              const label = promotion
+                ? promotionLabel(promotion.package_id)
+                : "";
+
+              const locationText =
+                [
+                  listing.item_area,
+                  listing.item_city,
+                  listing.item_region,
+                ]
+                  .filter(Boolean)
+                  .join(", ") || listing.location;
+
+              return (
+                <article
+                  key={listing.id}
+                  className="min-w-0 overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-200 transition hover:shadow-md"
+                >
+                  <Link
+                    href={`/listings/${listing.id}`}
+                    className="relative block"
+                  >
+                    <div className="relative aspect-square w-full overflow-hidden bg-gray-100">
+                      {showImage ? (
+                        <img
+                          src={imageUrl}
+                          alt={listing.title || t.untitled}
+                          loading="lazy"
+                          className="h-full w-full object-cover transition duration-300 hover:scale-105"
+                          onError={() =>
+                            setImageErrors((previous) => ({
+                              ...previous,
+                              [listing.id]: true,
+                            }))
+                          }
+                        />
+                      ) : (
+                        <div className="flex h-full flex-col items-center justify-center gap-2 text-gray-400">
+                          <span className="text-4xl">🛍️</span>
+                          <span className="px-2 text-center text-[10px]">
+                            {t.imageUnavailable}
+                          </span>
+                        </div>
+                      )}
+
+                      {label && promotion && (
+                        <span
+                          className={`absolute left-2 top-2 rounded-md px-2 py-1 text-[9px] font-extrabold shadow-sm ${promotionStyle(
+                            promotion.package_id
+                          )}`}
+                        >
+                          {label}
+                        </span>
+                      )}
+                    </div>
+                  </Link>
+
+                  <div className="p-2.5 sm:p-3">
+                    <Link href={`/listings/${listing.id}`}>
+                      <h3 className="line-clamp-2 min-h-[2.5rem] text-xs font-bold leading-5 text-gray-900 hover:text-blue-700 sm:text-sm">
+                        {listing.title || t.untitled}
+                      </h3>
+                    </Link>
+
+                    <p className="mt-1 line-clamp-1 text-sm font-extrabold text-blue-700 sm:text-base">
+                      {formatListingPrice(
+                        listing.price,
+                        listing.currency_code || listing.currency,
+                        currency,
+                        rates,
+                        language
+                      )}
+                    </p>
+
+                    {locationText && (
+                      <p className="mt-1 truncate text-[10px] text-gray-500 sm:text-xs">
+                        📍 {locationText}
+                      </p>
+                    )}
+
+                    {(listing.category || listing.subcategory) && (
+                      <p className="mt-1 truncate text-[10px] text-gray-500 sm:text-xs">
+                        {[listing.category, listing.subcategory]
+                          .filter(Boolean)
+                          .join(" • ")}
+                      </p>
+                    )}
+
+                    <div className="mt-3 grid grid-cols-2 gap-1.5">
+                      <Link
+                        href={`/listings/${listing.id}`}
+                        className="rounded-lg bg-blue-700 px-2 py-2 text-center text-[10px] font-bold text-white hover:bg-blue-800 sm:text-xs"
+                      >
+                        {t.viewListing}
+                      </Link>
+
+                      <Link
+                        href={`/chat?listing=${listing.id}`}
+                        className="rounded-lg border border-blue-200 bg-blue-50 px-2 py-2 text-center text-[10px] font-bold text-blue-800 hover:bg-blue-100 sm:text-xs"
+                      >
+                        {t.chatSeller}
+                      </Link>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+
+        <section className="mt-10 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200 sm:p-6">
+          <h2 className="text-xl font-bold text-gray-900">
+            {t.searchAcross}
+          </h2>
+          <p className="mt-2 text-sm text-gray-600">
+            {t.searchAcrossDescription}
+          </p>
+
+          <div className="mt-5 flex flex-wrap gap-2">
+            {CATEGORY_OPTIONS.slice(1).map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => {
+                  setCategory(item);
+                  setSubcategory("");
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+                className="rounded-full border border-gray-200 bg-gray-50 px-4 py-2 text-sm font-semibold text-gray-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800"
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+        </section>
+      </section>
+    </main>
+  );
+}
+
