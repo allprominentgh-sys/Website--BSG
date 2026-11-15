@@ -3,10 +3,26 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
+function safeNextPath(value: string | null): string {
+  if (
+    !value ||
+    !value.startsWith("/") ||
+    value.startsWith("//") ||
+    value.startsWith("/auth/callback")
+  ) {
+    return "/dashboard";
+  }
+
+  return value;
+}
+
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
   const origin = requestUrl.origin;
+  const nextPath = safeNextPath(
+    requestUrl.searchParams.get("next")
+  );
 
   if (!code) {
     return NextResponse.redirect(
@@ -16,27 +32,28 @@ export async function GET(request: Request) {
 
   const cookieStore = await cookies();
 
-  const response = NextResponse.redirect(
-    new URL("/dashboard", origin)
-  );
-
   const supabaseUrl =
     process.env.NEXT_PUBLIC_SUPABASE_URL;
 
-  const supabaseAnonKey =
+  const supabaseKey =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.error("Supabase authentication environment variables are missing.");
+  if (!supabaseUrl || !supabaseKey) {
+    console.error("Supabase authentication configuration is missing.");
 
     return NextResponse.redirect(
       new URL("/login?error=configuration_error", origin)
     );
   }
 
+  let response = NextResponse.redirect(
+    new URL(nextPath, origin)
+  );
+
   const supabase = createServerClient(
     supabaseUrl,
-    supabaseAnonKey,
+    supabaseKey,
     {
       cookies: {
         getAll() {
@@ -78,11 +95,9 @@ export async function GET(request: Request) {
     );
   }
 
-  // Read the account type saved during registration.
   const metadataAccountType =
     user.user_metadata?.account_type;
 
-  // Check the user's existing profile without changing it.
   const { data: profile, error: profileError } =
     await supabase
       .from("profiles")
@@ -91,43 +106,22 @@ export async function GET(request: Request) {
       .maybeSingle();
 
   if (profileError) {
-    console.error(
-      "PROFILE LOOKUP ERROR:",
-      profileError.message
-    );
-
-    // Do not block a valid login because of a profile lookup.
+    console.error("PROFILE LOOKUP ERROR:", profileError.message);
     return response;
   }
 
   const accountType =
     profile?.account_type || metadataAccountType;
 
-  // Buyers can proceed directly to the dashboard.
-  if (accountType !== "seller" && accountType !== "business") {
-    response.headers.set(
-      "location",
-      new URL("/dashboard", origin).toString()
+  // New sellers and businesses must complete their profiles first.
+  if (
+    (accountType === "seller" || accountType === "business") &&
+    profile?.profile_completed !== true
+  ) {
+    response = NextResponse.redirect(
+      new URL("/complete-profile", origin)
     );
-
-    return response;
   }
-
-  // Existing completed profiles can proceed normally.
-  if (profile?.profile_completed === true) {
-    response.headers.set(
-      "location",
-      new URL("/dashboard", origin).toString()
-    );
-
-    return response;
-  }
-
-  // New sellers and businesses need to complete their profiles.
-  response.headers.set(
-    "location",
-    new URL("/complete-profile", origin).toString()
-  );
 
   return response;
 }
