@@ -1,6 +1,5 @@
 
 import { NextRequest, NextResponse } from "next/server";
-import { updateSession } from "./utils/supabase/middleware";
 
 const COOKIE_NAME = "bsg_admin_session";
 const ADMIN_EMAIL = "admin@bestsalesgh.com";
@@ -92,15 +91,10 @@ async function verifySession(
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Refresh Supabase authentication cookies across the application.
-  const response = await updateSession(request);
-
-  // Preserve the separate admin login page.
   if (pathname === "/admin/login") {
-    return response;
+    return NextResponse.next();
   }
 
-  // Keep the existing admin security check.
   if (pathname === "/admin" || pathname.startsWith("/admin/")) {
     const session = request.cookies.get(COOKIE_NAME)?.value;
     const valid = await verifySession(session);
@@ -109,14 +103,8 @@ export async function middleware(request: NextRequest) {
       const loginUrl = new URL("/admin/login", request.url);
       loginUrl.searchParams.set("redirect", pathname);
 
-      const redirectResponse = NextResponse.redirect(loginUrl);
-
-      // Preserve any refreshed Supabase cookies.
-      response.cookies.getAll().forEach((cookie) => {
-        redirectResponse.cookies.set(cookie);
-      });
-
-      redirectResponse.cookies.set({
+      const response = NextResponse.redirect(loginUrl);
+      response.cookies.set({
         name: COOKIE_NAME,
         value: "",
         httpOnly: true,
@@ -125,18 +113,15 @@ export async function middleware(request: NextRequest) {
         path: "/",
         maxAge: 0,
       });
+      response.headers.set("Cache-Control", "no-store");
 
-      redirectResponse.headers.set("Cache-Control", "no-store");
-
-      return redirectResponse;
+      return response;
     }
   }
 
-  return response;
+  return NextResponse.next();
 }
 
 export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
-  ],
+  matcher: ["/admin", "/admin/:path*"],
 };
