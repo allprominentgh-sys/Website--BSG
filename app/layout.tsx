@@ -12,6 +12,9 @@ export const metadata: Metadata = {
     "BestSalesGH is a marketplace to buy, sell, and advertise products and services in Ghana.",
   manifest: "/manifest.json",
   themeColor: "#123B8A",
+  other: {
+    "google-adsense-account": "ca-pub-7477258968243100",
+  },
 };
 
 export default function RootLayout({
