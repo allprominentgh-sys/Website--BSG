@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { supabaseBrowser } from "@/lib/supabase/client";
+import { supabaseBrowser } from "@/supabase-browser";
 
 type Notification = {
   id: string;
@@ -89,7 +89,9 @@ export default function NotificationsPage() {
 
     setNotifications((current) =>
       current.map((item) =>
-        item.id === id ? { ...item, read_at: readAt } : item
+        item.id === id
+          ? { ...item, read_at: readAt }
+          : item
       )
     );
   }
@@ -122,7 +124,9 @@ export default function NotificationsPage() {
     } else {
       setNotifications((current) =>
         current.map((item) =>
-          item.read_at ? item : { ...item, read_at: readAt }
+          item.read_at
+            ? item
+            : { ...item, read_at: readAt }
         )
       );
     }
@@ -176,6 +180,7 @@ export default function NotificationsPage() {
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6">
       <div className="mx-auto max-w-4xl">
+
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <div>
             <Link
@@ -204,7 +209,10 @@ export default function NotificationsPage() {
 
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4">
           <div>
-            <p className="text-sm text-slate-500">Unread notifications</p>
+            <p className="text-sm text-slate-500">
+              Unread notifications
+            </p>
+
             <p className="text-2xl font-bold text-blue-700">
               {unreadCount}
             </p>
@@ -228,9 +236,11 @@ export default function NotificationsPage() {
         {notifications.length === 0 ? (
           <div className="rounded-xl border border-slate-200 bg-white px-6 py-14 text-center">
             <div className="mb-3 text-4xl">🔔</div>
+
             <h2 className="font-semibold text-slate-900">
               No notifications yet
             </h2>
+
             <p className="mt-2 text-sm text-slate-500">
               Your advert views and account updates will appear here.
             </p>
@@ -249,7 +259,9 @@ export default function NotificationsPage() {
                 <div
                   key={item.id}
                   className={`flex gap-3 border-b border-slate-100 p-4 last:border-b-0 ${
-                    item.read_at ? "bg-white" : "bg-blue-50/60"
+                    item.read_at
+                      ? "bg-white"
+                      : "bg-blue-50/60"
                   }`}
                 >
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xl">
