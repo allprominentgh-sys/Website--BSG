@@ -1,5 +1,6 @@
 
 import type { Metadata } from "next";
+import Script from "next/script";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { MarketPreferencesProvider } from "./components/MarketPreferencesProvider";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
@@ -20,6 +21,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <Script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7477258968243100"
+          crossOrigin="anonymous"
+          strategy="beforeInteractive"
+        />
+      </head>
       <body>
         <ServiceWorkerRegister />
         <ThemeProvider>
