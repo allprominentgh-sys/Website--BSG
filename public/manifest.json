@@ -1,0 +1,13 @@
+
+{
+  "id": "/",
+  "name": "BEST SALES GHANA",
+  "short_name": "BestSalesGH",
+  "description": "Buy, sell and advertise on BEST SALES GHANA.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#123B8A"
+}
