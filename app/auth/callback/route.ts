@@ -8,7 +8,8 @@ function safeNextPath(value: string | null): string {
     !value ||
     !value.startsWith("/") ||
     value.startsWith("//") ||
-    value.startsWith("/auth/callback")
+    value.startsWith("/auth/callback") ||
+    value.includes("\\")
   ) {
     return "/dashboard";
   }
@@ -18,8 +19,9 @@ function safeNextPath(value: string | null): string {
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
-  const code = requestUrl.searchParams.get("code");
   const origin = requestUrl.origin;
+  const code = requestUrl.searchParams.get("code");
+
   const nextPath = safeNextPath(
     requestUrl.searchParams.get("next")
   );
@@ -40,14 +42,17 @@ export async function GET(request: Request) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseKey) {
-    console.error("Supabase authentication configuration is missing.");
+    console.error(
+      "Supabase authentication configuration is missing."
+    );
 
     return NextResponse.redirect(
       new URL("/login?error=configuration_error", origin)
     );
   }
 
-  let response = NextResponse.redirect(
+  // Create one response and preserve it throughout the callback.
+  const response = NextResponse.redirect(
     new URL(nextPath, origin)
   );
 
@@ -61,10 +66,12 @@ export async function GET(request: Request) {
         },
 
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options);
-            response.cookies.set(name, value, options);
-          });
+          cookiesToSet.forEach(
+            ({ name, value, options }) => {
+              cookieStore.set(name, value, options);
+              response.cookies.set(name, value, options);
+            }
+          );
         },
       },
     }
@@ -106,20 +113,28 @@ export async function GET(request: Request) {
       .maybeSingle();
 
   if (profileError) {
-    console.error("PROFILE LOOKUP ERROR:", profileError.message);
+    console.error(
+      "PROFILE LOOKUP ERROR:",
+      profileError.message
+    );
+
     return response;
   }
 
   const accountType =
     profile?.account_type || metadataAccountType;
 
-  // New sellers and businesses must complete their profiles first.
+  // Sellers and businesses must complete their profiles first.
   if (
-    (accountType === "seller" || accountType === "business") &&
+    (accountType === "seller" ||
+      accountType === "business") &&
     profile?.profile_completed !== true
   ) {
-    response = NextResponse.redirect(
-      new URL("/complete-profile", origin)
+    // Change the destination without replacing the response.
+    // This preserves the Supabase session cookies.
+    response.headers.set(
+      "Location",
+      new URL("/complete-profile", origin).toString()
     );
   }
 
