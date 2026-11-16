@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { supabaseBrowser } from "@/lib/supabase/client";
+import { supabaseBrowser } from "@/supabase-browser";
 
 export default function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0);
@@ -39,7 +39,6 @@ export default function NotificationBell() {
     void loadUnreadCount();
 
     const supabase = supabaseBrowser();
-
     let channel: ReturnType<typeof supabase.channel> | null = null;
     let active = true;
 
